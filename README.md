@@ -64,3 +64,11 @@ Antes de implementar el cálculo de bolo se documentará y validará el motor cl
 ## Estado
 
 Proyecto nuevo. El sistema Bolus AI actual permanece sin cambios y sigue siendo la referencia de producción durante esta fase.
+
+## Documentación para ejecutar el proyecto
+
+- [`AGENTS.md`](AGENTS.md): contrato de trabajo, seguridad, arquitectura, pruebas y Git para Codex y otros agentes.
+- [`docs/EXECUTION_PLAN.md`](docs/EXECUTION_PLAN.md): plan completo por fases, puertas de seguridad, criterios de aceptación y comandos de entrega.
+- [`docs/LEGACY_SOURCE_MAP.md`](docs/LEGACY_SOURCE_MAP.md): mapa reproducible del GitHub de Bolus AI Legacy y fuentes concretas para la auditoría de solo lectura.
+- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md): arquitectura objetivo.
+- [`docs/ROADMAP.md`](docs/ROADMAP.md): resumen de hitos.
