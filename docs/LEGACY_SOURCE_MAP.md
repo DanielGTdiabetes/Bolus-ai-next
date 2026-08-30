@@ -16,9 +16,9 @@ Snapshot inspeccionado al crear este mapa:
 
 ```text
 rama: main
-commit: a4b1a7edee9640d59f089a412db68e2e7fb2b858
-fecha del commit: 2026-08-22T09:58:05+02:00
-asunto: Merge pull request #205 from DanielGTdiabetes/codex/redact-telegram-logs
+commit: 3182dac25f7ecc60a5da4d6ec61d08b60f7f3834
+fecha del commit: 2026-08-30T09:46:57+02:00
+asunto: Refresh Render frontend artifacts
 ```
 
 El SHA anterior es evidencia reproducible de este inventario, no una referencia
@@ -73,6 +73,13 @@ implementación:
 Riesgo principal observado: copiar el Android Companion como “motor local”
 perpetuaría un segundo motor y sus fallbacks. Next debe usarlo como fuente de
 requisitos, contratos y pruebas, y construir una única implementación compartida.
+
+La pasada de inventario funcional de este snapshot localizó 123 decoradores de
+ruta en 30 archivos API, 53 archivos de servicio backend, 22 páginas frontend,
+55 fuentes Kotlin Android, 96 tests backend, 19 tests Android y 15 tests frontend.
+Son superficies observadas, no garantía de uso en producción ni aprobación
+clínica. La cobertura y su clasificación están en
+[`audit/legacy-functional-inventory.md`](audit/legacy-functional-inventory.md).
 
 ## 4. Inventario dirigido
 
