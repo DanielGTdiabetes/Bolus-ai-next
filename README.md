@@ -63,7 +63,9 @@ Antes de implementar el cálculo de bolo se documentará y validará el motor cl
 
 ## Estado
 
-Proyecto nuevo. El sistema Bolus AI actual permanece sin cambios y sigue siendo la referencia de producción durante esta fase.
+Fase 0 en curso: gobierno y toolchain compartido. El sistema Bolus AI actual
+permanece sin cambios y sigue siendo la referencia de producción. Bolus AI Next
+todavía no implementa reglas clínicas ni tiene autoridad de tratamiento.
 
 ## Documentación para ejecutar el proyecto
 
