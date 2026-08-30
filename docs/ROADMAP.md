@@ -1,94 +1,43 @@
-# Roadmap inicial
+# Roadmap de Bolus AI Next
 
-## Fase 0 — Mantener Legacy estable
+Este documento es el resumen de hitos. La secuencia, puertas de seguridad,
+criterios de aceptación y comandos de entrega canónicos están en
+[`EXECUTION_PLAN.md`](EXECUTION_PLAN.md). Si ambos documentos discrepan, se aplica
+el plan ejecutable.
 
-- `DanielGTdiabetes/bolus_ai` continúa siendo producción.
-- Solo correcciones críticas de seguridad durante la migración.
-- Documentar el punto de referencia actual para comparar resultados.
+## Hitos
 
-## Fase 1 — Auditoría clínica y técnica
+1. **Gobierno y toolchain:** aislar Legacy, fijar el stack compartido y ejecutar
+   la misma verificación esencial localmente y en CI.
+2. **Auditoría completa de Legacy:** inventariar funciones, contratos,
+   divergencias y candidatos a retirada sin modificar producción.
+3. **Contratos y seguridad:** definir estados explícitos, bloqueos, procedencia,
+   unidades, versiones y huellas deterministas.
+4. **Motor compartido:** implementar solo reglas trazadas y aprobadas, con
+   vectores saneados y comportamiento fail-closed.
+5. **Persistencia y Dexcom local en Android:** recibir, validar, persistir y
+   mostrar glucosa en modo avión. Este es el primer hito funcional.
+6. **Perfil e IOB local:** versionar el perfil y calcular IOB solo con historial y
+   reglas cuya integridad pueda demostrarse.
+7. **Flujo de bolo local no autoritativo:** cálculo, revisión, confirmación y
+   registro local durable, todavía en modo sombra.
+8. **Importaciones y sincronización opcionales:** nutrición, outbox e
+   integraciones sin situar la red en el camino crítico.
+9. **Sombra, beta y promoción:** demostrar paridad, mantener un solo escritor y
+   cambiar autoridad de forma gradual y reversible.
+10. **Portabilidad y retirada reversible:** consumir el mismo motor desde iOS si
+    se aprueba y congelar servicios auxiliares solo con backup y rollback.
 
-- Localizar el motor de cálculo real del backend actual.
-- Documentar CR, ISF/CF, objetivos, DIA, IOB, curva de acción, Warsaw/otras reglas, límites y redondeos.
-- Identificar todas las fuentes de datos clínicas y sus fallos posibles.
-- Crear vectores de cálculo de referencia a partir del sistema actual.
+## Cobertura funcional y retirada
 
-Criterio de salida: se puede explicar y reproducir determinísticamente cada componente del cálculo actual.
+Ninguna función de Legacy se considera migrada por semejanza ni se omite en
+silencio. La auditoría mantiene una matriz con estas salidas explícitas:
 
-## Fase 2 — Núcleo compartido
+- migrar con paridad aprobada;
+- corregir deliberadamente con decisión y prueba;
+- bloquear porque falta evidencia o aprobación;
+- retirar por decisión aprobada, dependencias conocidas y rollback documentado.
 
-- Crear `shared/bolus-engine` sin dependencias de Android, UI o red.
-- Implementar únicamente reglas validadas contra Legacy.
-- Añadir tests unitarios y golden vectors.
-- Prohibir defaults clínicos silenciosos.
-
-Criterio de salida: los vectores Legacy y Next coinciden dentro del redondeo definido.
-
-## Fase 3 — Persistencia local Android
-
-- Crear base de datos Room/SQLite.
-- Modelar glucosa, comidas/revisiones, perfil, cálculos, bolos y cola de sincronización.
-- Diseñar migraciones y reglas de idempotencia desde el principio.
-
-## Fase 4 — Dexcom local
-
-- Reutilizar/adaptar únicamente la integración validada del proyecto actual.
-- Recibir glucosa directamente de Dexcom G7.
-- Persistir valor, timestamp, tendencia y origen.
-- Mostrar antigüedad y bloquear el uso automático de lecturas caducadas.
-- Probar en modo avión.
-
-Primer hito funcional: mostrar correctamente la glucosa Dexcom sin Internet.
-
-## Fase 5 — Perfil e IOB local
-
-- Persistir perfil clínico versionado.
-- Validación estricta de todos los parámetros necesarios.
-- Implementar IOB con la misma lógica validada de Legacy.
-- IOB desconocido nunca se convierte en 0 U.
-
-## Fase 6 — Cálculo local completo
-
-- Introducción manual de comida.
-- Desglose transparente del cálculo.
-- Confirmación explícita.
-- Persistencia local antes de cualquier sincronización.
-
-## Fase 7 — MyFitnessPal local-first
-
-- Auditar cómo acceder de forma fiable desde Android.
-- Importar alimentos/comidas al estado local.
-- Modelar revisiones exactas y fingerprints/versiones.
-- Nunca reutilizar una revisión antigua como nueva.
-- Permitir revisar, editar o descartar antes del cálculo.
-
-## Fase 8 — Modo sombra
-
-- Legacy continúa siendo autoridad de tratamiento.
-- Next recibe los mismos datos y calcula en paralelo.
-- Comparar automáticamente inputs, IOB, componentes y recomendación.
-- No escribir tratamientos reales desde Next.
-
-## Fase 9 — Beta controlada
-
-- Activar progresivamente confirmación y registro desde Next.
-- Garantizar que solo un sistema tiene autoridad de escritura.
-- Mantener Legacy disponible como rollback.
-
-## Fase 10 — Servicios auxiliares y sincronización
-
-- Sincronización idempotente con los servicios que se decida conservar.
-- Nightscout, backup, panel web y Telegram pasan a ser opcionales.
-- Una sincronización nunca recalcula un bolo ya confirmado.
-
-## Fase 11 — Migración final
-
-Solo cuando existan suficientes pruebas y uso estable:
-
-- Next pasa a ser sistema principal.
-- Legacy queda temporalmente disponible como respaldo.
-- Posteriormente se congelan NAS/Render y se conserva su código/configuración para una posible vuelta a una arquitectura compatible con iOS.
-
-## Regla de entrega
-
-Los cambios de Bolus AI Next se consideran integrados cuando están revisados, probados y presentes en `origin/main`. Durante fases experimentales se pueden utilizar ramas, pero `main` representa siempre el estado estable del nuevo proyecto.
+Legacy permanece sin cambios mientras sea producción. “Obsoleto” no equivale a
+“seguro de borrar”: primero se demuestra que no conserva autoridad, datos,
+dependencias o capacidad de recuperación necesaria.
