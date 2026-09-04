@@ -11,6 +11,11 @@ autoridad de tratamiento.
 | R-004 | Comprometer artefactos o datos sensibles | Seguridad | Ignorar outputs del build; fixtures reales prohibidos | `git status`, revisión y política del repositorio | Activo, sin datos clínicos en alcance |
 | R-005 | Confundir artefacto compilable con motor clínico válido | Seguridad | Nombre/flag explícito y ADR sin autorización clínica | Gate G1 y revisión del propietario | Bloqueo obligatorio |
 | R-006 | Dependencia de red en el futuro motor | Disponibilidad | `commonMain` sin clientes de red ni SDKs de plataforma | Revisión de dependencias/arquitectura | Activo |
+| R-007 | Elegir silenciosamente una de las tres fórmulas Legacy divergentes | Seguridad/consistencia | Auditoría por componente; ninguna variante se considera aprobada | Decisiones LC-006 a LC-009 + vectores revisados | Bloqueado hasta aprobación clínica |
+| R-008 | Perfil ausente o ambiguo sustituido por defaults históricos | Seguridad | Contrato Next fail-closed; no portar `UserSettings.default` ni `BolusProfile.defaultSlots` | LC-001 + tests de perfil incompleto/slot ausente | Bloqueado |
+| R-009 | IOB parcial o historial incompleto tratado como verificable | Seguridad | Exigir integridad de ventana, eventos, perfil y algoritmo; desconocido nunca es cero | LC-004/LC-005 + tests de huecos, conflictos y reinicio | Bloqueado |
+| R-010 | Aceptar un broadcast G7 basándose solo en extras controlables | Seguridad | Demostrar contrato y autenticidad del emisor; validar en el límite y persistir estado de permiso/origen | LC-003 + tests Android de emisor/permiso | Investigación técnica pendiente |
+| R-011 | Resultado no reproducible por relojes globales o huella incompleta | Consistencia/seguridad | Reloj inyectado y huella canónica que incluya inputs, perfil, reglas y motor | LC-012 + tests deterministas | Diseño Fase 2 pendiente |
 
 ## Decisiones pendientes
 
@@ -19,3 +24,4 @@ autoridad de tratamiento.
 - Reglas, parámetros, límites, redondeos y políticas de vigencia aprobadas.
 - Versiones mínimas de Android e iOS, que pertenecen al trabajo de clientes.
 - Responsables nominales y evidencia de aprobación clínica antes de cada regla.
+- Decisiones LC-001 a LC-012 de `docs/audit/legacy-clinical.md`.

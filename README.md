@@ -63,14 +63,18 @@ Antes de implementar el cálculo de bolo se documentará y validará el motor cl
 
 ## Estado
 
-Fase 0 en curso: gobierno y toolchain compartido. El sistema Bolus AI actual
-permanece sin cambios y sigue siendo la referencia de producción. Bolus AI Next
-todavía no implementa reglas clínicas ni tiene autoridad de tratamiento.
+Fase 1 en curso: auditoría clínica y técnica de Legacy en modo de solo lectura.
+El inventario funcional y el primer trazado de cálculo, perfil, IOB y glucosa
+están documentados, pero ninguna regla clínica está aprobada todavía. El sistema
+Bolus AI actual permanece sin cambios y sigue siendo la referencia de producción.
+Bolus AI Next todavía no implementa reglas clínicas ni tiene autoridad de
+tratamiento.
 
 ## Documentación para ejecutar el proyecto
 
 - [`AGENTS.md`](AGENTS.md): contrato de trabajo, seguridad, arquitectura, pruebas y Git para Codex y otros agentes.
 - [`docs/EXECUTION_PLAN.md`](docs/EXECUTION_PLAN.md): plan completo por fases, puertas de seguridad, criterios de aceptación y comandos de entrega.
 - [`docs/LEGACY_SOURCE_MAP.md`](docs/LEGACY_SOURCE_MAP.md): mapa reproducible del GitHub de Bolus AI Legacy y fuentes concretas para la auditoría de solo lectura.
+- [`docs/audit/legacy-clinical.md`](docs/audit/legacy-clinical.md): trazabilidad clínica por SHA, divergencias y decisiones pendientes.
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md): arquitectura objetivo.
 - [`docs/ROADMAP.md`](docs/ROADMAP.md): resumen de hitos.
