@@ -26,6 +26,16 @@ que deba quedarse congelada para siempre. Al iniciar cada lote de auditoría se
 consulta `main` en GitHub y se registra el nuevo SHA. No mezclar archivos de dos
 SHAs en un mismo vector o conclusión.
 
+Lotes posteriores registrados:
+
+| Fecha | SHA fijado | Alcance | Resultado |
+|---|---|---|---|
+| 2026-09-04 | `f5417721d8019a9831126f4d843edfc4de87653d` | cálculo, perfil, IOB y glucosa/Dexcom G7 local | [`audit/legacy-clinical.md`](audit/legacy-clinical.md); observado, sin reglas aprobadas ni vectores |
+
+Entre el snapshot inicial y el lote de 2026-09-04 solo cambiaron tres archivos
+de DB/autenticación; los archivos clínicos auditados no cambiaron. Cada informe
+mantiene aun así su propio SHA fijado.
+
 ## 2. Regla de uso
 
 La información del repositorio Legacy se clasifica así:
@@ -80,6 +90,8 @@ ruta en 30 archivos API, 53 archivos de servicio backend, 22 páginas frontend,
 Son superficies observadas, no garantía de uso en producción ni aprobación
 clínica. La cobertura y su clasificación están en
 [`audit/legacy-functional-inventory.md`](audit/legacy-functional-inventory.md).
+La primera trazabilidad clínica P0 y las divergencias entre backend, frontend y
+Android están en [`audit/legacy-clinical.md`](audit/legacy-clinical.md).
 
 ## 4. Inventario dirigido
 
