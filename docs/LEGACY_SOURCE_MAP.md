@@ -97,6 +97,59 @@ Android están en [`audit/legacy-clinical.md`](audit/legacy-clinical.md).
 
 Las rutas son relativas a la raíz de `DanielGTdiabetes/bolus_ai`.
 
+### Trazabilidad exacta del lote clínico de 2026-09-04
+
+Estas son las fuentes efectivamente usadas por
+[`audit/legacy-clinical.md`](audit/legacy-clinical.md). Cada afirmación queda
+anclada al mismo SHA; no se debe resolver una de estas rutas contra otro commit
+sin abrir un lote de auditoría nuevo.
+
+| Ruta exacta | Símbolo o contrato | SHA | Afirmación sustentada |
+|---|---|---|---|
+| `frontend/src/pages/BolusPage.jsx` | `BolusPage` | `f5417721d8019a9831126f4d843edfc4de87653d` | la página online consume el hook de cálculo |
+| `frontend/src/hooks/useBolusCalculator.js` | `useBolusCalculator` | `f5417721d8019a9831126f4d843edfc4de87653d` | reúne contexto de comida y construye el request online |
+| `frontend/src/lib/onlineBolusPayload.js` | `buildOnlineBolusPayload` | `f5417721d8019a9831126f4d843edfc4de87653d` | excluye del request la configuración de dosis que debe resolver el servidor |
+| `frontend/src/lib/api.ts` | `calculateBolusWithOptionalSplit`; `calculateBolus` | `f5417721d8019a9831126f4d843edfc4de87653d` | el helper invocado por el hook llama al cálculo base, que envía el payload a `POST /api/bolus/calc` y propaga errores estructurados |
+| `backend/app/api/bolus.py` | `calculate_bolus_stateless`; `POST /calc` | `f5417721d8019a9831126f4d843edfc4de87653d` | expone el caller HTTP del caso de uso de cálculo |
+| `backend/app/services/bolus_calc_service.py` | `calculate_bolus_stateless_service` | `f5417721d8019a9831126f4d843edfc4de87653d` | resuelve perfil, glucosa, IOB/COB y autosens antes del motor |
+| `backend/app/services/bolus_engine.py` | `resolve_target`; `calculate_bolus_v2`; `_calculate_core` | `f5417721d8019a9831126f4d843edfc4de87653d` | adapta inputs, ejecuta las fórmulas backend y construye el desglose |
+| `backend/app/dtos/math_models.py` | `CalculationInput`; `CalculationResult` | `f5417721d8019a9831126f4d843edfc4de87653d` | define el contrato interno y sus defaults históricos |
+| `backend/app/models/bolus_v2.py` | `BolusRequestV2`; `GlucoseUsed`; `UsedParams`; `BolusResponseV2` | `f5417721d8019a9831126f4d843edfc4de87653d` | define validación HTTP, estados transportados y respuesta de cálculo |
+| `frontend/src/pages/ManualCalculatorPage.jsx` | `ManualCalculatorPage` | `f5417721d8019a9831126f4d843edfc4de87653d` | invoca la calculadora manual web separada |
+| `frontend/src/lib/manualBolusCore.js` | `calculateManualBolus` | `f5417721d8019a9831126f4d843edfc4de87653d` | implementa la tercera fórmula observada y exige inputs manuales |
+| `android-companion/src/main/java/org/bolusai/companion/MainActivity.kt` | `BolusScreen` | `f5417721d8019a9831126f4d843edfc4de87653d` | bloquea si el perfil no parece sincronizado y convierte campos vacíos a cero |
+| `android-companion/src/main/java/org/bolusai/companion/bolus/BolusProfileRepository.kt` | `BolusProfileRepository.current`; `save` | `f5417721d8019a9831126f4d843edfc4de87653d` | carga y persiste el perfil descargado que consume la pantalla offline |
+| `android-companion/src/main/java/org/bolusai/companion/bolus/BolusProfile.kt` | `BolusProfile`; `slot`; `isSynced` | `f5417721d8019a9831126f4d843edfc4de87653d` | define perfil, defaults, fallback de slot y guard de sincronización |
+| `android-companion/src/main/java/org/bolusai/companion/bolus/BolusCalculator.kt` | `BolusCalculator.calculate` | `f5417721d8019a9831126f4d843edfc4de87653d` | implementa la fórmula offline Android divergente |
+| `backend/app/models/settings.py` | `UserSettings`; `migrate`; `compute_hash`; `IOBConfig`; `GlucoseSourceSettings` | `f5417721d8019a9831126f4d843edfc4de87653d` | define defaults, migraciones, hash parcial y políticas observadas |
+| `backend/app/services/store.py` | `DataStore.load_settings` | `f5417721d8019a9831126f4d843edfc4de87653d` | crea settings por defecto cuando falta el archivo local |
+| `backend/app/services/iob.py` | `_load_iob_sources`; `_merge_unique_boluses`; `compute_iob_from_sources`; `compute_iob` | `f5417721d8019a9831126f4d843edfc4de87653d` | carga fuentes, deduplica, clasifica estados y calcula IOB |
+| `backend/app/services/math/curves.py` | `InsulinCurves.get_iob` | `f5417721d8019a9831126f4d843edfc4de87653d` | selecciona la curva usada por el cálculo de IOB |
+| `android-companion/src/main/AndroidManifest.xml` | receiver `.dexcom.GlucoseReceiver`; permiso `com.dexcom.cgm.EXTERNAL_PERMISSION` | `f5417721d8019a9831126f4d843edfc4de87653d` | declara el receiver exportado y sus permisos/filtros observados |
+| `android-companion/src/main/java/org/bolusai/companion/dexcom/GlucoseReceiver.kt` | `GlucoseReceiver.onReceive` | `f5417721d8019a9831126f4d843edfc4de87653d` | filtra action y extras, encola lecturas y programa sync |
+| `android-companion/src/main/java/org/bolusai/companion/dexcom/GlucoseReading.kt` | `GlucoseReading`; `isValid`; `dedupeKey` | `f5417721d8019a9831126f4d843edfc4de87653d` | define el contrato local, validación mínima e identidad de lectura |
+| `android-companion/src/main/java/org/bolusai/companion/dexcom/GlucoseQueueRepository.kt` | `GlucoseQueueRepository`; `GlucoseQueueCodec` | `f5417721d8019a9831126f4d843edfc4de87653d` | persiste, ordena, limita y deduplica la cola/última lectura |
+| `backend/app/services/glucose_ingest_service.py` | `validate_ingest`; `ingest_glucose_reading`; `build_reading_uid` | `f5417721d8019a9831126f4d843edfc4de87653d` | normaliza identidad, tiempo, rango, estado y elegibilidad de dosis |
+| `backend/app/services/glucose_source_service.py` | `_choose_candidate`; `resolve_current_glucose` | `f5417721d8019a9831126f4d843edfc4de87653d` | aplica precedencia/fallback, frescura y conflicto entre fuentes |
+
+Pruebas citadas por el mismo informe:
+
+| Ruta exacta | Símbolo o contrato | SHA | Afirmación sustentada |
+|---|---|---|---|
+| `backend/tests/test_bolus_v2.py` | tests `test_*` del motor V2 | `f5417721d8019a9831126f4d843edfc4de87653d` | preserva IOB sobre corrección, hipo, Warsaw, límites y redondeo backend |
+| `backend/tests/test_target_resolution.py` | tests de `resolve_target` | `f5417721d8019a9831126f4d843edfc4de87653d` | preserva objetivos por slot y fallbacks |
+| `backend/tests/test_bolus_request_validation.py` | tests del request V2 | `f5417721d8019a9831126f4d843edfc4de87653d` | preserva rangos y rechazo de valores no finitos |
+| `backend/tests/test_iob.py` | tests de curvas, fuentes e identidad | `f5417721d8019a9831126f4d843edfc4de87653d` | diferencia fuente fallida de cero conocido y prueba deduplicación |
+| `backend/tests/test_glucose_sources.py` | tests de ingesta/selección | `f5417721d8019a9831126f4d843edfc4de87653d` | prueba idempotencia, conflicto, backfill y fallback de glucosa |
+| `backend/tests/test_mobile_glucose_entry.py` | tests del contrato móvil | `f5417721d8019a9831126f4d843edfc4de87653d` | prueba persistencia e identidad de lecturas móviles |
+| `backend/tests/test_bolus_glucose_validation.py` | tests del límite caso de uso/motor | `f5417721d8019a9831126f4d843edfc4de87653d` | impide que glucosa automática no utilizable vuelva al motor |
+| `frontend/tests/manualBolusCore.test.js` | tests de `calculateManualBolus` | `f5417721d8019a9831126f4d843edfc4de87653d` | preserva la variante manual web y sus bloqueos |
+| `android-companion/src/test/java/org/bolusai/companion/bolus/BolusCalculatorTest.kt` | tests de `BolusCalculator` | `f5417721d8019a9831126f4d843edfc4de87653d` | preserva la variante offline Android y el guard del perfil |
+| `android-companion/src/test/java/org/bolusai/companion/dexcom/GlucoseQueueCodecTest.kt` | tests de `GlucoseQueueCodec` | `f5417721d8019a9831126f4d843edfc4de87653d` | prueba codec/deduplicación de cola |
+| `android-companion/src/test/java/org/bolusai/companion/worker/GlucoseQueueDrainerTest.kt` | tests de drenado | `f5417721d8019a9831126f4d843edfc4de87653d` | prueba el drenado de la cola hacia sync |
+| `android-companion/src/test/java/org/bolusai/companion/worker/GlucoseSyncResultPolicyTest.kt` | tests de política de resultado | `f5417721d8019a9831126f4d843edfc4de87653d` | prueba clasificación de resultados de sync |
+| `android-companion/src/test/java/org/bolusai/companion/worker/GlucoseSyncWakePolicyTest.kt` | tests de política de wake | `f5417721d8019a9831126f4d843edfc4de87653d` | prueba cuándo reactivar el sync |
+
 ### 4.1 Cálculo y orquestación
 
 | Prioridad | Fuente Legacy | Qué extraer/verificar |
@@ -107,8 +160,8 @@ Las rutas son relativas a la raíz de `DanielGTdiabetes/bolus_ai`.
 | P0 | `backend/app/dtos/math_models.py` | contrato matemático actual y campos implícitos/obligatorios |
 | P0 | `backend/app/models/bolus_v2.py` | requests/responses, desglose, glucose used y used params |
 | P0 | `backend/app/models/settings.py` | procedencia/esquema de perfil y defaults históricos que no deben portarse |
-| P0 | `android-companion/.../bolus/BolusCalculator.kt` | alcance y divergencias del cálculo offline Android |
-| P0 | `android-companion/.../bolus/BolusProfile.kt` | schema, slots y fallbacks locales que Next debe reemplazar por validación estricta |
+| P0 | `android-companion/src/main/java/org/bolusai/companion/bolus/BolusCalculator.kt` | alcance y divergencias del cálculo offline Android |
+| P0 | `android-companion/src/main/java/org/bolusai/companion/bolus/BolusProfile.kt` | schema, slots y fallbacks locales que Next debe reemplazar por validación estricta |
 | P1 | `frontend/src/lib/manualBolusCore.js` | posibles decisiones o transformaciones adicionales en UI |
 | P1 | `frontend/src/lib/onlineBolusPayload.js` | adaptación de inputs desde frontend al backend |
 | P1 | `frontend/src/lib/bolusTrace.js` | trazabilidad y comparación de cálculos |
@@ -122,12 +175,14 @@ backend/tests/test_bolus_calc_carb_profile.py
 backend/tests/test_bolus_v2.py
 backend/tests/test_target_resolution.py
 backend/tests/test_bolus_trace.py
-backend/tests/test_bolus_confirm.py (si existe en el SHA auditado)
 android-companion/src/test/java/org/bolusai/companion/bolus/BolusCalculatorTest.kt
 frontend/tests/manualBolusCore.test.js
 frontend/tests/onlineBolusPayload.test.js
 frontend/tests/bolusTrace.test.js
 ```
+
+`backend/tests/test_bolus_confirm.py` no existe en el SHA fijado; la ausencia es
+un hueco de cobertura, no una ruta aproximada.
 
 No asumir que la lista es exhaustiva. Confirmarla con búsquedas por símbolo,
 imports y llamadas desde API/UI en el SHA fijado.
@@ -142,12 +197,19 @@ imports y llamadas desde API/UI en el SHA fijado.
 | P0 | `backend/app/models/treatment.py` | modelo persistido, timestamps, source e IDs |
 | P0 | `backend/app/api/injection.py` y `backend/app/api/events.py` | rutas de registro/confirmación y efectos laterales |
 | P1 | `backend/app/services/async_injection_manager.py` | asincronía, reintentos y estado de entrega |
-| P1 | `android-companion/.../network/DexcomBolusEventClient.kt` | eventos de bolo procedentes de Dexcom y ledger local |
-| P1 | `android-companion/.../dexcom/DexcomEventSyncRepository.kt` | deduplicación/estado de sincronización |
+| P1 | `android-companion/src/main/java/org/bolusai/companion/network/DexcomBolusEventClient.kt` | eventos de bolo procedentes de Dexcom y ledger local |
+| P1 | `android-companion/src/main/java/org/bolusai/companion/dexcom/DexcomEventSyncRepository.kt` | deduplicación/estado de sincronización |
 
-Pruebas relevantes incluyen los grupos `test_iob*`,
-`test_treatment_logger_idempotency.py`, `test_mobile_bolus_events.py`,
-`DexcomEventSyncLedgerTest.kt` y `DexcomBolusEventClientTest.kt`.
+Pruebas relevantes con ruta exacta:
+
+```text
+backend/tests/test_iob.py
+tests/test_iob_confirm.py
+backend/tests/test_treatment_logger_idempotency.py
+backend/tests/test_mobile_bolus_events.py
+android-companion/src/test/java/org/bolusai/companion/dexcom/DexcomEventSyncLedgerTest.kt
+android-companion/src/test/java/org/bolusai/companion/network/DexcomBolusEventClientTest.kt
+```
 
 La auditoría debe responder:
 
@@ -162,13 +224,13 @@ La auditoría debe responder:
 
 | Prioridad | Fuente Legacy | Qué extraer/verificar |
 |---|---|---|
-| P0 | `android-companion/.../dexcom/GlucoseReceiver.kt` | contrato del broadcast G7, validación de sensor/package y extracción de lecturas |
-| P0 | `android-companion/.../dexcom/GlucoseReading.kt` | validaciones, unidades, identidad y timestamps |
-| P0 | `android-companion/.../dexcom/GlucoseQueueRepository.kt` | persistencia/deduplicación de cola y comportamiento tras reinicio |
+| P0 | `android-companion/src/main/java/org/bolusai/companion/dexcom/GlucoseReceiver.kt` | contrato del broadcast G7, validación de sensor/package y extracción de lecturas |
+| P0 | `android-companion/src/main/java/org/bolusai/companion/dexcom/GlucoseReading.kt` | validaciones, unidades, identidad y timestamps |
+| P0 | `android-companion/src/main/java/org/bolusai/companion/dexcom/GlucoseQueueRepository.kt` | persistencia/deduplicación de cola y comportamiento tras reinicio |
 | P0 | `android-companion/src/main/AndroidManifest.xml` | receiver, permisos, exportación y filtros |
 | P0 | `backend/app/services/glucose_ingest_service.py` | UID, normalización, validación temporal e idempotencia de ingesta |
 | P0 | `backend/app/services/glucose_source_service.py` | selección de fuentes, frescura, precedencias y fallbacks |
-| P1 | `android-companion/.../worker/GlucoseSyncWorker.kt` | drenado, retry y dependencia de servidor que Next debe sacar del camino crítico |
+| P1 | `android-companion/src/main/java/org/bolusai/companion/worker/GlucoseSyncWorker.kt` | drenado, retry y dependencia de servidor que Next debe sacar del camino crítico |
 | P1 | `backend/app/services/glucose_sync_service.py` | sincronización y conflictos |
 
 Documentación de apoyo:
@@ -181,11 +243,18 @@ docs/android/ANDROID_UNIFIED_CLIENT_ROADMAP.md
 docs/android/BOLUS_AI_COMPANION_TECHNICAL_STUDY.md
 ```
 
-Pruebas iniciales: `test_glucose_ingest.py`, `test_glucose_source_service.py` o
-nombres equivalentes presentes en el SHA; en Android,
-`GlucoseQueueCodecTest.kt`, `GlucoseQueueDrainerTest.kt`,
-`GlucoseSyncResultPolicyTest.kt`, `GlucoseSyncWakePolicyTest.kt` y
-`GlucoseIngestClientTest.kt`.
+Pruebas iniciales presentes en el SHA:
+
+```text
+backend/tests/test_glucose_sources.py
+backend/tests/test_mobile_glucose_entry.py
+backend/tests/test_bolus_glucose_validation.py
+android-companion/src/test/java/org/bolusai/companion/dexcom/GlucoseQueueCodecTest.kt
+android-companion/src/test/java/org/bolusai/companion/worker/GlucoseQueueDrainerTest.kt
+android-companion/src/test/java/org/bolusai/companion/worker/GlucoseSyncResultPolicyTest.kt
+android-companion/src/test/java/org/bolusai/companion/worker/GlucoseSyncWakePolicyTest.kt
+android-companion/src/test/java/org/bolusai/companion/network/GlucoseIngestClientTest.kt
+```
 
 El primer hito de Next debe reutilizar el conocimiento del contrato local, no el
 envío al backend: recibir -> validar -> persistir local -> mostrar, todo en modo
@@ -198,14 +267,14 @@ avión.
 | P0 | `docs/HERMES_MYFITNESSPAL_BOLUS_SYNC.md` | flujo real Hermes/MFP, detección de revisiones, secretos y fallos conocidos |
 | P0 | `scripts/hermes/mfp_sync_trigger.py` | disparo y semántica observable, sin ejecutarlo contra servicios reales |
 | P0 | `scripts/hermes/sync_to_bolus.py` | contrato enviado, identidad/reintentos y errores |
-| P0 | `android-companion/.../accessibility/MyFitnessPalAssistantService.kt` | interacción Android, permisos y riesgos de accesibilidad |
-| P0 | `android-companion/.../health/NutritionRecordReader.kt` | fuente Health Connect/Auto Export y ventanas de lectura |
-| P0 | `android-companion/.../worker/NutritionSyncRunner.kt` | cola, cambios/revisiones y reintentos |
+| P0 | `android-companion/src/main/java/org/bolusai/companion/accessibility/MyFitnessPalAssistantService.kt` | interacción Android, permisos y riesgos de accesibilidad |
+| P0 | `android-companion/src/main/java/org/bolusai/companion/health/NutritionRecordReader.kt` | fuente Health Connect/Auto Export y ventanas de lectura |
+| P0 | `android-companion/src/main/java/org/bolusai/companion/worker/NutritionSyncRunner.kt` | cola, cambios/revisiones y reintentos |
 | P0 | `backend/app/services/imported_meal_service.py` | normalización, fingerprints, reconciliación, edición/descarte y conflictos |
 | P0 | `backend/app/services/nutrition_shadow_matcher.py` | clasificación shadow de identidades/revisiones |
 | P0 | `backend/app/services/nutrition_notification_outbox.py` | outbox, claim, retry y entrega |
 | P0 | `backend/app/models/imported_meal.py` | estados e identidad persistida |
-| P1 | migraciones `clin001_*`, `b5d9e3f7a1c2_*`, `c6e0f4a8b2d3_*`, `9e2f4a6b8c1d_*` | evolución de identidad, reconciliación, revisiones rechazadas y outbox |
+| P1 | `backend/alembic/versions/clin001_nutrition_event_identities.py`, `backend/alembic/versions/b5d9e3f7a1c2_add_imported_meal_reconciliation.py`, `backend/alembic/versions/c6e0f4a8b2d3_remember_rejected_import_revision.py`, `backend/alembic/versions/9e2f4a6b8c1d_add_nutrition_notification_outbox.py` | evolución de identidad, reconciliación, revisiones rechazadas y outbox |
 
 Pruebas iniciales:
 
@@ -216,10 +285,10 @@ backend/tests/test_integrations_nutrition.py
 backend/tests/test_nutrition_notification_outbox.py
 scripts/hermes/tests/test_mfp_sync_trigger.py
 scripts/hermes/tests/test_sync_to_bolus.py
-android-companion/.../queue/MealQueueRepositoryTest.kt
-android-companion/.../network/NutritionIngestClientTest.kt
-android-companion/.../health/NutritionReadWindowTest.kt
-android-companion/.../health/NutritionRecordSnapshotTest.kt
+android-companion/src/test/java/org/bolusai/companion/queue/MealQueueRepositoryTest.kt
+android-companion/src/test/java/org/bolusai/companion/network/NutritionIngestClientTest.kt
+android-companion/src/test/java/org/bolusai/companion/health/NutritionReadWindowTest.kt
+android-companion/src/test/java/org/bolusai/companion/health/NutritionRecordSnapshotTest.kt
 ```
 
 Antes de adoptar una vía de acceso MyFitnessPal en Next, confirmar que sigue
@@ -231,7 +300,7 @@ scraper no aprobado por defecto.
 
 | Prioridad | Fuente Legacy | Qué extraer/verificar |
 |---|---|---|
-| P0 | `android-companion/.../queue/BolusCompanionDatabase.kt` y `MealQueue*` | esquema Room, estados de cola y “never lose a meal” |
+| P0 | `android-companion/src/main/java/org/bolusai/companion/queue/BolusCompanionDatabase.kt`, `android-companion/src/main/java/org/bolusai/companion/queue/MealQueueItem.kt`, `android-companion/src/main/java/org/bolusai/companion/queue/MealQueueDao.kt`, `android-companion/src/main/java/org/bolusai/companion/queue/MealQueueRepository.kt` y `android-companion/src/main/java/org/bolusai/companion/queue/MealQueueStatus.kt` | esquema Room, estados de cola y “never lose a meal” |
 | P0 | `backend/app/services/nutrition_notification_outbox.py` | patrón outbox existente y sus limitaciones |
 | P0 | `backend/app/services/rescue_sync.py` | recuperación/replay y riesgos de duplicado |
 | P0 | `backend/app/services/treatment_logger.py` | claves idempotentes en efectos clínicos |
