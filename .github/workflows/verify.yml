@@ -36,5 +36,7 @@ jobs:
       - uses: gradle/actions/setup-gradle@v6
       - name: Run common tests on JVM
         run: ./gradlew --no-daemon androidJvmTest
+      - name: Run common tests on iOS simulator
+        run: ./gradlew --no-daemon iosSimulatorArm64Test
       - name: Link iOS simulator framework
         run: ./gradlew --no-daemon linkDebugFrameworkIosSimulatorArm64
