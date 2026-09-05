@@ -40,3 +40,6 @@ jobs:
         run: ./gradlew --no-daemon iosSimulatorArm64Test
       - name: Link iOS simulator framework
         run: ./gradlew --no-daemon linkDebugFrameworkIosSimulatorArm64
+      - name: Verify Swift error propagation through exported framework
+        timeout-minutes: 5
+        run: bash scripts/verify-swift.sh
