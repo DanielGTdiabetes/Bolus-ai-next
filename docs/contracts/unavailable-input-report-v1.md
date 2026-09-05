@@ -17,6 +17,13 @@ si el productor debe investigar una contradicción entre ellos.
   clínico válido ni un resultado de cálculo.
 - Cambiar la lista original o la lista devuelta no modifica el informe.
 
+El constructor declara `@Throws(IllegalArgumentException::class)`: desde Swift
+se invoca con `try` y el error se captura como `Error`/`NSError`, con el mismo
+identificador en `localizedDescription`. Sin esa declaración Kotlin/Native
+terminaba el proceso al atravesar el límite Objective-C. Esto corrige la
+interoperabilidad, sin cambiar el rechazo de vacío ni las reglas del contrato.
+Véase [la documentación de excepciones de Kotlin/Native](https://kotlinlang.org/docs/native-objc-interop.html#errors-and-exceptions).
+
 Ejemplo sintético: `input.iob.unknown` y `input.iob.incomplete` permanecen como
 dos causas distintas. Repetir `input.iob.unknown` no añade otra causa. Esta
 deduplicación de informes no deduplica eventos de insulina ni acredita historial
@@ -38,6 +45,13 @@ Los casos son técnicos y sintéticos, sin parámetros ni golden vectors clínic
 `scripts/verify.ps1` ejecuta las pruebas comunes en JVM. CI ejecuta también
 `iosSimulatorArm64Test` en macOS y enlaza el framework compartido. La ejecución
 de pruebas iOS requiere macOS; no se puede sustituir por el resultado de Windows.
+
+Tras enlazar el framework, CI ejecuta `bash scripts/verify-swift.sh`: compila un
+consumidor Swift y lo ejecuta en el simulador iOS. La regresión verifica que una
+lista vacía se capture con su identificador y que después se pueda construir
+un informe no vacío en el mismo proceso. Las pruebas Kotlin por sí solas no
+cubren este límite. El script requiere macOS arm64, Xcode y un simulador iPhone
+disponible; no desarrolla un cliente iOS ni cambia la prioridad de Android.
 
 Verificación local del 2026-09-05: `scripts/verify.ps1` finalizó con
 `BUILD SUCCESSFUL`; 11 pruebas JVM, cero fallos y cero errores (6 del informe,

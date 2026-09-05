@@ -6,7 +6,9 @@ package org.bolusai.engine
  * An empty collection is a contract error, never evidence that inputs are valid.
  * This report cannot authorize calculation or treatment.
  */
-public class UnavailableInputReport(reports: List<UnavailableInput>) {
+public class UnavailableInputReport @Throws(IllegalArgumentException::class) public constructor(
+    reports: List<UnavailableInput>,
+) {
     private val snapshot: List<UnavailableInput> = reports.distinct().sortedBy { it.code }
 
     init {
