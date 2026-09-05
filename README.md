@@ -70,6 +70,10 @@ Bolus AI actual permanece sin cambios y sigue siendo la referencia de producció
 Bolus AI Next todavía no implementa reglas clínicas ni tiene autoridad de
 tratamiento.
 
+La fase 2 cuenta con un primer [contrato de entradas no disponibles](docs/contracts/unavailable-input-v1.md)
+en el núcleo compartido y pruebas comunes de sus códigos estables. Es un contrato
+en memoria sin valores clínicos; aún no implementa validación ni cálculo.
+
 ## Documentación para ejecutar el proyecto
 
 - [`AGENTS.md`](AGENTS.md): contrato de trabajo, seguridad, arquitectura, pruebas y Git para Codex y otros agentes.
