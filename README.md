@@ -73,6 +73,10 @@ tratamiento.
 La fase 2 cuenta con un primer [contrato de entradas no disponibles](docs/contracts/unavailable-input-v1.md)
 en el núcleo compartido y pruebas comunes de sus códigos estables. Es un contrato
 en memoria sin valores clínicos; aún no implementa validación ni cálculo.
+El [informe de entradas no disponibles](docs/contracts/unavailable-input-report-v1.md)
+reúne causas sin perder motivos distintos, con orden determinista y copia
+independiente de las listas del consumidor. CI prueba los contratos en JVM y
+en el simulador iOS.
 
 ## Documentación para ejecutar el proyecto
 

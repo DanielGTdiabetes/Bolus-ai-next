@@ -35,7 +35,8 @@ cuando la política de vigencia está pendiente.
 
 Los códigos publicados quedan fijados por pruebas comunes. Añadir motivos exige
 revisar consumidores; renombrar o cambiar su significado exige nueva versión.
-La serialización, huella, acumulación de bloqueos, procedencia y snapshots
+La acumulación de causas se define en [el contrato de informe v1](unavailable-input-report-v1.md).
+La serialización, huella, procedencia y snapshots
 validados quedan pendientes de sus contratos. Este objeto no debe persistirse
 como registro clínico completo ni usarse como prueba de integridad del historial.
 
@@ -43,6 +44,6 @@ como registro clínico completo ni usarse como prueba de integridad del historia
 
 `UnavailableInputTest` comprueba códigos estables y únicos, versión e identidad
 de los estados desconocido/incompleto y política pendiente/caducidad. Se ejecuta
-con `scripts/verify.ps1` en JVM. CI enlaza el framework iOS desde las mismas
-fuentes; la ejecución nativa de pruebas queda pendiente. Los casos son técnicos
+con `scripts/verify.ps1` en JVM. CI ejecuta las pruebas comunes en el simulador
+iOS y enlaza el framework desde las mismas fuentes. Los casos son técnicos
 y sintéticos, no golden vectors clínicos. No se incorporan reglas clínicas.
