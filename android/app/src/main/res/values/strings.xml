@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Bolus AI Next</string>
+    <string name="non_authoritative_label">Desarrollo · no autoritativo</string>
+    <string name="screen_title">Glucosa local</string>
+    <string name="screen_intro">Estado del acceso local necesario para el futuro flujo sin conexión.</string>
+    <string name="glucose_section_label">Estado actual</string>
+    <string name="glucose_status_missing">Sin lectura de glucosa</string>
+    <string name="glucose_status_permission_denied">Permiso de glucosa no concedido</string>
+    <string name="glucose_status_source_unavailable">Fuente local de glucosa no disponible</string>
+    <string name="glucose_status_other_unavailable">Lectura de glucosa no utilizable</string>
+    <string name="glucose_status_code">Código técnico: %1$s</string>
+    <string name="calculation_blocked">Cálculo bloqueado</string>
+    <string name="development_scope">Esta compilación no calcula bolos, no registra tratamientos y todavía no se conecta a Dexcom. Nunca sustituye una lectura ausente por 0 ni por un valor guardado.</string>
+</resources>

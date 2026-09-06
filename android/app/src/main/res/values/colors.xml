@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="page_background">#FFF9F7</color>
+    <color name="status_background">#FFFFFF</color>
+    <color name="status_border">#E3D8D4</color>
+    <color name="primary_text">#241C1A</color>
+    <color name="secondary_text">#685B57</color>
+    <color name="error_text">#A72C23</color>
+    <color name="non_authoritative_background">#FBE4DF</color>
+    <color name="non_authoritative_text">#7C201A</color>
+</resources>

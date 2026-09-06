@@ -20,6 +20,9 @@ jobs:
           distribution: temurin
           java-version: "21"
       - uses: gradle/actions/setup-gradle@v6
+      - name: Install Android SDK packages
+        shell: pwsh
+        run: sdkmanager "platforms;android-36" "build-tools;36.0.0"
       - name: Verify
         shell: pwsh
         run: .\scripts\verify.ps1
