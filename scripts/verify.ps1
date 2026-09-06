@@ -47,9 +47,38 @@ try {
     if ([string]::IsNullOrWhiteSpace($canonicalWorkflowContent)) {
         throw "The canonical Windows verification workflow is empty"
     }
-    if ($canonicalWorkflowContent -notmatch "(?i)windows-latest" -or
-        $canonicalWorkflowContent -notmatch "(?i)scripts\\verify\.ps1") {
-        throw "The canonical workflow must run scripts/verify.ps1 on windows-latest"
+
+    $expectedCanonicalWorkflow = @'
+name: Verify
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  windows:
+    name: Windows verification
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "21"
+      - uses: gradle/actions/setup-gradle@v6
+      - name: Verify
+        shell: pwsh
+        run: .\scripts\verify.ps1
+'@
+    $normalizedWorkflow = ($canonicalWorkflowContent -replace "`r`n", "`n").Trim()
+    $normalizedExpectedWorkflow = ($expectedCanonicalWorkflow -replace "`r`n", "`n").Trim()
+    if ($normalizedWorkflow -cne $normalizedExpectedWorkflow) {
+        throw "The canonical Windows verification workflow differs from the approved executable template"
     }
 
     $workflowFiles = @(

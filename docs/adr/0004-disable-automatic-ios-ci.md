@@ -57,7 +57,9 @@ demostrar que no contienen runners macOS ni tareas iOS/Swift. `scripts/verify.ps
 escanea todos esos workflows y bloquea cualquier referencia a `macos` —incluidas
 comillas y matrices—, `iosSimulatorArm64Test`, enlace de framework iOS o
 `verify-swift.sh`. También exige que `verify.yml` exista, no esté vacío y ejecute
-`scripts/verify.ps1` en `windows-latest`, para que desactivar macOS no permita
-eliminar accidentalmente la puerta automática restante. Los artefactos KMP/iOS
-y el script se conservan fuera de los workflows para una verificación futura
-autorizada.
+la plantilla canónica exacta aprobada: triggers de PR y push a `main`, permisos
+de lectura, job activo en `windows-latest` y paso PowerShell que invoca
+`scripts/verify.ps1`. Así, comentarios, condiciones deshabilitadas, otro runner o
+cambios de estructura no pueden simular la puerta restante. Los artefactos
+KMP/iOS y el script se conservan fuera de los workflows para una verificación
+futura autorizada.
