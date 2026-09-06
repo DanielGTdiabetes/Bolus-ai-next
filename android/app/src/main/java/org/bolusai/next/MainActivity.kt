@@ -26,9 +26,18 @@ class MainActivity : Activity() {
 
         val title = when (model.messageKey) {
             GlucoseStatusMessageKey.MISSING -> R.string.glucose_status_missing
+            GlucoseStatusMessageKey.INVALID -> R.string.glucose_status_invalid
+            GlucoseStatusMessageKey.EXPIRED -> R.string.glucose_status_expired
+            GlucoseStatusMessageKey.UNKNOWN -> R.string.glucose_status_unknown
+            GlucoseStatusMessageKey.INCOMPLETE -> R.string.glucose_status_incomplete
+            GlucoseStatusMessageKey.CONFLICTING -> R.string.glucose_status_conflicting
             GlucoseStatusMessageKey.PERMISSION_DENIED -> R.string.glucose_status_permission_denied
             GlucoseStatusMessageKey.SOURCE_UNAVAILABLE -> R.string.glucose_status_source_unavailable
-            GlucoseStatusMessageKey.OTHER_UNAVAILABLE -> R.string.glucose_status_other_unavailable
+            GlucoseStatusMessageKey.AUTHENTICATION_FAILED -> R.string.glucose_status_authentication_failed
+            GlucoseStatusMessageKey.CLOCK_ANOMALY -> R.string.glucose_status_clock_anomaly
+            GlucoseStatusMessageKey.PARSE_FAILED -> R.string.glucose_status_parse_failed
+            GlucoseStatusMessageKey.PERSISTENCE_FAILED -> R.string.glucose_status_persistence_failed
+            GlucoseStatusMessageKey.POLICY_NOT_APPROVED -> R.string.glucose_status_policy_not_approved
         }
 
         findViewById<TextView>(R.id.glucose_status_title).setText(title)

@@ -6,9 +6,18 @@ import org.bolusai.engine.UnavailableInput
 
 internal enum class GlucoseStatusMessageKey {
     MISSING,
+    INVALID,
+    EXPIRED,
+    UNKNOWN,
+    INCOMPLETE,
+    CONFLICTING,
     PERMISSION_DENIED,
     SOURCE_UNAVAILABLE,
-    OTHER_UNAVAILABLE,
+    AUTHENTICATION_FAILED,
+    CLOCK_ANOMALY,
+    PARSE_FAILED,
+    PERSISTENCE_FAILED,
+    POLICY_NOT_APPROVED,
 }
 
 internal data class GlucoseStatusUiModel(
@@ -29,9 +38,18 @@ internal object GlucoseStatusPresenter {
 
         val messageKey = when (unavailableInput.reason) {
             UnavailabilityReason.MISSING -> GlucoseStatusMessageKey.MISSING
+            UnavailabilityReason.INVALID -> GlucoseStatusMessageKey.INVALID
+            UnavailabilityReason.EXPIRED -> GlucoseStatusMessageKey.EXPIRED
+            UnavailabilityReason.UNKNOWN -> GlucoseStatusMessageKey.UNKNOWN
+            UnavailabilityReason.INCOMPLETE -> GlucoseStatusMessageKey.INCOMPLETE
+            UnavailabilityReason.CONFLICTING -> GlucoseStatusMessageKey.CONFLICTING
             UnavailabilityReason.PERMISSION_DENIED -> GlucoseStatusMessageKey.PERMISSION_DENIED
             UnavailabilityReason.SOURCE_UNAVAILABLE -> GlucoseStatusMessageKey.SOURCE_UNAVAILABLE
-            else -> GlucoseStatusMessageKey.OTHER_UNAVAILABLE
+            UnavailabilityReason.AUTHENTICATION_FAILED -> GlucoseStatusMessageKey.AUTHENTICATION_FAILED
+            UnavailabilityReason.CLOCK_ANOMALY -> GlucoseStatusMessageKey.CLOCK_ANOMALY
+            UnavailabilityReason.PARSE_FAILED -> GlucoseStatusMessageKey.PARSE_FAILED
+            UnavailabilityReason.PERSISTENCE_FAILED -> GlucoseStatusMessageKey.PERSISTENCE_FAILED
+            UnavailabilityReason.POLICY_NOT_APPROVED -> GlucoseStatusMessageKey.POLICY_NOT_APPROVED
         }
 
         return GlucoseStatusUiModel(

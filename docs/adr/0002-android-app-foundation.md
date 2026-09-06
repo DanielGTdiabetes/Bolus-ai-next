@@ -39,8 +39,8 @@ actualizar este ADR y aportar evidencia del dispositivo/Dexcom autorizado.
 ## Consecuencias
 
 - Se puede generar un APK de depuración instalable sin introducir lógica clínica.
-- Los estados de ausencia, permiso denegado y fuente no disponible tienen
-  presentaciones distintas, aunque este lote solo produce ausencia.
+- Cada motivo de entrada no disponible tiene una presentación distinta y el
+  mapeo es exhaustivo, aunque este lote solo produce ausencia.
 - Un adaptador Dexcom futuro deberá determinar la causa real en el límite; la UI
   no la infiere.
 - El primer hito offline todavía no está cumplido: falta recibir, validar,
@@ -51,8 +51,7 @@ actualizar este ADR y aportar evidencia del dispositivo/Dexcom autorizado.
 
 `scripts/verify.ps1` compila el APK, ejecuta lint y las pruebas unitarias Android,
 además de las comprobaciones existentes del núcleo. Las pruebas fijan que toda
-causa no disponible bloquea el cálculo y que permiso/fuente no se colapsan en un
-mensaje genérico idéntico.
+causa no disponible bloquea el cálculo y recibe un estado visible distinto.
 
 La configuración sigue la recomendación de Kotlin integrado introducida en
 [Android Gradle Plugin 9.0](https://developer.android.com/build/migrate-to-built-in-kotlin)

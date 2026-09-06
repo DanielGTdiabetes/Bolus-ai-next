@@ -30,10 +30,12 @@ class GlucoseStatusPresenterTest {
     }
 
     @Test
-    fun `every unavailable reason blocks calculation`() {
-        UnavailabilityReason.entries.forEach { reason ->
-            assertFalse(present(reason).allowsCalculation)
-        }
+    fun `every unavailable reason has a distinct status and blocks calculation`() {
+        val models = UnavailabilityReason.entries.map(::present)
+
+        assertEquals(UnavailabilityReason.entries.size, models.map { it.messageKey }.toSet().size)
+        assertEquals(UnavailabilityReason.entries.size, models.map { it.stableCode }.toSet().size)
+        models.forEach { assertFalse(it.allowsCalculation) }
     }
 
     @Test

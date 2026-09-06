@@ -33,6 +33,6 @@ versión de tratamiento y no debe distribuirse como tal.
 - No declara el permiso `INTERNET` ni permisos Dexcom.
 - No interpreta broadcasts, notificaciones ni datos de otros proveedores.
 - No contiene lecturas de ejemplo ni valores clínicos sustitutivos.
-- Los estados de permiso y fuente existen en el presentador, pero solo un futuro
-  adaptador autorizado podrá producirlos.
+- Cada causa no disponible tiene un estado visible distinto, pero solo un futuro
+  adaptador autorizado podrá producir la causa observada.
 - `minSdk 26` y `applicationId` son provisionales según el ADR 0002.
