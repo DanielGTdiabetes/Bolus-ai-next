@@ -76,10 +76,11 @@ en memoria sin valores clínicos; aún no implementa validación ni cálculo.
 El [informe de entradas no disponibles](docs/contracts/unavailable-input-report-v1.md)
 reúne causas sin perder motivos distintos, con orden determinista y copia
 independiente de las listas del consumidor. CI prueba los contratos en JVM. La
-ruta iOS KMP se conserva, pero su ejecución automática en runners
-macOS quedó desactivada por coste según el
-[ADR 0004](docs/adr/0004-disable-automatic-ios-ci.md); una prueba JVM no sustituye
-la verificación iOS explícita antes de afirmar compatibilidad actualizada.
+ruta iOS KMP se conserva para el futuro, pero iOS no es actualmente una
+plataforma soportada y su ejecución automática en runners macOS quedó
+desactivada por coste según el
+[ADR 0004](docs/adr/0004-disable-automatic-ios-ci.md). Una prueba JVM no sustituye
+la verificación iOS necesaria antes de promover ese binding a soportado.
 
 Android dispone ya de un [esqueleto instalable](docs/adr/0002-android-app-foundation.md)
 y de un [límite local fail-closed](docs/adr/0003-android-local-glucose-boundary.md)
