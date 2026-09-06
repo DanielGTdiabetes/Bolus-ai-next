@@ -19,6 +19,13 @@ Demuestra que existe una integración histórica, pero no autoriza sus literales
 validaciones ni modelo de permisos para Next. Las decisiones LC-002 y LC-003 y
 el riesgo R-010 continúan abiertos.
 
+La [investigación oficial y de dispositivo del 2026-09-06](../validation/dexcom-g7-android-local-reception-2026-09-06.md)
+solo encontró como vía pública autorizable la Web API REST/OAuth de Dexcom. Esa
+vía requiere Internet y entrega datos del móvil con retraso, por lo que no cumple
+el hito local. El paquete instalado define un permiso `dangerous`, pero Dexcom no
+publica en las fuentes revisadas el contrato del broadcast local ni una garantía
+de autenticidad del emisor. Ese metadato no amplía la autorización de este ADR.
+
 ## Decisión
 
 Se añade en el módulo Android:
@@ -79,5 +86,9 @@ de un puerto probado cuando el contrato se apruebe.
 Una variante de lectura disponible requiere contrato versionado, trazabilidad y
 aprobación de cada decisión pendiente enumerada en
 `android-local-glucose-boundary-v1.md`, pruebas del adaptador y persistencia, y
-evidencia en dispositivo real sin Internet. No basta con observar un payload o
+evidencia en dispositivo real sin Internet. También requiere una garantía de
+emisor proporcionada por Dexcom: un extra `packageName`, una acción de intent, el
+nombre del paquete instalado o la posesión de un permiso `dangerous` no bastan.
+No es válido fijar como ancla de confianza una firma extraída del APK observado
+sin confirmación/versionado de Dexcom. No basta con observar un payload o
 replicar el comportamiento Legacy.
