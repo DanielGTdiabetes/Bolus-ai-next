@@ -56,5 +56,8 @@ La revisión de todos los archivos `.yml` y `.yaml` bajo `.github/workflows` deb
 demostrar que no contienen runners macOS ni tareas iOS/Swift. `scripts/verify.ps1`
 escanea todos esos workflows y bloquea cualquier referencia a `macos` —incluidas
 comillas y matrices—, `iosSimulatorArm64Test`, enlace de framework iOS o
-`verify-swift.sh`. Los artefactos KMP/iOS y el script se conservan fuera de los
-workflows para una verificación futura autorizada.
+`verify-swift.sh`. También exige que `verify.yml` exista, no esté vacío y ejecute
+`scripts/verify.ps1` en `windows-latest`, para que desactivar macOS no permita
+eliminar accidentalmente la puerta automática restante. Los artefactos KMP/iOS
+y el script se conservan fuera de los workflows para una verificación futura
+autorizada.

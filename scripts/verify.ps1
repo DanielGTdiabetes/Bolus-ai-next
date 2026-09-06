@@ -39,8 +39,26 @@ try {
     }
 
     $workflowDirectory = Join-Path $repositoryRoot ".github\workflows"
-    $workflowFiles = Get-ChildItem -LiteralPath $workflowDirectory -File |
-        Where-Object { $_.Extension -in @(".yml", ".yaml") }
+    $canonicalWorkflow = Join-Path $workflowDirectory "verify.yml"
+    if (-not (Test-Path -LiteralPath $canonicalWorkflow -PathType Leaf)) {
+        throw "The canonical Windows verification workflow is missing"
+    }
+    $canonicalWorkflowContent = Get-Content -Raw -LiteralPath $canonicalWorkflow
+    if ([string]::IsNullOrWhiteSpace($canonicalWorkflowContent)) {
+        throw "The canonical Windows verification workflow is empty"
+    }
+    if ($canonicalWorkflowContent -notmatch "(?i)windows-latest" -or
+        $canonicalWorkflowContent -notmatch "(?i)scripts\\verify\.ps1") {
+        throw "The canonical workflow must run scripts/verify.ps1 on windows-latest"
+    }
+
+    $workflowFiles = @(
+        Get-ChildItem -LiteralPath $workflowDirectory -File |
+            Where-Object { $_.Extension -in @(".yml", ".yaml") }
+    )
+    if ($workflowFiles.Count -eq 0) {
+        throw "No GitHub workflow files were found"
+    }
     $forbiddenAutomaticIosPatterns = @(
         "(?i)macos",
         "(?i)iosSimulatorArm64Test",
