@@ -93,6 +93,11 @@ evidencia en dispositivo real sin Internet. También requiere una garantía de
 emisor aprobada por el propietario y fijada a una release reproducible: un extra
 `packageName`, una acción de intent, el nombre del paquete instalado o la
 posesión de un permiso `dangerous` no bastan.
+Si la garantía usa la identidad de envío disponible desde API 34, el productor
+debe incluir `BroadcastOptions.setShareIdentityEnabled(true)` y una prueba
+instrumentada debe demostrar que Next obtiene paquete y UID; el envío observado
+sin opciones no proporciona esa garantía.
+
 No es válido fijar como ancla de confianza una firma extraída de una compilación
 no archivada. No basta con observar un payload o replicar el comportamiento
 Legacy.
