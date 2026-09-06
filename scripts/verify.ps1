@@ -38,6 +38,19 @@ try {
         throw "The Android foundation must not request Internet permission"
     }
 
+    $verifyWorkflow = Join-Path $repositoryRoot ".github\workflows\verify.yml"
+    $forbiddenAutomaticIosSteps = @(
+        "runs-on: macos-",
+        "iosSimulatorArm64Test",
+        "linkDebugFrameworkIosSimulatorArm64",
+        "verify-swift.sh"
+    )
+    foreach ($token in $forbiddenAutomaticIosSteps) {
+        if (Select-String -LiteralPath $verifyWorkflow -SimpleMatch $token -Quiet) {
+            throw "Automatic GitHub macOS/iOS verification is disabled by ADR 0004: $token"
+        }
+    }
+
     git diff --check
     if ($LASTEXITCODE -ne 0) {
         throw "git diff --check found whitespace errors"
