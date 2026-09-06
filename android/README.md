@@ -39,4 +39,7 @@ versión de tratamiento y no debe distribuirse como tal.
 - El puerto actual devuelve `policy_not_approved` y no expone una variante de
   lectura hasta aprobar contrato, autenticidad, unidades, timestamps, identidad
   y políticas de validación.
+- La [investigación oficial y del dispositivo](../docs/validation/dexcom-g7-android-local-reception-2026-09-06.md)
+  no encontró un contrato público autorizado para el broadcast local. La Web API
+  oficial requiere red y no sustituye este límite offline.
 - `minSdk 26` y `applicationId` son provisionales según el ADR 0002.

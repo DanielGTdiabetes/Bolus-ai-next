@@ -4,6 +4,7 @@
 - Alcance: Android; iOS conserva el consumo del núcleo KMP
 - Estado: solo resultados no disponibles; recepción Dexcom no autorizada
 - Evidencia Legacy consultada: `DanielGTdiabetes/bolus_ai@f5417721d8019a9831126f4d843edfc4de87653d`
+- Evidencia oficial/dispositivo: [investigación del 2026-09-06](../validation/dexcom-g7-android-local-reception-2026-09-06.md)
 
 `LocalGlucoseSourcePort` separa la futura integración Android de la UI y del
 contrato compartido. Su operación `readLatest()` devuelve
@@ -41,7 +42,9 @@ receiver y no se leen, simulan, persisten ni sincronizan datos.
 ## Decisiones pendientes que bloquean una lectura disponible
 
 1. Contrato autorizado para recepción local Dexcom G7 y mecanismo demostrable
-   de autenticidad/autorización del emisor.
+   de autenticidad/autorización del emisor. No sirven como prueba un extra con
+   package name, la acción del intent, el paquete instalado ni por sí solo el
+   permiso `com.dexcom.cgm.EXTERNAL_PERMISSION`, observado como `dangerous`.
 2. Valor y unidad explícitos, sin conversión ambigua.
 3. Timestamp de la medida, timestamp de recepción y semántica de zona/offset.
 4. Identidad estable, duplicados, orden temporal y timestamps futuros.
@@ -51,6 +54,13 @@ receiver y no se leen, simulan, persisten ni sincronizan datos.
 Hasta resolver todas las decisiones aplicables, el puerto solo puede bloquear.
 Este contrato no calcula bolos, no registra tratamientos y no concede autoridad
 de escritura.
+
+La Dexcom Web API V3 es la única vía oficial localizada en este lote. Requiere
+OAuth 2.0 y acceso aprobado, funciona por red y documenta retraso para datos
+subidos desde las apps móviles. Por ello no se adoptará como sustituto silencioso
+del productor local/offline. Health Connect dispone de un tipo de glucosa, pero
+no se encontró evidencia oficial de que la versión G7 Android inspeccionada lo
+produzca; tampoco autoriza una lectura disponible.
 
 ## Verificación
 

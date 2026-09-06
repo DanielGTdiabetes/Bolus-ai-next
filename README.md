@@ -87,7 +87,10 @@ y de un [límite local fail-closed](docs/adr/0003-android-local-glucose-boundary
 que solo admite causas no disponibles y marca la compilación como no autoritaria.
 No se conecta todavía a Dexcom, no solicita permisos, no calcula bolos ni
 registra tratamientos. Las versiones mínimas y el contrato Dexcom definitivos
-continúan pendientes; el puerto devuelve `policy_not_approved` hasta resolverlos.
+continúan pendientes. La [investigación de recepción local G7 en Android](docs/validation/dexcom-g7-android-local-reception-2026-09-06.md)
+solo demostró la Web API oficial online y metadatos no suficientes de un
+broadcast local; el puerto devuelve `policy_not_approved` hasta obtener un
+contrato Dexcom autorizado y autenticar el emisor.
 
 ## Documentación para ejecutar el proyecto
 
