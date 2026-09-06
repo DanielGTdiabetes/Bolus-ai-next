@@ -16,6 +16,8 @@ autoridad de tratamiento.
 | R-009 | IOB parcial o historial incompleto tratado como verificable | Seguridad | Exigir integridad de ventana, eventos, perfil y algoritmo; desconocido nunca es cero | LC-004/LC-005 + tests de huecos, conflictos y reinicio | Bloqueado |
 | R-010 | Aceptar un broadcast G7 basándose solo en extras controlables | Seguridad | Demostrar contrato y autenticidad del emisor; validar en el límite y persistir estado de permiso/origen | LC-003 + tests Android de emisor/permiso | Investigación técnica pendiente |
 | R-011 | Resultado no reproducible por relojes globales o huella incompleta | Consistencia/seguridad | Reloj inyectado y huella canónica que incluya inputs, perfil, reglas y motor | LC-012 + tests deterministas | Diseño Fase 2 pendiente |
+| R-012 | Una UI temprana parece apta para tratamiento antes de existir validación | Seguridad | Banner no autoritativo, cálculo bloqueado y ausencia explícita; sin acciones de confirmación o registro | Tests del presentador + lint/compilación Android + revisión visual en dispositivo | Mitigación inicial; prueba en dispositivo pendiente |
+| R-013 | La versión Android provisional excluye el dispositivo objetivo o no coincide con Dexcom | Disponibilidad/consistencia | `minSdk 26` se documenta como provisional; no se declara compatibilidad Dexcom hasta auditar y probar el dispositivo autorizado | ADR 0002 + prueba de instalación/dispositivo antes de Fase 5 | Decisión de compatibilidad pendiente |
 
 ## Decisiones pendientes
 
