@@ -2,7 +2,10 @@
 
 ## Decisión principal
 
-Bolus AI Next adopta una arquitectura **local-first**. El dispositivo móvil ejecuta las funciones clínicas críticas y conserva el estado operativo necesario para seguir funcionando sin NAS, Render o Telegram.
+Bolus AI Next adopta una arquitectura **local-first**. Es el sustituto previsto
+de Bolus AI Legacy y debe alcanzar paridad funcional aprobada ejecutando en el
+dispositivo móvil las funciones clínicas críticas y conservando el estado
+operativo necesario para seguir funcionando sin NAS, Render o Telegram.
 
 ## Principios
 
@@ -67,8 +70,10 @@ MyFitnessPal, Nightscout, backup, panel web, Telegram u otras integraciones se c
 
 La recepción local de glucosa entra por un puerto Android separado de la UI. El
 caso de uso traduce causas ya determinadas al contrato compartido de entradas no
-disponibles; no interpreta payloads ni decide vigencia. Mientras el contrato
-Dexcom, la autenticidad del emisor, las unidades, timestamps, identidad y
+disponibles; no interpreta payloads ni decide vigencia. La aplicación Dexcom G7
+modificada y controlada por el propietario es el productor local primario; la
+Web API es solo contingencia online. Mientras el contrato versionado del
+productor, la autenticidad del emisor, las unidades, timestamps, identidad y
 políticas no estén aprobados, el puerto no tiene una variante de lectura válida
 y devuelve `policy_not_approved`. Véanse el [ADR 0003](adr/0003-android-local-glucose-boundary.md)
 y el [contrato v1](contracts/android-local-glucose-boundary-v1.md).

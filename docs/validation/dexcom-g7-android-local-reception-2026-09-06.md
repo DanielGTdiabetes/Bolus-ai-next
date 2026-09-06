@@ -1,23 +1,38 @@
 # Investigación de recepción local Dexcom G7 en Android — 2026-09-06
 
-## Decisión
+## Decisión corregida con la evidencia del productor
 
-No se ha demostrado un contrato Dexcom autorizado para que Bolus AI Next reciba
-lecturas locales de G7 en Android. La única integración pública oficial
-localizada es la Dexcom Web API, que requiere OAuth 2.0, autorización del usuario
-y aprobación de acceso de Dexcom. Además depende de Internet y publica los datos
-del móvil con retraso, por lo que no cumple el primer hito local/offline.
+El propietario confirma que la fuente primaria es su aplicación Dexcom G7
+modificada, que ya produce localmente el broadcast usado por Bolus AI Legacy.
+Bolus AI Next debe sustituir el sistema actual ejecutando el flujo completo en el
+móvil; la red y la Dexcom Web API no forman parte del camino crítico.
 
-El broadcast y el permiso observados en el dispositivo son evidencia técnica de
-una superficie instalada, no un contrato autorizado ni una autenticación
-suficiente del emisor. En consecuencia:
+El código del productor controlado por el propietario demuestra la acción, la
+forma del `Bundle` y su distribución a las aplicaciones que poseen el permiso.
+Esta evidencia se fija en el
+[contrato de transporte observado v1](../contracts/modified-dexcom-g7-broadcast-observed-v1.md).
+La autorización del propietario resuelve qué productor local se pretende usar,
+pero aún no resuelve autenticidad robusta, release reproducible, políticas
+clínicas, vigencia, identidad o persistencia. En consecuencia:
 
 - `LocalGlucoseSourceResult` continúa sin variante de lectura disponible;
 - `PendingDexcomSource` continúa devolviendo
   `input.glucose.policy_not_approved`;
 - Next no registra un receiver, no solicita permisos Dexcom y no interpreta,
   persiste ni muestra payloads;
-- R-010 y R-014 siguen bloqueando la recepción real.
+- R-010 y R-014 siguen bloqueando una lectura disponible.
+
+Orden de fuentes acordado:
+
+| Prioridad | Fuente | Papel |
+|---|---|---|
+| 1 | aplicación Dexcom G7 modificada | fuente local primaria y offline |
+| 2 | Dexcom Web API | contingencia de emergencia, online y con retraso explícito |
+| 3 | ausencia/error | estado bloqueante específico; nunca reutilizar un dato antiguo como actual |
+
+La contingencia web deberá conservar procedencia, timestamp de medida y de
+recepción, retraso y estado propios. No puede sustituir silenciosamente al
+productor local ni presentarse como glucosa actual sin una política aprobada.
 
 ## Alcance, privacidad y snapshots
 
@@ -29,9 +44,12 @@ suficiente del emisor. En consecuencia:
 - Se usó ADB únicamente para metadatos de sistema, paquetes, permisos y filtros
   de intents. No se registró el número de serie, no se inspeccionaron extras de
   broadcasts, bases de datos, logs Dexcom ni lecturas clínicas.
-- Fuentes web consultadas el 2026-09-06. La ausencia de documentación pública no
-  prueba que Dexcom no disponga de un contrato privado para partners; prueba que
-  Next todavía no lo posee ni puede implementarlo de forma autorizada.
+- Se inspeccionó además, en solo lectura, el workspace de la aplicación modificada
+  facilitada por el propietario. No se le hicieron cambios ni se leyeron datos
+  clínicos.
+- Fuentes web consultadas el 2026-09-06. La ausencia de documentación pública
+  limita la integración oficial del proveedor, pero no invalida el contrato del
+  productor modificado autorizado por su propietario.
 
 ## Evidencia oficial Dexcom
 
@@ -54,9 +72,9 @@ suficiente del emisor. En consecuencia:
    `com.dexcom.cgm.EXTERNAL_BROADCAST`, su payload, unidades, timestamps,
    versionado, semántica offline ni un procedimiento para autenticar al emisor.
 
-Por tanto, la Web API es una vía oficial posible para una integración online
-futura, pero no puede sustituir la recepción local ni utilizarse como dato actual
-en el hito Android offline.
+Por tanto, la Web API es una vía oficial posible únicamente para la contingencia
+online. No puede sustituir la recepción local ni utilizarse como dato actual en
+el hito Android offline.
 
 ## Evidencia oficial Android y análisis de autenticidad
 
@@ -76,15 +94,16 @@ nivel del permiso. En API 34 o superior,
 permiten consultar la identidad inicial que Android atribuye al emisor, aunque
 pueden devolver identidad no disponible.
 
-Implicaciones para un adaptador futuro, solo si Dexcom autoriza el contrato:
+Implicaciones para un adaptador futuro del productor modificado:
 
 - un extra `packageName`, la acción del intent o el nombre del paquete instalado
   nunca bastan para autenticar al emisor;
-- el receiver debe exigir un control de emisor definido por Dexcom y fallar si
-  Android no proporciona identidad;
-- si Dexcom proporciona anclas de firma/versionado, la UID emisora debe
-  resolverse con `PackageManager` y validarse contra esas anclas; no se inventará
-  un certificado confiable a partir del APK observado;
+- el receiver debe exigir un control de emisor aprobado por el propietario y
+  fallar si Android no proporciona identidad;
+- la UID emisora debe resolverse con `PackageManager` y validarse contra anclas
+  de paquete, firma y versión de una release reproducible del productor;
+- en API 33 o inferior se debe bloquear la recepción hasta aprobar un mecanismo
+  alternativo; nunca degradar a confiar en extras;
 - el payload seguirá en cuarentena hasta validar esquema/versionado, tipos,
   unidad, timestamps, identidad y persistencia; ningún fallo de autenticación o
   parseo se relabelará como ausencia o desconexión.
@@ -98,6 +117,7 @@ En un único dispositivo conectado y autorizado por ADB se observó:
 | Dispositivo | Pixel 10 Pro Fold, Android 17, API 37 |
 | Paquete | `com.dexcom.g7` |
 | Versión | `1.6.1.4537` (`versionCode 4537`) |
+| SHA-256 del APK instalado | `6746ac78f5c6eaa4b4ad802f0dec59e55a64b05821d0ff43de4e0f39c8e4b572` |
 | SDK del paquete | `minSdk 29`, `targetSdk 31` |
 | Permiso definido | `com.dexcom.cgm.EXTERNAL_PERMISSION` |
 | Propietario del permiso | `sourcePackage=com.dexcom.g7` |
@@ -105,11 +125,10 @@ En un único dispositivo conectado y autorizado por ADB se observó:
 | Receivers para la acción histórica | cuatro paquetes instalados; Next no estaba entre ellos |
 | Permisos Health Connect en el paquete Dexcom | no se observaron permisos `android.permission.health.*` |
 
-Estos metadatos no demuestran que la aplicación emita actualmente un broadcast,
-que lo haga offline, que alguno de los receivers reciba datos auténticos ni que
-Dexcom autorice su uso. Que el permiso sea `dangerous` refuerza el bloqueo: una
-aplicación distinta podría solicitarlo y su mera posesión no equivale a una
-identidad Dexcom aprobada.
+Estos metadatos, aislados, no demuestran un contrato. La inspección separada del
+productor sí demuestra que su código construye y distribuye el broadcast, pero
+no demuestra por sí sola qué aplicación originó un intent recibido. Que el
+permiso sea `dangerous` refuerza la necesidad de validar identidad y firma.
 
 Health Connect sí define un tipo Android
 [`BloodGlucoseRecord`](https://developer.android.com/health-and-fitness/health-connect/data-types),
@@ -158,38 +177,26 @@ No debe añadirse `dumpsys activity broadcasts`, `logcat`, inspección de extras
 archivos internos o bases de datos a este procedimiento: podrían contener datos
 clínicos.
 
-## Información que debe proporcionar o confirmar Dexcom
+## Evidencia y decisiones que debe cerrar el propietario
 
-La solicitud de soporte/partnership debe pedir una respuesta escrita y
-versionada para:
+Para el canal local modificado deben quedar versionados:
 
-1. si `com.dexcom.cgm.EXTERNAL_BROADCAST` y
-   `com.dexcom.cgm.EXTERNAL_PERMISSION` forman una API soportada para G7 Android,
-   incluida la región y las versiones compatibles;
-2. mecanismo de alta/autorización de Bolus AI Next y términos de uso aplicables;
-3. contrato completo y versionado del payload, campos obligatorios/opcionales,
-   tipos y comportamiento ante campos desconocidos;
-4. unidad del valor y de la tendencia, sin inferencia por región o preferencias;
-5. semántica, base temporal, zona/offset y precisión de cada timestamp;
-6. identidad estable de la lectura, duplicados, reordenación y backfill;
-7. garantías de entrega offline, tras reinicio y con restricciones de segundo
-   plano;
-8. autenticación del emisor: permiso exigido, UID/package verificable y anclas
-   de firma/versionado suministradas por Dexcom;
-9. cambios de contrato, deprecación, compatibilidad y canal de incidencias;
-10. alcance autorizado para visualización, comparación en sombra y eventual uso
-    clínico. La autorización técnica no se interpretará como aprobación clínica.
+1. release reproducible que corresponda con la APK instalada;
+2. anclas autorizadas de paquete, firma y rango de versiones;
+3. contrato completo de campos, tipos y comportamiento ante desconocidos;
+4. unidad y semántica de cada timestamp y tendencia;
+5. identidad, duplicados, reordenación, backfill y entrega offline/reinicio;
+6. alcance aprobado para visualización y posterior uso clínico.
 
-El canal público indicado por Dexcom es registrarse como developer y usar
-[Support Requests](https://developer.dexcom.com/docs/support/requests) o el
-proceso de Partnership/Limited Access. Hasta recibir y aprobar esa evidencia,
-la decisión reproducible de Next es `policy_not_approved`.
+La aprobación técnica no se interpretará como aprobación clínica. Para la
+contingencia Web API siguen aplicando registro, OAuth, Partnership/Limited Access
+y [Support Requests](https://developer.dexcom.com/docs/support/requests).
 
 ## Puertas para un lote posterior
 
 Un cambio posterior solo podrá proponer recepción real si adjunta:
 
-- referencia Dexcom autorizada y versión exacta del contrato;
+- release reproducible y contrato versionado del productor modificado;
 - ADR actualizado con threat model del emisor y matriz versión/región;
 - contrato Next explícito para unidad, timestamps, identidad y procedencia;
 - política clínica de vigencia y anomalías aprobada separadamente;

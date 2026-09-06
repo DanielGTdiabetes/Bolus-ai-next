@@ -2,9 +2,10 @@
 
 - Fase: infraestructura preparatoria para Fase 5
 - Alcance: Android; iOS conserva el consumo del núcleo KMP
-- Estado: solo resultados no disponibles; recepción Dexcom no autorizada
+- Estado: solo resultados no disponibles; productor local autorizado, lectura
+  clínica aún no aprobada
 - Evidencia Legacy consultada: `DanielGTdiabetes/bolus_ai@f5417721d8019a9831126f4d843edfc4de87653d`
-- Evidencia oficial/dispositivo: [investigación del 2026-09-06](../validation/dexcom-g7-android-local-reception-2026-09-06.md)
+- Evidencia oficial/productor/dispositivo: [investigación del 2026-09-06](../validation/dexcom-g7-android-local-reception-2026-09-06.md)
 
 `LocalGlucoseSourcePort` separa la futura integración Android de la UI y del
 contrato compartido. Su operación `readLatest()` devuelve
@@ -13,7 +14,8 @@ contrato compartido. Su operación `readLatest()` devuelve
 unidad, timestamp, tendencia, procedencia o identidad.
 
 La ausencia deliberada de una variante disponible impide que un payload sin
-contrato se trate como glucosa válida. Cuando se autoricen el contrato Dexcom,
+validación se trate como glucosa válida. Cuando se aprueben el contrato del
+productor modificado,
 la autenticidad del emisor, las unidades, ambos timestamps, la identidad y las
 políticas de validación, añadir una variante al tipo sellado obligará al
 compilador a señalar todos los consumidores exhaustivos para revisión.
@@ -35,14 +37,16 @@ como tales para que no se pierda su diagnóstico.
 
 La composición actual usa `PendingDexcomSource`, que siempre devuelve
 `policy_not_approved`. Esto describe la situación real con más precisión que
-`missing`: no existe todavía un productor autenticado y autorizado al que se le
-haya solicitado una lectura. No se solicitan permisos, no se registra un
-receiver y no se leen, simulan, persisten ni sincronizan datos.
+`missing`: el productor previsto está autorizado por el propietario, pero Next
+todavía no autentica al emisor ni valida el transporte observado. No se
+solicitan permisos, no se registra un receiver y no se leen, simulan, persisten
+ni sincronizan datos.
 
 ## Decisiones pendientes que bloquean una lectura disponible
 
-1. Contrato autorizado para recepción local Dexcom G7 y mecanismo demostrable
-   de autenticidad/autorización del emisor. No sirven como prueba un extra con
+1. Release reproducible y contrato versionado del productor modificado, además
+   de un mecanismo demostrable de autenticidad del emisor. No sirven como prueba
+   un extra con
    package name, la acción del intent, el paquete instalado ni por sí solo el
    permiso `com.dexcom.cgm.EXTERNAL_PERMISSION`, observado como `dangerous`.
 2. Valor y unidad explícitos, sin conversión ambigua.
@@ -55,12 +59,13 @@ Hasta resolver todas las decisiones aplicables, el puerto solo puede bloquear.
 Este contrato no calcula bolos, no registra tratamientos y no concede autoridad
 de escritura.
 
-La Dexcom Web API V3 es la única vía oficial localizada en este lote. Requiere
-OAuth 2.0 y acceso aprobado, funciona por red y documenta retraso para datos
-subidos desde las apps móviles. Por ello no se adoptará como sustituto silencioso
-del productor local/offline. Health Connect dispone de un tipo de glucosa, pero
-no se encontró evidencia oficial de que la versión G7 Android inspeccionada lo
-produzca; tampoco autoriza una lectura disponible.
+El [contrato observado del productor](modified-dexcom-g7-broadcast-observed-v1.md)
+fija la forma del transporte sin aprobar todavía una lectura. La Dexcom Web API
+V3 requiere OAuth 2.0 y acceso aprobado, funciona por red y documenta retraso
+para datos subidos desde las apps móviles. Solo será contingencia de emergencia
+y no un sustituto silencioso del productor local/offline. Health Connect dispone
+de un tipo de glucosa, pero no se encontró evidencia oficial de que la versión
+G7 Android inspeccionada lo produzca; tampoco autoriza una lectura disponible.
 
 ## Verificación
 
