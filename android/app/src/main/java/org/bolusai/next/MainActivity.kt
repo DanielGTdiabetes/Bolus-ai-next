@@ -3,20 +3,17 @@ package org.bolusai.next
 import android.app.Activity
 import android.os.Bundle
 import android.widget.TextView
-import org.bolusai.engine.InputKind
-import org.bolusai.engine.UnavailabilityReason
-import org.bolusai.engine.UnavailableInput
+import org.bolusai.next.glucose.PendingDexcomSource
+import org.bolusai.next.glucose.ReadLocalGlucoseStatus
 
 class MainActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-        // No Dexcom producer exists yet, so absence is explicit rather than a
-        // fabricated reading, cached value or zero.
         renderGlucoseStatus(
             GlucoseStatusPresenter.present(
-                UnavailableInput(InputKind.GLUCOSE, UnavailabilityReason.MISSING),
+                ReadLocalGlucoseStatus(PendingDexcomSource).execute(),
             ),
         )
     }

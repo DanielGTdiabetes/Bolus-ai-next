@@ -63,6 +63,16 @@ Sin Internet deben seguir disponibles las funciones que solo requieren datos loc
 
 MyFitnessPal, Nightscout, backup, panel web, Telegram u otras integraciones se consideran servicios externos. Si alguno falla, la aplicación debe degradarse de forma explícita y segura, nunca sustituir datos faltantes por datos antiguos sin indicarlo.
 
+## Límite Android de glucosa local
+
+La recepción local de glucosa entra por un puerto Android separado de la UI. El
+caso de uso traduce causas ya determinadas al contrato compartido de entradas no
+disponibles; no interpreta payloads ni decide vigencia. Mientras el contrato
+Dexcom, la autenticidad del emisor, las unidades, timestamps, identidad y
+políticas no estén aprobados, el puerto no tiene una variante de lectura válida
+y devuelve `policy_not_approved`. Véanse el [ADR 0003](adr/0003-android-local-glucose-boundary.md)
+y el [contrato v1](contracts/android-local-glucose-boundary-v1.md).
+
 ## Convivencia con Legacy
 
 `bolus_ai` seguirá siendo producción mientras Bolus AI Next se valida.

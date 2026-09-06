@@ -31,6 +31,7 @@ Lotes posteriores registrados:
 | Fecha | SHA fijado | Alcance | Resultado |
 |---|---|---|---|
 | 2026-09-04 | `f5417721d8019a9831126f4d843edfc4de87653d` | cálculo, perfil, IOB y glucosa/Dexcom G7 local | [`audit/legacy-clinical.md`](audit/legacy-clinical.md); observado, sin reglas aprobadas ni vectores |
+| 2026-09-06 | `f5417721d8019a9831126f4d843edfc4de87653d` | revalidación para el límite Android de glucosa local | [`adr/0003-android-local-glucose-boundary.md`](adr/0003-android-local-glucose-boundary.md) y [`contracts/android-local-glucose-boundary-v1.md`](contracts/android-local-glucose-boundary-v1.md); sin fuentes nuevas, sin portar contratos ni literales |
 
 Entre el snapshot inicial y el lote de 2026-09-04 solo cambiaron tres archivos
 de DB/autenticación; los archivos clínicos auditados no cambiaron. Cada informe

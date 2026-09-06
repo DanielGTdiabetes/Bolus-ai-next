@@ -79,10 +79,11 @@ independiente de las listas del consumidor. CI prueba los contratos en JVM y
 en el simulador iOS.
 
 Android dispone ya de un [esqueleto instalable](docs/adr/0002-android-app-foundation.md)
-que muestra la ausencia de glucosa como bloqueo y marca la compilación como no
-autoritaria. No se conecta todavía a Dexcom, no solicita permisos, no calcula
-bolos ni registra tratamientos. Las versiones mínimas y el contrato Dexcom
-definitivos continúan pendientes de validación en el dispositivo objetivo.
+y de un [límite local fail-closed](docs/adr/0003-android-local-glucose-boundary.md)
+que solo admite causas no disponibles y marca la compilación como no autoritaria.
+No se conecta todavía a Dexcom, no solicita permisos, no calcula bolos ni
+registra tratamientos. Las versiones mínimas y el contrato Dexcom definitivos
+continúan pendientes; el puerto devuelve `policy_not_approved` hasta resolverlos.
 
 ## Documentación para ejecutar el proyecto
 
