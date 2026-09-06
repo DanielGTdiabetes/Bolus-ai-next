@@ -39,8 +39,55 @@ try {
     }
 
     $workflowDirectory = Join-Path $repositoryRoot ".github\workflows"
-    $workflowFiles = Get-ChildItem -LiteralPath $workflowDirectory -File |
-        Where-Object { $_.Extension -in @(".yml", ".yaml") }
+    $canonicalWorkflow = Join-Path $workflowDirectory "verify.yml"
+    if (-not (Test-Path -LiteralPath $canonicalWorkflow -PathType Leaf)) {
+        throw "The canonical Windows verification workflow is missing"
+    }
+    $canonicalWorkflowContent = Get-Content -Raw -LiteralPath $canonicalWorkflow
+    if ([string]::IsNullOrWhiteSpace($canonicalWorkflowContent)) {
+        throw "The canonical Windows verification workflow is empty"
+    }
+
+    $expectedCanonicalWorkflow = @'
+name: Verify
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  windows:
+    name: Windows verification
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "21"
+      - uses: gradle/actions/setup-gradle@v6
+      - name: Verify
+        shell: pwsh
+        run: .\scripts\verify.ps1
+'@
+    $normalizedWorkflow = ($canonicalWorkflowContent -replace "`r`n", "`n").Trim()
+    $normalizedExpectedWorkflow = ($expectedCanonicalWorkflow -replace "`r`n", "`n").Trim()
+    if ($normalizedWorkflow -cne $normalizedExpectedWorkflow) {
+        throw "The canonical Windows verification workflow differs from the approved executable template"
+    }
+
+    $workflowFiles = @(
+        Get-ChildItem -LiteralPath $workflowDirectory -File |
+            Where-Object { $_.Extension -in @(".yml", ".yaml") }
+    )
+    if ($workflowFiles.Count -eq 0) {
+        throw "No GitHub workflow files were found"
+    }
     $forbiddenAutomaticIosPatterns = @(
         "(?i)macos",
         "(?i)iosSimulatorArm64Test",
