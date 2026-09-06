@@ -45,7 +45,8 @@ actualizar este ADR y aportar evidencia del dispositivo/Dexcom autorizado.
   no la infiere.
 - El primer hito offline todavía no está cumplido: falta recibir, validar,
   persistir y mostrar una lectura local real en modo avión.
-- iOS no recibe UI ni funcionalidad nueva; conserva las pruebas del núcleo KMP.
+- iOS no recibe UI ni funcionalidad nueva; conserva los targets y pruebas del
+  núcleo KMP, cuya ejecución macOS automática fue retirada por el ADR 0004.
 
 ## Verificación
 

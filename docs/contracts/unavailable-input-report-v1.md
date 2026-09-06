@@ -42,16 +42,18 @@ deduplicación exacta, orden determinista para todas las combinaciones del
 contrato v1 y aislamiento frente a mutaciones del productor y consumidor.
 Los casos son técnicos y sintéticos, sin parámetros ni golden vectors clínicos.
 
-`scripts/verify.ps1` ejecuta las pruebas comunes en JVM. CI ejecuta también
-`iosSimulatorArm64Test` en macOS y enlaza el framework compartido. La ejecución
-de pruebas iOS requiere macOS; no se puede sustituir por el resultado de Windows.
+`scripts/verify.ps1` ejecuta las pruebas comunes en JVM. Las pruebas iOS requieren
+macOS y no se pueden sustituir por el resultado de Windows. El ADR 0004 retiró
+su ejecución automática de GitHub por coste; una futura ejecución requiere
+autorización explícita y evidencia separada.
 
-Tras enlazar el framework, CI ejecuta `bash scripts/verify-swift.sh`: compila un
-consumidor Swift y lo ejecuta en el simulador iOS. La regresión verifica que una
-lista vacía se capture con su identificador y que después se pueda construir
-un informe no vacío en el mismo proceso. Las pruebas Kotlin por sí solas no
-cubren este límite. El script requiere macOS arm64, Xcode y un simulador iPhone
-disponible; no desarrolla un cliente iOS ni cambia la prioridad de Android.
+Tras enlazar el framework, `bash scripts/verify-swift.sh` compila un consumidor
+Swift y lo ejecuta en el simulador iOS. La regresión verifica que una lista vacía
+se capture con su identificador y que después se pueda construir un informe no
+vacío en el mismo proceso. Las pruebas Kotlin por sí solas no cubren este límite.
+El script se conserva para una ejecución autorizada y requiere macOS arm64,
+Xcode y un simulador iPhone disponible; no desarrolla un cliente iOS ni cambia
+la prioridad de Android.
 
 Verificación local del 2026-09-05: `scripts/verify.ps1` finalizó con
 `BUILD SUCCESSFUL`; 11 pruebas JVM, cero fallos y cero errores (6 del informe,

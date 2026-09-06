@@ -44,6 +44,8 @@ como registro clínico completo ni usarse como prueba de integridad del historia
 
 `UnavailableInputTest` comprueba códigos estables y únicos, versión e identidad
 de los estados desconocido/incompleto y política pendiente/caducidad. Se ejecuta
-con `scripts/verify.ps1` en JVM. CI ejecuta las pruebas comunes en el simulador
-iOS y enlaza el framework desde las mismas fuentes. Los casos son técnicos
-y sintéticos, no golden vectors clínicos. No se incorporan reglas clínicas.
+con `scripts/verify.ps1` en JVM. Los targets y pruebas iOS permanecen en las
+mismas fuentes, pero el ADR 0004 retiró su ejecución macOS automática; deben
+ejecutarse explícitamente antes de afirmar compatibilidad iOS actualizada. Los
+casos son técnicos y sintéticos, no golden vectors clínicos. No se incorporan
+reglas clínicas.

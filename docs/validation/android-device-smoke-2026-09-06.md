@@ -55,7 +55,8 @@ hito funcional offline.
   `:android:app:assembleDebug` finalizaron con `BUILD SUCCESSFUL`.
 - Resultado Android: 8 pruebas, 0 fallos; lint sin incidencias bloqueantes.
 - `scripts/verify.ps1`: `BUILD SUCCESSFUL`; 11 pruebas comunes JVM y 8 Android,
-  0 fallos. Las puertas iOS se ejecutan únicamente en CI macOS.
+  0 fallos. La PR #10 pasó la puerta iOS/macOS antes de que el propietario
+  desactivase su ejecución automática mediante el ADR 0004.
 - `git diff --check`: sin errores.
 
 ## Resultado de seguridad
