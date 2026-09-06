@@ -1,6 +1,7 @@
 # Bolus AI Next
 
-Bolus AI Next es la nueva generación local-first de Bolus AI.
+Bolus AI Next es la nueva generación local-first de Bolus AI y está destinada a
+sustituirlo con paridad funcional aprobada, no a depender de él como servicio.
 
 ## Objetivo
 
@@ -88,9 +89,10 @@ que solo admite causas no disponibles y marca la compilación como no autoritari
 No se conecta todavía a Dexcom, no solicita permisos, no calcula bolos ni
 registra tratamientos. Las versiones mínimas y el contrato Dexcom definitivos
 continúan pendientes. La [investigación de recepción local G7 en Android](docs/validation/dexcom-g7-android-local-reception-2026-09-06.md)
-solo demostró la Web API oficial online y metadatos no suficientes de un
-broadcast local; el puerto devuelve `policy_not_approved` hasta obtener un
-contrato Dexcom autorizado y autenticar el emisor.
+identifica la aplicación Dexcom modificada por el propietario como fuente local
+primaria y la Web API como contingencia de emergencia con retraso. El puerto
+devuelve `policy_not_approved` hasta fijar una release reproducible, autenticar
+el emisor y aprobar las políticas clínicas restantes.
 
 ## Documentación para ejecutar el proyecto
 
