@@ -38,16 +38,20 @@ try {
         throw "The Android foundation must not request Internet permission"
     }
 
-    $verifyWorkflow = Join-Path $repositoryRoot ".github\workflows\verify.yml"
-    $forbiddenAutomaticIosSteps = @(
-        "runs-on: macos-",
-        "iosSimulatorArm64Test",
-        "linkDebugFrameworkIosSimulatorArm64",
-        "verify-swift.sh"
+    $workflowDirectory = Join-Path $repositoryRoot ".github\workflows"
+    $workflowFiles = Get-ChildItem -LiteralPath $workflowDirectory -File |
+        Where-Object { $_.Extension -in @(".yml", ".yaml") }
+    $forbiddenAutomaticIosPatterns = @(
+        "(?i)macos",
+        "(?i)iosSimulatorArm64Test",
+        "(?i)linkDebugFrameworkIosSimulatorArm64",
+        "(?i)verify-swift\.sh"
     )
-    foreach ($token in $forbiddenAutomaticIosSteps) {
-        if (Select-String -LiteralPath $verifyWorkflow -SimpleMatch $token -Quiet) {
-            throw "Automatic GitHub macOS/iOS verification is disabled by ADR 0004: $token"
+    foreach ($workflowFile in $workflowFiles) {
+        foreach ($pattern in $forbiddenAutomaticIosPatterns) {
+            if (Select-String -LiteralPath $workflowFile.FullName -Pattern $pattern -Quiet) {
+                throw "Automatic GitHub macOS/iOS verification is disabled by ADR 0004: $($workflowFile.Name) matches $pattern"
+            }
         }
     }
 

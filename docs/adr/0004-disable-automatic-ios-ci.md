@@ -25,18 +25,24 @@ instrucción; no debe contarse como verificación verde de `main`.
   repositorio; no se elimina la ruta técnica compartida.
 - Mantener `scripts/verify.ps1` y las pruebas JVM/Android como la puerta
   automática en Windows para PR y `main`.
+- Mientras esa puerta iOS no exista, iOS es una plataforma futura y no soportada,
+  no un binding cuya compatibilidad esté garantizada en cada commit. La regla de
+  `AGENTS.md` que exige ejecutar contratos en cada plataforma soportada continúa
+  aplicándose sin excepción a las plataformas que sí estén soportadas.
 - No añadir un workflow macOS manual en GitHub: una ejecución futura que consuma
   esos minutos requiere una nueva autorización explícita del propietario.
-- Antes de declarar una versión iOS, cambiar un contrato exportado a Swift o
-  afirmar compatibilidad iOS actualizada, ejecutar de forma explícita las tareas
-  iOS y el consumidor Swift en un Mac autorizado y registrar commit, comandos y
-  resultados.
+- Todo cambio en `commonMain` o en un contrato exportado a Swift debe registrar
+  iOS como no verificado; no puede afirmar soporte o compatibilidad iOS actual.
+- Antes de promover iOS a plataforma soportada, declarar una versión iOS o
+  afirmar compatibilidad actualizada, obtener autorización explícita, ejecutar
+  las tareas iOS y el consumidor Swift en un Mac autorizado y registrar commit,
+  comandos y resultados.
 
 ## Consecuencias
 
 - Los cambios ordinarios dejan de consumir minutos macOS de GitHub.
-- La compatibilidad iOS permanece como diseño y toolchain, no como garantía
-  verificada en cada commit.
+- La ruta iOS permanece como diseño y toolchain para el futuro, no como
+  plataforma soportada ni como garantía verificada en cada commit.
 - Una regresión Kotlin/Native u Objective-C/Swift puede detectarse más tarde. Se
   registra este compromiso de consistencia y no se presentará una prueba JVM
   como sustituto de una prueba iOS.
@@ -46,8 +52,9 @@ instrucción; no debe contarse como verificación verde de `main`.
 
 ## Verificación
 
-La revisión del workflow debe demostrar que no contiene `runs-on: macos-*`,
-`iosSimulatorArm64Test`, enlace de framework iOS ni ejecución de
-`verify-swift.sh`. `scripts/verify.ps1` bloquea esos tokens en el workflow para
-evitar una reactivación accidental. Los artefactos KMP/iOS y el script se
-conservan para una verificación futura autorizada.
+La revisión de todos los archivos `.yml` y `.yaml` bajo `.github/workflows` debe
+demostrar que no contienen runners macOS ni tareas iOS/Swift. `scripts/verify.ps1`
+escanea todos esos workflows y bloquea cualquier referencia a `macos` —incluidas
+comillas y matrices—, `iosSimulatorArm64Test`, enlace de framework iOS o
+`verify-swift.sh`. Los artefactos KMP/iOS y el script se conservan fuera de los
+workflows para una verificación futura autorizada.

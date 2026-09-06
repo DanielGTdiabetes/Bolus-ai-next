@@ -44,8 +44,9 @@ Los casos son técnicos y sintéticos, sin parámetros ni golden vectors clínic
 
 `scripts/verify.ps1` ejecuta las pruebas comunes en JVM. Las pruebas iOS requieren
 macOS y no se pueden sustituir por el resultado de Windows. El ADR 0004 retiró
-su ejecución automática de GitHub por coste; una futura ejecución requiere
-autorización explícita y evidencia separada.
+su ejecución automática de GitHub por coste y clasifica iOS como plataforma
+futura no soportada; una futura ejecución requiere autorización explícita y
+evidencia separada.
 
 Tras enlazar el framework, `bash scripts/verify-swift.sh` compila un consumidor
 Swift y lo ejecuta en el simulador iOS. La regresión verifica que una lista vacía

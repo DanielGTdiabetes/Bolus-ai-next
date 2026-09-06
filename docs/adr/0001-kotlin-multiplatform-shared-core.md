@@ -57,7 +57,8 @@ adicionales en ambos móviles y dificultaría una integración nativa y tipada.
 ## Consecuencias
 
 - Android puede consumir el artefacto JVM sin reimplementar el dominio.
-- iOS consume el framework generado desde las mismas fuentes comunes.
+- Un futuro cliente iOS podrá consumir el framework generado desde las mismas
+  fuentes comunes; el ADR 0004 lo clasifica actualmente como no soportado.
 - La verificación iOS no puede completarse en el host Windows. Desde el ADR 0004
   no se ejecuta automáticamente y debe registrarse por separado antes de afirmar
   compatibilidad iOS actualizada.
