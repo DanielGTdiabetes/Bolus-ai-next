@@ -34,6 +34,8 @@ versión de tratamiento y no debe distribuirse como tal.
 - No declara el permiso `INTERNET` ni permisos Dexcom.
 - No interpreta broadcasts, notificaciones ni datos de otros proveedores.
 - No contiene lecturas de ejemplo ni valores clínicos sustitutivos.
+- Incluye un verificador puro y todavía no conectado para futura identidad del
+  emisor. Su política real permanece pendiente y no contiene anclas de Dexcom.
 - Cada causa no disponible tiene un estado visible distinto, pero solo un futuro
   adaptador autorizado podrá producir la causa observada.
 - El puerto actual devuelve `policy_not_approved` y no expone una variante de
