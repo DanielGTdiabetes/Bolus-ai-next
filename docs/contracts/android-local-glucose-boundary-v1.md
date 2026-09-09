@@ -49,6 +49,9 @@ ni sincronizan datos.
    un extra con
    package name, la acción del intent, el paquete instalado ni por sí solo el
    permiso `com.dexcom.cgm.EXTERNAL_PERMISSION`, observado como `dangerous`.
+   En API 34+, si se usan `getSentFromUid()`/`getSentFromPackage()`, el productor
+   debe optar por compartir identidad mediante `setShareIdentityEnabled(true)`;
+   el envío observado no lo hace todavía.
 2. Valor y unidad explícitos, sin conversión ambigua.
 3. Timestamp de la medida, timestamp de recepción y semántica de zona/offset.
 4. Identidad estable, duplicados, orden temporal y timestamps futuros.

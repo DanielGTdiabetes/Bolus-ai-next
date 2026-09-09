@@ -76,27 +76,43 @@ La implementación observada:
 3. excluye Legacy para evitar el duplicado y envía una copia dirigida a cada
    paquete restante.
 
+Las dos rutas observadas llaman a `Context.sendBroadcast(Intent)` sin opciones.
+Por tanto, la compilación instalada no solicita a Android que comparta su
+identidad con los receivers.
+
 El permiso está definido por la aplicación modificada con nivel `dangerous`.
 Esto explica cómo Next podría descubrirse como destinatario, pero no autentica
 al emisor: otra aplicación puede solicitar el permiso y los extras/action son
 controlables.
 
-En Android 14/API 34 o superior, el adaptador deberá obtener la identidad de
-envío atribuida por el sistema mediante `getSentFromUid()` y
+En Android 14/API 34 o superior, la identidad solo estará disponible si el
+productor opta expresamente por compartirla. Una futura versión del productor
+deberá crear `BroadcastOptions`, llamar a
+`setShareIdentityEnabled(true)` y pasar el `Bundle` resultante a
+`Context.sendBroadcast(Intent, String, Bundle)`. Android documenta que la opción
+es `false` por defecto. El envío actual sin opciones no cumple este requisito.
+
+Solo después de ese opt-in el adaptador podrá exigir `getSentFromUid()` y
 `getSentFromPackage()`, resolver el certificado con `PackageManager` y comparar
 paquete, certificado y versión con una ancla aprobada del productor. Cualquier
 identidad ausente, múltiple o no coincidente debe fallar cerrada con su motivo
-específico. El digest de firma anotado en el handoff del productor aún no se
-fija aquí como ancla porque la compilación instalada no está archivada como
-release reproducible. En API 33 o inferior, la recepción local permanecerá no
-disponible hasta documentar y probar otro mecanismo de autenticación; no se
-degradará a confiar en extras.
+específico, antes de parsear o persistir el payload. Véanse
+[`BroadcastOptions.setShareIdentityEnabled`](https://developer.android.com/reference/android/app/BroadcastOptions#setShareIdentityEnabled(boolean))
+y [`BroadcastReceiver.getSentFromUid`](https://developer.android.com/reference/android/content/BroadcastReceiver#getSentFromUid()).
+
+El digest de firma anotado en el handoff del productor aún no se fija aquí como
+ancla porque la compilación instalada no está archivada como release
+reproducible. En API 33 o inferior, la recepción local permanecerá no disponible
+hasta documentar y probar otro mecanismo de autenticación; no se degradará a
+confiar en extras.
 
 ## Puertas aún bloqueantes
 
 Antes de añadir `LocalGlucoseSourceResult.Available` deben aprobarse y probarse:
 
 - release reproducible del productor y anclas de paquete/firma/versiones;
+- opt-in de identidad del emisor en API 34+ mediante
+  `setShareIdentityEnabled(true)`, o un mecanismo autenticado alternativo;
 - contrato de campos obligatorios, opcionales y desconocidos;
 - unidad, timestamps de medida y recepción, zona/offset y anomalías de reloj;
 - identidad, duplicados, reordenación y backfill;
@@ -105,6 +121,14 @@ Antes de añadir `LocalGlucoseSourceResult.Available` deben aprobarse y probarse
 - permiso denegado, fuente ausente, emisor inválido, parseo e invalidez como
   estados distintos;
 - prueba Android real en modo avión con datos minimizados.
+
+Las pruebas instrumentadas del contrato productor/consumidor deben demostrar,
+como mínimo:
+
+- el broadcast genuino con identity sharing expone el paquete y la UID esperados;
+- omitir identity sharing produce identidad no disponible y bloqueo explícito;
+- un emisor distinto que copie action y extras no supera la validación de firma;
+- el fallo de identidad ocurre antes del parseo y no persiste ningún payload.
 
 Hasta entonces, `PendingDexcomSource` sigue devolviendo
 `input.glucose.policy_not_approved` y no se interpretan payloads.

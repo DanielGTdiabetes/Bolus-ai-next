@@ -91,8 +91,10 @@ aplicaciones pueden solicitarlos; recomienda controles de firma. El
 restringe qué broadcasters pueden invocarlo, pero la fuerza real depende del
 nivel del permiso. En API 34 o superior,
 [`getSentFromPackage()` y `getSentFromUid()`](https://developer.android.com/reference/android/content/BroadcastReceiver#getSentFromPackage())
-permiten consultar la identidad inicial que Android atribuye al emisor, aunque
-pueden devolver identidad no disponible.
+permiten consultar la identidad inicial que Android atribuye al emisor. Sin
+embargo, para aplicaciones con UID distinto el productor debe habilitar
+[`BroadcastOptions.setShareIdentityEnabled(true)`](https://developer.android.com/reference/android/app/BroadcastOptions#setShareIdentityEnabled(boolean));
+la opción es `false` por defecto y, sin ella, la identidad no está disponible.
 
 Implicaciones para un adaptador futuro del productor modificado:
 
@@ -100,6 +102,10 @@ Implicaciones para un adaptador futuro del productor modificado:
   nunca bastan para autenticar al emisor;
 - el receiver debe exigir un control de emisor aprobado por el propietario y
   fallar si Android no proporciona identidad;
+- en API 34+, el productor debe compartir la identidad mediante
+  `setShareIdentityEnabled(true)` y el receiver debe verificar que efectivamente
+  la recibe; el envío observado usa `sendBroadcast(Intent)` sin esa opción y no
+  cumple todavía el gate;
 - la UID emisora debe resolverse con `PackageManager` y validarse contra anclas
   de paquete, firma y versión de una release reproducible del productor;
 - en API 33 o inferior se debe bloquear la recepción hasta aprobar un mecanismo
@@ -182,11 +188,13 @@ clínicos.
 Para el canal local modificado deben quedar versionados:
 
 1. release reproducible que corresponda con la APK instalada;
-2. anclas autorizadas de paquete, firma y rango de versiones;
-3. contrato completo de campos, tipos y comportamiento ante desconocidos;
-4. unidad y semántica de cada timestamp y tendencia;
-5. identidad, duplicados, reordenación, backfill y entrega offline/reinicio;
-6. alcance aprobado para visualización y posterior uso clínico.
+2. identity sharing del productor en API 34+ y prueba de que el receiver obtiene
+   paquete y UID; o un mecanismo autenticado alternativo;
+3. anclas autorizadas de paquete, firma y rango de versiones;
+4. contrato completo de campos, tipos y comportamiento ante desconocidos;
+5. unidad y semántica de cada timestamp y tendencia;
+6. identidad, duplicados, reordenación, backfill y entrega offline/reinicio;
+7. alcance aprobado para visualización y posterior uso clínico.
 
 La aprobación técnica no se interpretará como aprobación clínica. Para la
 contingencia Web API siguen aplicando registro, OAuth, Partnership/Limited Access
@@ -197,6 +205,8 @@ y [Support Requests](https://developer.dexcom.com/docs/support/requests).
 Un cambio posterior solo podrá proponer recepción real si adjunta:
 
 - release reproducible y contrato versionado del productor modificado;
+- prueba instrumentada de identity sharing en API 34+ o del mecanismo
+  autenticado alternativo;
 - ADR actualizado con threat model del emisor y matriz versión/región;
 - contrato Next explícito para unidad, timestamps, identidad y procedencia;
 - política clínica de vigencia y anomalías aprobada separadamente;
