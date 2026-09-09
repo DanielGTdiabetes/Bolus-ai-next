@@ -42,6 +42,12 @@ todavía no autentica al emisor ni valida el transporte observado. No se
 solicitan permisos, no se registra un receiver y no se leen, simulan, persisten
 ni sincronizan datos.
 
+El [contrato de autenticación del emisor v1](android-dexcom-sender-authentication-v1.md)
+añade un verificador puro y fail-closed de package, UID, versión y firmantes. No
+está conectado a la composición actual y no contiene anclas reales. Por tanto,
+reduce el hueco de implementación sin cambiar el estado de la lectura ni
+resolver ninguna de las decisiones siguientes.
+
 ## Decisiones pendientes que bloquean una lectura disponible
 
 1. Release reproducible y contrato versionado del productor modificado, además
@@ -76,3 +82,6 @@ G7 Android inspeccionada lo produzca; tampoco autoriza una lectura disponible.
 `input.glucose.policy_not_approved`, que todos los motivos cruzan el límite sin
 colapsarse, que ausencia/permiso/fuente/invalidez siguen siendo distintos y que
 una excepción inesperada no se relabela como estado clínico.
+`DexcomSenderAuthenticatorTest` comprueba además política pendiente, identidad
+no compartida, spoofing de package, resolución, UID, release exacta, firmantes,
+inmutabilidad de anclas y rechazo de configuraciones incompletas.

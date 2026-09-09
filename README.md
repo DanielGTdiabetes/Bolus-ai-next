@@ -86,6 +86,9 @@ la verificación iOS necesaria antes de promover ese binding a soportado.
 Android dispone ya de un [esqueleto instalable](docs/adr/0002-android-app-foundation.md)
 y de un [límite local fail-closed](docs/adr/0003-android-local-glucose-boundary.md)
 que solo admite causas no disponibles y marca la compilación como no autoritaria.
+Un [verificador preparatorio del emisor](docs/contracts/android-dexcom-sender-authentication-v1.md)
+exige identidad atribuida por Android y anclas exactas de release, pero no está
+conectado a un receiver ni contiene package, versión o certificado real.
 No se conecta todavía a Dexcom, no solicita permisos, no calcula bolos ni
 registra tratamientos. Las versiones mínimas y el contrato Dexcom definitivos
 continúan pendientes. La [investigación de recepción local G7 en Android](docs/validation/dexcom-g7-android-local-reception-2026-09-06.md)

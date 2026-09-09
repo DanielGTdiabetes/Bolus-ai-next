@@ -52,6 +52,11 @@ MainActivity
   cálculo bloqueado.
 - Excepciones técnicas inesperadas no se convierten silenciosamente en una
   causa clínica o de conectividad.
+- Un verificador preparatorio separado autentica package y UID atribuidos por
+  Android contra anclas exactas de release (versión + conjunto de firmantes).
+  La política real permanece `Pending`, el verificador no está conectado a un
+  receiver y no puede producir una lectura disponible. Véase el
+  [contrato v1](../contracts/android-dexcom-sender-authentication-v1.md).
 
 ## Consecuencias
 
@@ -62,6 +67,8 @@ MainActivity
   exige revisar el consumidor en el mismo cambio.
 - La recepción real, permisos, manifest, persistencia, modo avión y validación
   de lectura siguen pendientes; el primer hito offline no está cumplido.
+- Las anclas de releases distintas no se combinan: cada `versionCode` conserva
+  su conjunto exacto de firmantes aprobado.
 - El puerto es específico del adaptador Android. Los estados no disponibles
   continúan en el núcleo KMP compartido, por lo que iOS no duplica lógica.
 

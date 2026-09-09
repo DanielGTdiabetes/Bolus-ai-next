@@ -132,3 +132,8 @@ como mínimo:
 
 Hasta entonces, `PendingDexcomSource` sigue devolviendo
 `input.glucose.policy_not_approved` y no se interpretan payloads.
+
+Next dispone de un [verificador preparatorio de identidad](android-dexcom-sender-authentication-v1.md)
+que modela estos rechazos sin anclas reales ni acceso a payloads. Todavía falta
+el opt-in del productor, la release reproducible y la prueba instrumentada; el
+verificador JVM por sí solo no abre este gate.
