@@ -36,6 +36,9 @@ versión de tratamiento y no debe distribuirse como tal.
 - No contiene lecturas de ejemplo ni valores clínicos sustitutivos.
 - Incluye un verificador puro y todavía no conectado para futura identidad del
   emisor. Su política real permanece pendiente y no contiene anclas de Dexcom.
+- El adaptador Android obtiene identidad y firmantes del sistema para el
+  verificador. Solo se conecta durante las pruebas sintéticas; véase el
+  [ADR 0005](../docs/adr/0005-android-sender-evidence-adapter.md).
 - Cada causa no disponible tiene un estado visible distinto, pero solo un futuro
   adaptador autorizado podrá producir la causa observada.
 - El puerto actual devuelve `policy_not_approved` y no expone una variante de
@@ -46,3 +49,18 @@ versión de tratamiento y no debe distribuirse como tal.
   transporte está observado, pero faltan release reproducible, autenticación y
   políticas clínicas. La Web API queda solo como contingencia con retraso.
 - `minSdk 26` y `applicationId` son provisionales según el ADR 0002.
+
+## Pruebas instrumentadas de identidad
+
+Con un único dispositivo USB autorizado API 34 o superior:
+
+```powershell
+.\scripts\verify.ps1 -DeviceTests
+```
+
+El arnés instala/actualiza Next y dos APKs desechables: instrumentación y emisor
+sintético. Al terminar retira las dos APKs de prueba; Next permanece instalada.
+No sobrescribe fixtures preexistentes. La acción sintética tiene destino fijo
+Next y ningún dato clínico. No utiliza Dexcom real, Legacy, servidores, logcat
+ni cambios de conectividad. La prueba real Dexcom en modo avión queda pendiente.
+La ejecución normal de `verify.ps1` y CI compilan las pruebas sin usar un teléfono.

@@ -75,6 +75,8 @@ internal enum class DexcomSenderAuthenticationFailure {
     POLICY_NOT_APPROVED,
     IDENTITY_NOT_SHARED,
     PACKAGE_NOT_RESOLVED,
+    PACKAGE_LOOKUP_DENIED,
+    SIGNING_INFO_UNAVAILABLE,
     PACKAGE_MISMATCH,
     UID_MISMATCH,
     VERSION_NOT_APPROVED,
@@ -145,25 +147,27 @@ internal class DexcomSenderAuthenticator(
                 resolvedPackage.signerCertificateSha256Digests.toSet(),
         )
     }
-
-    private fun rejected(
-        failure: DexcomSenderAuthenticationFailure,
-    ): DexcomSenderAuthenticationResult.Rejected =
-        DexcomSenderAuthenticationResult.Rejected(
-            failure = failure,
-            unavailabilityReason = when (failure) {
-                DexcomSenderAuthenticationFailure.POLICY_NOT_APPROVED ->
-                    UnavailabilityReason.POLICY_NOT_APPROVED
-                DexcomSenderAuthenticationFailure.IDENTITY_NOT_SHARED,
-                DexcomSenderAuthenticationFailure.PACKAGE_NOT_RESOLVED,
-                DexcomSenderAuthenticationFailure.PACKAGE_MISMATCH,
-                DexcomSenderAuthenticationFailure.UID_MISMATCH,
-                DexcomSenderAuthenticationFailure.VERSION_NOT_APPROVED,
-                DexcomSenderAuthenticationFailure.CERTIFICATE_MISMATCH,
-                -> UnavailabilityReason.AUTHENTICATION_FAILED
-            }
-        )
 }
+
+internal fun rejected(
+    failure: DexcomSenderAuthenticationFailure,
+): DexcomSenderAuthenticationResult.Rejected =
+    DexcomSenderAuthenticationResult.Rejected(
+        failure = failure,
+        unavailabilityReason = when (failure) {
+            DexcomSenderAuthenticationFailure.POLICY_NOT_APPROVED ->
+                UnavailabilityReason.POLICY_NOT_APPROVED
+            DexcomSenderAuthenticationFailure.IDENTITY_NOT_SHARED,
+            DexcomSenderAuthenticationFailure.PACKAGE_NOT_RESOLVED,
+            DexcomSenderAuthenticationFailure.PACKAGE_LOOKUP_DENIED,
+            DexcomSenderAuthenticationFailure.SIGNING_INFO_UNAVAILABLE,
+            DexcomSenderAuthenticationFailure.PACKAGE_MISMATCH,
+            DexcomSenderAuthenticationFailure.UID_MISMATCH,
+            DexcomSenderAuthenticationFailure.VERSION_NOT_APPROVED,
+            DexcomSenderAuthenticationFailure.CERTIFICATE_MISMATCH,
+            -> UnavailabilityReason.AUTHENTICATION_FAILED
+        },
+    )
 
 private fun canonicalSha256Digest(value: String): String {
     require(SHA256_HEX.matches(value)) {

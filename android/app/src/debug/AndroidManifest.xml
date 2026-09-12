@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Visibility for the synthetic instrumented sender, debug builds only. -->
+    <uses-permission android:name="org.bolusai.next.senderfixture.REQUEST_IDENTITY" />
+    <queries>
+        <package android:name="org.bolusai.next.senderfixture" />
+    </queries>
+</manifest>

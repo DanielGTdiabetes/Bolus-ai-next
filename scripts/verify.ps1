@@ -1,5 +1,5 @@
 [CmdletBinding()]
-param()
+param([switch]$DeviceTests)
 
 $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
@@ -20,7 +20,11 @@ try {
         allMetadataJar `
         :android:app:testDebugUnitTest `
         :android:app:lintDebug `
-        :android:app:assembleDebug
+        :android:app:assembleDebug `
+        :android:app:assembleDebugAndroidTest `
+        :android:app:processReleaseMainManifest `
+        :android:sender-fixture:assembleDebug `
+        :android:sender-fixture:lintDebug
     if ($LASTEXITCODE -ne 0) {
         throw "Gradle verification failed with exit code $LASTEXITCODE"
     }
@@ -36,6 +40,14 @@ try {
     }
     if (Select-String -LiteralPath $mergedManifest -SimpleMatch "android.permission.INTERNET" -Quiet) {
         throw "The Android foundation must not request Internet permission"
+    }
+    if (Select-String -LiteralPath $mergedManifest -Pattern '<receiver\b|com\.dexcom\.' -Quiet) {
+        throw "The preparatory Android foundation must not register receivers or Dexcom permissions"
+    }
+    $releaseManifest = Join-Path $repositoryRoot "android\app\build\intermediates\merged_manifest\release\processReleaseMainManifest\AndroidManifest.xml"
+    if (-not (Test-Path -LiteralPath $releaseManifest) -or
+        (Select-String -LiteralPath $releaseManifest -Pattern 'senderfixture|android.permission.INTERNET|<receiver\b|com\.dexcom\.' -Quiet)) {
+        throw "Release manifest must stay isolated from fixtures, receivers and clinical/network permissions"
     }
 
     $workflowDirectory = Join-Path $repositoryRoot ".github\workflows"
@@ -105,6 +117,61 @@ jobs:
     git diff --check
     if ($LASTEXITCODE -ne 0) {
         throw "git diff --check found whitespace errors"
+    }
+
+    if ($DeviceTests) {
+        # Explicit opt-in: installs Next plus disposable synthetic test APKs only.
+        $deviceRows = @(adb devices | Select-Object -Skip 1 | Where-Object { $_ -match '\S+\s+(device|offline|unauthorized)$' })
+        if ($deviceRows.Count -ne 1 -or $deviceRows[0] -notmatch '\sdevice$') {
+            throw "Device tests require exactly one authorized USB device"
+        }
+        $deviceApi = (adb shell getprop ro.build.version.sdk).Trim()
+        if ($LASTEXITCODE -ne 0 -or $deviceApi -notmatch '^\d+$' -or [int]$deviceApi -lt 34) {
+            throw "Cross-UID identity sharing tests require Android API 34 or newer"
+        }
+        $fixturePackage = "org.bolusai.next.senderfixture"
+        $testPackage = "org.bolusai.next.test"
+        foreach ($package in @($fixturePackage, $testPackage)) {
+            $existingPackage = @(adb shell pm path $package)
+            if ($existingPackage -match '^package:') {
+                throw "Disposable test package already exists; refusing to overwrite or remove it: $package"
+            }
+        }
+        $installedTestPackages = [System.Collections.Generic.List[string]]::new()
+        try {
+            adb install -r $debugApk
+            if ($LASTEXITCODE -ne 0) { throw "Next APK installation failed" }
+            $testApks = @(
+                @{ Package = $fixturePackage; Path = "android\sender-fixture\build\outputs\apk\debug\sender-fixture-debug.apk" },
+                @{ Package = $testPackage; Path = "android\app\build\outputs\apk\androidTest\debug\app-debug-androidTest.apk" }
+            )
+            foreach ($testApk in $testApks) {
+                adb install -t (Join-Path $repositoryRoot $testApk.Path)
+                if ($LASTEXITCODE -ne 0) { throw "Synthetic test APK installation failed" }
+                $installedTestPackages.Add($testApk.Package)
+            }
+            # Direct instrumentation avoids collecting unrelated device logcat or clinical data.
+            $instrumentation = @(adb shell am instrument -w -r `
+                -e class org.bolusai.next.glucose.dexcom.AndroidDexcomSenderEvidenceTest `
+                org.bolusai.next.test/androidx.test.runner.AndroidJUnitRunner)
+            $instrumentationExit = $LASTEXITCODE
+            $instrumentation | Write-Output
+            $instrumentationText = $instrumentation -join "`n"
+            if ($instrumentationExit -ne 0 -or $instrumentationText -notmatch 'OK \([1-9]\d* tests?\)' -or
+                $instrumentationText -match 'FAILURES!!!|INSTRUMENTATION_FAILED|shortMsg=|INSTRUMENTATION_STATUS_CODE: -[1-4]') {
+                throw "Android sender instrumentation failed or did not complete"
+            }
+        }
+        finally {
+            $cleanupFailures = [System.Collections.Generic.List[string]]::new()
+            foreach ($package in $installedTestPackages) {
+                adb uninstall $package
+                if ($LASTEXITCODE -ne 0) { $cleanupFailures.Add($package) }
+            }
+            if ($cleanupFailures.Count -gt 0) {
+                throw "Could not remove disposable test packages: $($cleanupFailures -join ', ')"
+            }
+        }
     }
 }
 finally {
