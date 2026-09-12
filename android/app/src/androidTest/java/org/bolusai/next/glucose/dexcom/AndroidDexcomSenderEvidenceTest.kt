@@ -110,11 +110,26 @@ class AndroidDexcomSenderEvidenceTest {
         val responses = ArrayBlockingQueue<Result<DexcomSenderAuthenticationResult>>(1)
         val receiver = object : BroadcastReceiver() {
             override fun onReceive(context: Context, intent: Intent) {
-                // The incoming intent and its extras never enter the authentication boundary.
                 responses.offer(runCatching {
-                    DexcomSenderEvidenceAuthentication(policy).authenticate(
+                    var payloadReads = 0
+                    val result = DexcomAuthenticatedIngress(policy).receive(
                         AndroidDexcomSenderEvidenceSource(this, context.packageManager),
-                    )
+                    ) { sender ->
+                        payloadReads++
+                        // Only a synthetic, non-clinical marker; never an identity source.
+                        assertEquals("example.forged.package", intent.getStringExtra("packageName"))
+                        sender
+                    }
+                    when (result) {
+                        is DexcomIngressResult.Rejected -> {
+                            assertEquals("Rejected broadcasts must not access extras", 0, payloadReads)
+                            result.authentication
+                        }
+                        is DexcomIngressResult.Handled -> {
+                            assertEquals("Authenticated broadcasts dispatch exactly once", 1, payloadReads)
+                            result.value
+                        }
+                    }
                 })
             }
         }
