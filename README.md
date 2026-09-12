@@ -92,6 +92,9 @@ conectado a un receiver productivo ni contiene package, versión o certificado r
 El [adaptador de evidencia Android](docs/adr/0005-android-sender-evidence-adapter.md)
 extrae identidad y firmantes del sistema y dispone de un arnés instrumentado con
 emisor sintético de distinto UID. La composición productiva sigue bloqueada.
+Una [frontera de acceso diferido](docs/adr/0006-authenticate-before-payload.md)
+verifica cada mensaje antes de ejecutar el acceso al contenido; las pruebas USB
+comprueban que los rechazos no ejecutan ese acceso usando un marcador sintético.
 No se conecta todavía a Dexcom, no solicita permisos Dexcom, no calcula bolos ni
 registra tratamientos. Las versiones mínimas y el contrato Dexcom definitivos
 continúan pendientes. La [investigación de recepción local G7 en Android](docs/validation/dexcom-g7-android-local-reception-2026-09-06.md)

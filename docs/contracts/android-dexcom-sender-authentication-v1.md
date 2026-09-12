@@ -113,3 +113,17 @@ contrato compartido y su causa específica en Android.
 
 El arnés instrumentado usa un emisor sintético de distinto UID y anclas de test.
 No prueba todavía el productor Dexcom real ni aprueba su política.
+
+## Acceso diferido al contenido
+
+La frontera `DexcomAuthenticatedIngress` del [ADR 0006](../adr/0006-authenticate-before-payload.md)
+autentica de nuevo cada mensaje y solo entonces ejecuta la función de acceso al
+contenido. Los rechazos conservan su causa y no invocan esa función. La respuesta
+`Handled<T>` es exclusivamente técnica; no concede validez clínica. Los defectos
+inesperados se propagan sin reintentos ni clasificación engañosa.
+
+Las pruebas instrumentadas acceden únicamente a un marcador sintético después
+de autenticar y verifican cero accesos en los casos rechazados. No existe parser
+ni persistencia Dexcom; la composición productiva sigue pendiente. El futuro
+receiver deberá colocar todos los accesos al contenido dentro de esta función,
+añadir validación aprobada y probar por separado sus efectos de persistencia.

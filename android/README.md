@@ -64,3 +64,8 @@ No sobrescribe fixtures preexistentes. La acción sintética tiene destino fijo
 Next y ningún dato clínico. No utiliza Dexcom real, Legacy, servidores, logcat
 ni cambios de conectividad. La prueba real Dexcom en modo avión queda pendiente.
 La ejecución normal de `verify.ps1` y CI compilan las pruebas sin usar un teléfono.
+
+El arnés usa además `DexcomAuthenticatedIngress` para diferir el acceso a un
+marcador sintético hasta autenticar cada mensaje. Comprueba cero accesos cuando
+se rechaza y uno cuando se autentica. No interpreta campos de glucosa ni persiste
+mensajes; véase el [ADR 0006](../docs/adr/0006-authenticate-before-payload.md).
