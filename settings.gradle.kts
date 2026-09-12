@@ -18,3 +18,4 @@ rootProject.name = "bolus-ai-next"
 
 include(":shared:bolus-engine")
 include(":android:app")
+include(":android:sender-fixture")

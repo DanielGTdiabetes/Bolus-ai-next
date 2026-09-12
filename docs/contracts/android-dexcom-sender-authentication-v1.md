@@ -2,8 +2,8 @@
 
 - Fase: infraestructura preparatoria para Fase 5
 - Alcance: autenticación técnica anterior al payload; no valida glucosa
-- Estado: verificador implementado, sin política aprobada ni integración con un
-  receiver
+- Estado: verificador y adaptador de evidencia implementados, sin política
+  aprobada ni receiver productivo
 - Evidencia Legacy consultada:
   `DanielGTdiabetes/bolus_ai@f5417721d8019a9831126f4d843edfc4de87653d`
 - Evidencia del productor: [transporte observado v1](modified-dexcom-g7-broadcast-observed-v1.md)
@@ -63,6 +63,8 @@ Se conservan causas internas específicas:
 - `POLICY_NOT_APPROVED`;
 - `IDENTITY_NOT_SHARED`;
 - `PACKAGE_NOT_RESOLVED`;
+- `PACKAGE_LOOKUP_DENIED`;
+- `SIGNING_INFO_UNAVAILABLE`;
 - `PACKAGE_MISMATCH`;
 - `UID_MISMATCH`;
 - `VERSION_NOT_APPROVED`;
@@ -79,8 +81,9 @@ mantiene en el resultado Android para diagnóstico y pruebas, sin relabeling a
 - No se ha fijado una política `Approved` real.
 - El productor observado aún no usa
   `BroadcastOptions.setShareIdentityEnabled(true)`.
-- No existe extracción Android de identidad, resolución de `SigningInfo`,
-  receiver, permiso Dexcom, parser ni persistencia.
+- Existe extracción Android de identidad y resolución de `SigningInfo`,
+  ejercitadas mediante el arnés sintético del [ADR 0005](../adr/0005-android-sender-evidence-adapter.md).
+  No existe receiver productivo, permiso Dexcom, parser ni persistencia.
 - No se interpreta ningún extra ni se introducen lecturas sintéticas.
 - `PendingDexcomSource` continúa devolviendo
   `input.glucose.policy_not_approved` y la UI sigue bloqueada.
@@ -92,3 +95,21 @@ antes de cualquier parseo y que un rechazo no persiste ningún payload. También
 deberá resolver por separado todos los gates de unidad, timestamps, identidad
 de lectura, orden, duplicados, vigencia y persistencia enumerados en
 [`android-local-glucose-boundary-v1.md`](android-local-glucose-boundary-v1.md).
+
+## Adaptador Android preparatorio
+
+`DexcomSenderEvidenceAuthentication` coordina la política y el puerto de
+metadatos `DexcomSenderEvidenceSource`. No lee evidencia con política pendiente
+ni resuelve paquetes cuando falta identidad o el paquete atribuido es distinto.
+`AndroidDexcomSenderEvidenceSource` debe consumirse síncronamente dentro de
+`onReceive`; solo API 34+ proporciona identidad y resolución de firma para esta
+ruta. Los sistemas anteriores permanecen bloqueados.
+
+Se solicita `GET_SIGNING_CERTIFICATES` y se calculan SHA-256 sobre los firmantes
+actuales del APK, nunca sobre todo el historial de rotación. Una resolución
+denegada produce `PACKAGE_LOOKUP_DENIED`; firma ausente/vacía produce
+`SIGNING_INFO_UNAVAILABLE`. Ambas conservan `authentication_failed` en el
+contrato compartido y su causa específica en Android.
+
+El arnés instrumentado usa un emisor sintético de distinto UID y anclas de test.
+No prueba todavía el productor Dexcom real ni aprueba su política.

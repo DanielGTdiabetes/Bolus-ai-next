@@ -57,6 +57,9 @@ MainActivity
   La política real permanece `Pending`, el verificador no está conectado a un
   receiver y no puede producir una lectura disponible. Véase el
   [contrato v1](../contracts/android-dexcom-sender-authentication-v1.md).
+- El [ADR 0005](0005-android-sender-evidence-adapter.md) añade el adaptador de
+  evidencia del sistema y pruebas con un emisor sintético de distinto UID.
+  No conecta el productor real ni amplía los resultados admitidos por el puerto.
 
 ## Consecuencias
 
