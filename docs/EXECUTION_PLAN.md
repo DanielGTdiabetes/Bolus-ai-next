@@ -454,6 +454,22 @@ perder reversibilidad ni portabilidad.
 
 ## 6. Orden recomendado de los primeros cambios
 
+### Entrega de interfaz adelantada — 2026-09-12
+
+Por petición del propietario tras PR #19 se adelanta la estructura visual de los
+flujos de fases 6–8 y herramientas auxiliares, manteniendo intactas sus puertas
+clínicas. [Auditoría](audit/legacy-ui-2026-09-12.md),
+[ADR 0007](adr/0007-legacy-android-navigation.md) y
+[verificación USB](validation/android-navigation-2026-09-12.md).
+
+Criterios de este incremento: Inicio y navegación equivalente al frontend real,
+contraste explícito con Companion, pantallas locales para los accesos observados,
+estados ausentes/pending visibles, cálculo y tratamiento bloqueados, restauración
+y Atrás, verificación local/USB/CI, integración y árbol limpio. No completa
+recepción Dexcom, persistencia, perfil, IOB, motor, importación ni paridad clínica.
+
+### Secuencia de capacidades
+
 No intentar construir toda una fase en un solo cambio. Secuencia inicial:
 
 1. Gobierno: `AGENTS.md`, plan, ADR/risk templates.

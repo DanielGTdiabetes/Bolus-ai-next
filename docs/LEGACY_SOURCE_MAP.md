@@ -390,3 +390,35 @@ decisión para Next: migrar | corregir explícitamente | bloquear | descartar
 El criterio de salida no es “hemos leído los archivos”, sino poder trazar cada
 regla aprobada desde GitHub hasta un requisito y un vector que el motor único de
 Next reproduce sin defaults clínicos.
+
+## 7. Fuentes de interfaz — lote 2026-09-12
+
+SHA remoto fijado para **todas** las filas:
+`f5417721d8019a9831126f4d843edfc4de87653d`.
+Revalidado al retomar el cierre el 2026-09-13, sin cambio del SHA.
+Informe: [interfaz Legacy y traslado Android](audit/legacy-ui-2026-09-12.md).
+Se leyó el contenido con `git show SHA:ruta`, incluso cuando el checkout temporal
+no contenía el archivo. Sin ejecutar frontend, Companion ni servicios Legacy.
+
+| Ruta exacta | Símbolo / contrato | Afirmación sustentada |
+|---|---|---|
+| `frontend/src/main.js` | `registerView` | Registro de rutas de producto y cuenta. |
+| `frontend/src/components/layout/BottomNav.jsx` | `BottomNav`, `items` | Cinco destinos principales y alias activos. |
+| `frontend/src/pages/MenuPage.jsx` | `sections`, `AndroidTools`, `MenuPage` | Cuatro grupos de Más y enlaces condicionales al puente Android. |
+| `frontend/src/pages/HomePage.jsx` | `GlucoseHero`, `MetricsGrid`, `QuickActions`, `HomePage` | Glucosa → Predicción, IOB/COB/último bolo, accesos y actividad → Historial; contiene fallbacks no portados. |
+| `frontend/src/pages/BolusPage.jsx` | `BolusPage`, modal Cargar importación | Entradas comida/macros/glucosa/IOB, cálculo y confirmación; no autoriza sus fallbacks. |
+| `frontend/src/pages/ScanPage.jsx` | `CameraSection`, `PlateBuilder`, uso de `ScaleControl` | Cámara/Galería, báscula y Mi plato; no hay sección propia de pluma pese al texto del menú. |
+| `frontend/src/pages/NotificationsPage.jsx` | página, Avisos y Alertas | Destino Compañero y acciones de avisos. |
+| `frontend/src/pages/ProfilePage.jsx` | página, cuenta y Modo Enfermedad | Mi perfil no equivale al editor completo de parámetros clínicos. |
+| `frontend/src/pages/SettingsPage.jsx` | página, `CalcParamsPanel` | Diez secciones de Ajustes; parámetros clínicos bajo Cálculo; defaults observados no portados. |
+| `frontend/src/pages/HistoryPage.jsx` | `HistoryPage`, Editar Registro | Historial de tratamientos con consulta/edición y favoritos. |
+| `frontend/src/pages/FavoritesPage.jsx` | página, Nueva Comida | Biblioteca personal y editor de macros. |
+| `frontend/src/pages/FoodDatabasePage.jsx` | página y navegación a bolo | Catálogo de alimentos y selección para cálculo. |
+| `android-companion/src/main/java/org/bolusai/companion/MainActivity.kt` | `CompanionScreen`, `primaryScreens`, `expandedScreens`, `BolusCompanionApp` | Arranca WEB; barra nativa móvil distinta de la web y distribución ampliada distinta. |
+| `android-companion/src/main/java/org/bolusai/companion/MainActivity.kt` | `HomeScreen`, `BolusScreen`, `MealsScreen`, `SettingsScreen`, `DiagnosticsScreen`, `ScaleScreen` | Centro móvil, cálculo offline histórico, cola de comidas, ajustes, diagnóstico y báscula nativa. |
+| `android-companion/src/main/java/org/bolusai/companion/portal/InAppPortal.kt` | `InAppPortal`, `AndroidCompanionInterface` | WebView remota y puente de herramientas Android; Next reemplaza navegación sin cargar ese portal. |
+
+Los nombres de las pantallas secundarias Predicción, Basal, Aprendizaje,
+Sugerencias, Mapa corporal, Suministros, Estado del sistema, Emergencia y
+Nightscout se sustentan en `MenuPage.sections` y `main.js.registerView`; no se
+atribuye a este lote una auditoría clínica de sus implementaciones.

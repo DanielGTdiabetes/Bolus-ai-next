@@ -152,14 +152,14 @@ jobs:
             }
             # Direct instrumentation avoids collecting unrelated device logcat or clinical data.
             $instrumentation = @(adb shell am instrument -w -r `
-                -e class org.bolusai.next.glucose.dexcom.AndroidDexcomSenderEvidenceTest `
+                -e class org.bolusai.next.glucose.dexcom.AndroidDexcomSenderEvidenceTest,org.bolusai.next.NavigationDeviceTest `
                 org.bolusai.next.test/androidx.test.runner.AndroidJUnitRunner)
             $instrumentationExit = $LASTEXITCODE
             $instrumentation | Write-Output
             $instrumentationText = $instrumentation -join "`n"
             if ($instrumentationExit -ne 0 -or $instrumentationText -notmatch 'OK \([1-9]\d* tests?\)' -or
                 $instrumentationText -match 'FAILURES!!!|INSTRUMENTATION_FAILED|shortMsg=|INSTRUMENTATION_STATUS_CODE: -[1-4]') {
-                throw "Android sender instrumentation failed or did not complete"
+                throw "Android sender/navigation instrumentation failed or did not complete"
             }
         }
         finally {
