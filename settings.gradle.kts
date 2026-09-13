@@ -17,5 +17,6 @@ dependencyResolutionManagement {
 rootProject.name = "bolus-ai-next"
 
 include(":shared:bolus-engine")
+include(":shared:meal-drafts")
 include(":android:app")
 include(":android:sender-fixture")

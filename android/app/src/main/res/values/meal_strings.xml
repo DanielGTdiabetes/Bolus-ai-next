@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="draft_safety">Solo borradores y biblioteca local. Guardar no registra una ingesta ni un tratamiento. Estos datos no están validados para calcular.</string>
+    <string name="dish_library">Mis platos · biblioteca local</string>
+    <string name="draft_library">Comidas · borradores locales</string>
+    <string name="new_dish">Nuevo plato</string>
+    <string name="new_draft">Nueva comida manual</string>
+    <string name="draft_loading">Leyendo almacenamiento local…</string>
+    <string name="draft_read_failed">No se pudo leer la biblioteca. No se puede afirmar que esté vacía. Motivo: %1$s</string>
+    <string name="draft_retry">Reintentar lectura</string>
+    <string name="draft_empty">No hay borradores guardados en esta biblioteca.</string>
+    <string name="draft_unnamed">Nombre ausente</string>
+    <string name="draft_revision">Revisión local %1$d</string>
+    <string name="draft_incomplete">Hay campos de captura ausentes · uso clínico bloqueado</string>
+    <string name="draft_unvalidated">Campos introducidos · sin validación clínica</string>
+    <string name="draft_review">Revisar / editar</string>
+    <string name="draft_copy">Cargar como borrador de comida</string>
+    <string name="draft_discard_question">¿Descartar los cambios sin guardar? Las revisiones ya guardadas se conservan.</string>
+    <string name="draft_keep">Seguir editando</string>
+    <string name="draft_discard">Descartar cambios</string>
+    <string name="dish_editor">Revisar plato guardado</string>
+    <string name="draft_editor">Revisar borrador de comida</string>
+    <string name="draft_field_help">Vacío significa ausente; 0 solo se conserva si lo escribes. Se guarda el texto tal como lo introduces, sin convertir ni validar macros. Indica la unidad y base con la casilla. No se asignan fecha de consumo, hora ni zona.</string>
+    <string name="draft_origin">Copia independiente de un plato, revisión %1$d. Revisa los campos; editarla no modifica el plato.</string>
+    <string name="draft_basis">Declaro que los cuatro macros son totales en gramos (g) de este plato/comida, no por 100 g</string>
+    <string name="draft_name">Nombre</string>
+    <string name="draft_carbs">Hidratos · texto introducido</string>
+    <string name="draft_fat">Grasa · texto introducido</string>
+    <string name="draft_protein">Proteína · texto introducido</string>
+    <string name="draft_fiber">Fibra · texto introducido</string>
+    <string name="draft_notes">Notas</string>
+    <string name="draft_missing">Ausente · sin introducir</string>
+    <string name="draft_save">Guardar borrador en este dispositivo</string>
+    <string name="dish_save">Guardar plato en este dispositivo</string>
+    <string name="draft_back_to_list">Volver a la biblioteca</string>
+    <string name="draft_saving">Guardando en el dispositivo…</string>
+    <string name="draft_save_failed">No se confirmó el guardado. Tus campos siguen en el editor. Reintenta; si hay conflicto, vuelve a cargar la revisión guardada. Motivo: %1$s</string>
+    <string name="draft_saved">Borrador guardado en este dispositivo. Uso clínico bloqueado.</string>
+    <string name="dish_saved">Plato guardado en este dispositivo. Uso clínico bloqueado.</string>
+    <string name="draft_unsaved">Editor abierto · cambios sin confirmar guardado</string>
+    <string name="dish_unsaved">Editor de plato abierto · cambios sin confirmar guardado</string>
+    <string name="manual_drafts_link">Comida manual y borradores locales</string>
+</resources>

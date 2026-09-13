@@ -24,6 +24,8 @@ import org.bolusai.next.glucose.ReadLocalGlucoseStatus
 import org.bolusai.next.navigation.Destination
 import org.bolusai.next.ui.ScreenRenderer
 import org.bolusai.next.ui.SettingsSection
+import org.bolusai.next.meals.SqliteMealRepository
+import org.junit.After
 import org.junit.Assert.*
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -36,17 +38,22 @@ import java.util.concurrent.TimeUnit
 class NavigationDeviceTest {
     private val instrumentation = InstrumentationRegistry.getInstrumentation()
 
-    private fun launch(): ActivityScenario<MainActivity> = ActivityScenario.launch(MainActivity::class.java).also { scenario ->
-        scenario.onActivity { activity ->
-            // Test window only: no device settings, keyguard dismissal or production behavior change.
-            activity.window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-            if (Build.VERSION.SDK_INT >= 27) {
-                activity.setShowWhenLocked(true)
-                activity.setTurnScreenOn(true)
+    private fun launch(): ActivityScenario<MainActivity> {
+        MainActivity.mealRepositoryFactory = { SqliteMealRepository(it, null) }
+        return ActivityScenario.launch(MainActivity::class.java).also { scenario ->
+            scenario.onActivity { activity ->
+                // Test window only: no device settings, keyguard dismissal or production behavior change.
+                activity.window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                if (Build.VERSION.SDK_INT >= 27) {
+                    activity.setShowWhenLocked(true)
+                    activity.setTurnScreenOn(true)
+                }
             }
+            awaitLayout(scenario)
         }
-        awaitLayout(scenario)
     }
+
+    @After fun clearTestStorageFactory() { MainActivity.mealRepositoryFactory = null }
 
     private fun views(root: View): List<View> = listOf(root) + if (root is ViewGroup) {
         (0 until root.childCount).flatMap { views(root.getChildAt(it)) }
@@ -169,6 +176,31 @@ class NavigationDeviceTest {
                     assertTrue(codes.text.contains("input.iob.unknown"))
                     assertTrue(codes.text.contains("input.profile.missing"))
                 }
+            }
+        }
+    }
+
+    @Test fun bolusLinksToSavedDishesAndManualDraftsWithoutEnablingCalculation() {
+        launch().use { scenario ->
+            click(scenario, "tab:/bolus")
+            scenario.onActivity { activity ->
+                val root = activity.findViewById<View>(R.id.screen_content)
+                assertNotNull(root.findViewWithTag<View>("link:/favorites"))
+                assertNotNull(root.findViewWithTag<View>("link:native/meals"))
+                assertFalse(root.findViewWithTag<Button>("blocked:calculate").isEnabled)
+                assertFalse(root.findViewWithTag<Button>("blocked:confirm").isEnabled)
+            }
+            click(scenario, "link:/favorites")
+            scenario.onActivity { activity ->
+                assertTrue(activity.findViewById<View>(R.id.screen_content)
+                    .findViewWithTag<Button>("meal:new").isEnabled)
+            }
+            scenario.onActivity { it.onBackPressedDispatcher.onBackPressed() }
+            instrumentation.waitForIdleSync()
+            click(scenario, "link:native/meals")
+            scenario.onActivity { activity ->
+                assertTrue(activity.findViewById<View>(R.id.screen_content)
+                    .findViewWithTag<Button>("meal:new").isEnabled)
             }
         }
     }
