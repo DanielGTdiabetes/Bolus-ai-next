@@ -78,6 +78,16 @@ políticas no estén aprobados, el puerto no tiene una variante de lectura váli
 y devuelve `policy_not_approved`. Véanse el [ADR 0003](adr/0003-android-local-glucose-boundary.md)
 y el [contrato v1](contracts/android-local-glucose-boundary-v1.md).
 
+## Presentación Android local
+
+La estructura de UI usa Views/XML y AndroidX Activity para el ciclo de vida y
+Atrás. `AppNavigation` mantiene destinos/pila sin Android ni lógica clínica;
+`ScreenRenderer` presenta estados y enlaces internos. `MainActivity` compone
+`ReadOverview`, que consume el caso de uso de glucosa y los contratos compartidos
+de entradas no disponibles. No hay WebView ni acceso remoto. La pila, el scroll y
+la sección de Ajustes se restauran como estado de UI, sin persistir datos clínicos.
+La implementación y los límites están en el [ADR 0007](adr/0007-legacy-android-navigation.md).
+
 ## Convivencia con Legacy
 
 `bolus_ai` seguirá siendo producción mientras Bolus AI Next se valida.

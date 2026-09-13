@@ -35,9 +35,14 @@ android {
 }
 
 dependencies {
+    implementation("androidx.activity:activity:1.13.0") {
+        // This UI shell does not install baseline profiles or expose a profiling receiver.
+        exclude(group = "androidx.profileinstaller", module = "profileinstaller")
+    }
     implementation(project(":shared:bolus-engine"))
 
     testImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test:runner:1.7.0")
+    androidTestImplementation("androidx.test:core:1.7.0")
     androidTestImplementation("androidx.test.ext:junit:1.3.0")
 }

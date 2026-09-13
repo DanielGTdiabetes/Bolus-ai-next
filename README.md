@@ -64,6 +64,15 @@ Antes de implementar el cálculo de bolo se documentará y validará el motor cl
 
 ## Estado
 
+Android ya tiene una primera [estructura de interfaz basada en Legacy](docs/audit/legacy-ui-2026-09-12.md):
+Inicio, Compañero, Escanear, Bolo y Más, con 25 destinos locales, accesos a comidas,
+perfil, historial y herramientas Android. Conserva nombres y recorridos y mejora
+la presentación móvil. La navegación no requiere cuenta ni red; las funciones
+pendientes muestran su estado y las operaciones están deshabilitadas. No implica
+que exista todavía cálculo, persistencia clínica ni recepción de glucosa real.
+Véanse el [ADR 0007](docs/adr/0007-legacy-android-navigation.md) y la
+[verificación en teléfono](docs/validation/android-navigation-2026-09-12.md).
+
 Fase 1 en curso: auditoría clínica y técnica de Legacy en modo de solo lectura.
 El inventario funcional y el primer trazado de cálculo, perfil, IOB y glucosa
 están documentados, pero ninguna regla clínica está aprobada todavía. El sistema
@@ -105,6 +114,7 @@ el emisor y aprobar las políticas clínicas restantes.
 
 ## Documentación para ejecutar el proyecto
 
+- [`docs/NEXT_SESSION_PROMPT.md`](docs/NEXT_SESSION_PROMPT.md): prompt preparado para continuar con borradores de comidas y Mis platos locales.
 - [`AGENTS.md`](AGENTS.md): contrato de trabajo, seguridad, arquitectura, pruebas y Git para Codex y otros agentes.
 - [`docs/EXECUTION_PLAN.md`](docs/EXECUTION_PLAN.md): plan completo por fases, puertas de seguridad, criterios de aceptación y comandos de entrega.
 - [`docs/LEGACY_SOURCE_MAP.md`](docs/LEGACY_SOURCE_MAP.md): mapa reproducible del GitHub de Bolus AI Legacy y fuentes concretas para la auditoría de solo lectura.
