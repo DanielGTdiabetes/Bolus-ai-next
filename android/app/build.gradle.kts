@@ -40,6 +40,7 @@ dependencies {
         exclude(group = "androidx.profileinstaller", module = "profileinstaller")
     }
     implementation(project(":shared:bolus-engine"))
+    implementation(project(":shared:meal-drafts"))
 
     testImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test:runner:1.7.0")

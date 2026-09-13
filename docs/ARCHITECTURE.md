@@ -60,6 +60,15 @@ La aplicación Android deberá utilizar una base de datos durable, previsiblemen
 - perfil clínico y versión/config hash;
 - cola de sincronización e idempotency keys.
 
+### Primer adaptador: borradores de comida
+
+`shared/meal-drafts` define el modelo KMP y el puerto de persistencia para
+borradores y platos guardados. Android implementa el puerto con SQLite y conserva
+revisiones append-only. Los campos nutricionales son ausencia o texto introducido;
+el módulo no interpreta números ni aplica reglas. Guardar no crea recomendación,
+ingesta confirmada, tratamiento ni item de sincronización. Véase el
+[ADR 0008](adr/0008-local-meal-drafts.md).
+
 ## Conectividad
 
 Sin Internet deben seguir disponibles las funciones que solo requieren datos locales válidos.
@@ -84,8 +93,10 @@ La estructura de UI usa Views/XML y AndroidX Activity para el ciclo de vida y
 Atrás. `AppNavigation` mantiene destinos/pila sin Android ni lógica clínica;
 `ScreenRenderer` presenta estados y enlaces internos. `MainActivity` compone
 `ReadOverview`, que consume el caso de uso de glucosa y los contratos compartidos
-de entradas no disponibles. No hay WebView ni acceso remoto. La pila, el scroll y
-la sección de Ajustes se restauran como estado de UI, sin persistir datos clínicos.
+de entradas no disponibles, y `MealDraftModel`, que llama al módulo compartido y
+al adaptador SQLite. No hay WebView ni acceso remoto. La pila, el scroll, el editor
+de borrador y la sección de Ajustes se restauran; las revisiones confirmadas viven
+en SQLite.
 La implementación y los límites están en el [ADR 0007](adr/0007-legacy-android-navigation.md).
 
 ## Convivencia con Legacy

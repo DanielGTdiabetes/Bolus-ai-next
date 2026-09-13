@@ -422,3 +422,21 @@ Los nombres de las pantallas secundarias Predicción, Basal, Aprendizaje,
 Sugerencias, Mapa corporal, Suministros, Estado del sistema, Emergencia y
 Nightscout se sustentan en `MenuPage.sections` y `main.js.registerView`; no se
 atribuye a este lote una auditoría clínica de sus implementaciones.
+
+## 8. Fuentes de platos y entrada manual — lote 2026-09-13
+
+SHA remoto fijado y revalidado:
+`f5417721d8019a9831126f4d843edfc4de87653d`.
+Informe: [platos y entrada de comida Legacy](audit/legacy-meal-entry-2026-09-13.md).
+
+| Ruta exacta | Símbolo / contrato | Afirmación sustentada |
+|---|---|---|
+| `frontend/src/pages/FavoritesPage.jsx` | `FavoritesPage`, `handleAdd`, `handleUpdate`, `handleLoad` | Campos nombre/HC/grasa/proteína/fibra/notas, CRUD y carga parcial a Bolo; contiene fallbacks a cero. |
+| `frontend/src/lib/api.ts` | `getFavorites`, `saveFavorite`, `updateFavorite`, `deleteFavorite` | Persistencia remota Legacy de favoritos. |
+| `backend/app/api/user_data.py` | `FavoriteCreate`, `FavoriteRead`, `FavoriteUpdate` y endpoints | Contrato servidor del favorito; no es un borrador versionado. |
+| `backend/app/models/user_data.py` | `FavoriteFood` | Identidad/columnas Legacy y ausencia de revisiones de borrador. |
+| `frontend/src/pages/FoodDatabasePage.jsx` | `FoodDatabasePage`, `toggleFavorite`, `handleAddToCart`, `handleCheckout` | Catálogo/carrito efímero, base de 100 g y paso a Bolo; catálogo y heurísticas no se copian. |
+| `frontend/src/pages/BolusPage.jsx` | `BolusPage`, entrada manual y `Nueva comida` | Campos de comida y limpieza en memoria; fallbacks, clamps y cálculo no aprobados. |
+| `frontend/src/components/bolus/FoodSmartAutocomplete.jsx` | `FoodSmartAutocomplete` | Selección de favoritos y propagación de macros con conversión ausente→cero. |
+| `android-companion/src/main/java/org/bolusai/companion/MainActivity.kt` | `HomeScreen`, `manualNutritionRecord`, `MealsScreen` | Entrada manual que asigna instante y envía/encola; no equivale a biblioteca de borradores. |
+| `android-companion/src/main/java/org/bolusai/companion/queue/MealQueueRepository.kt` | `enqueueDetected`, estados de envío | Cola de integración Legacy, descartada como almacén de borradores Next. |

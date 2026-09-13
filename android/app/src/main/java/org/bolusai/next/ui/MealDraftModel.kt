@@ -1,0 +1,127 @@
+package org.bolusai.next.ui
+
+import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
+import androidx.lifecycle.ViewModel
+import org.bolusai.meals.*
+import java.io.Closeable
+import java.util.concurrent.Executors
+import java.util.concurrent.atomic.AtomicBoolean
+
+/** Lifecycle state and worker dispatch only. Shared use cases own the draft operations. */
+internal class MealDraftModel(
+    private val useCases: MealDrafts,
+    private val storage: Closeable,
+    restored: Bundle?,
+) : ViewModel() {
+    private val worker = Executors.newSingleThreadExecutor()
+    private val disposed = AtomicBoolean(false)
+    private val main = Handler(Looper.getMainLooper())
+    var changed: (() -> Unit)? = null
+    val lists = mutableMapOf<MealKind, MealRead>()
+    private val loading = mutableSetOf<MealKind>()
+    var editor: MealRecord? = restored?.let { restore(it) }
+        private set
+    private var baseline: MealRecord? = editor?.takeIf { restored?.getBoolean("dirty", true) == false }
+    var busy = false
+        private set
+    var failure: MealFailure? = null
+        private set
+    val dirty: Boolean get() = editor != null && editor != baseline
+    val canSave: Boolean get() = !busy && editor?.let { it.revision == 0L || dirty } == true
+
+    fun load(kind: MealKind) {
+        if (lists.containsKey(kind) || !loading.add(kind)) return
+        worker.execute {
+            val result = useCases.read(kind)
+            main.post { lists[kind] = result; loading.remove(kind); changed?.invoke() }
+        }
+    }
+
+    fun retry(kind: MealKind) { lists.remove(kind); load(kind); changed?.invoke() }
+    fun new(kind: MealKind) = open(useCases.new(kind), persisted = false)
+    fun edit(record: MealRecord) = open(record, persisted = true)
+    fun copy(record: MealRecord) = open(useCases.copyDish(record), persisted = false)
+
+    private fun open(record: MealRecord, persisted: Boolean) {
+        if (busy) return
+        editor = record
+        baseline = record.takeIf { persisted }
+        failure = null
+        changed?.invoke()
+    }
+
+    fun update(content: MealContent) {
+        if (busy) return
+        editor = editor?.copy(content = content)
+        failure = null
+    }
+
+    fun closeEditor() {
+        if (busy) return
+        editor = null
+        baseline = null
+        failure = null
+        changed?.invoke()
+    }
+
+    fun save() {
+        val pending = editor ?: return
+        if (!canSave) return
+        busy = true
+        failure = null
+        changed?.invoke()
+        worker.execute {
+            val result = useCases.save(pending)
+            main.post {
+                busy = false
+                when (result) {
+                    is MealSave.Saved -> {
+                        editor = result.record
+                        baseline = result.record
+                        lists.remove(result.record.kind)
+                    }
+                    is MealSave.Failed -> {
+                        failure = result.reason
+                        if (result.reason == MealFailure.CONFLICT) lists.remove(pending.kind)
+                    }
+                }
+                changed?.invoke()
+            }
+        }
+    }
+
+    fun snapshot(): Bundle? = editor?.let { record ->
+        Bundle().apply {
+            putString("id", record.id)
+            putLong("revision", record.revision)
+            putString("kind", record.kind.name)
+            putString("basis", record.content.basis.name)
+            putStringArrayList("fields", ArrayList(record.content.fields.map { it.editText() }))
+            putBoolean("dirty", dirty)
+            record.copiedFrom?.let { putString("source", it.id); putLong("sourceRevision", it.revision) }
+        }
+    }
+
+    private fun restore(bundle: Bundle): MealRecord? = try {
+        val fields = requireNotNull(bundle.getStringArrayList("fields")).map { draftField(it) }
+        require(fields.size == 6)
+        MealRecord(requireNotNull(bundle.getString("id")), bundle.getLong("revision"),
+            MealKind.valueOf(requireNotNull(bundle.getString("kind"))),
+            MealContent(fields[0], fields[1], fields[2], fields[3], fields[4], fields[5],
+                NutritionBasis.valueOf(requireNotNull(bundle.getString("basis")))),
+            bundle.getString("source")?.let { DishReference(it, bundle.getLong("sourceRevision")) })
+    } catch (_: IllegalArgumentException) { null }
+
+    override fun onCleared() {
+        changed = null
+        dispose()
+    }
+
+    internal fun dispose() {
+        if (!disposed.compareAndSet(false, true)) return
+        worker.execute { storage.close() }
+        worker.shutdown()
+    }
+}

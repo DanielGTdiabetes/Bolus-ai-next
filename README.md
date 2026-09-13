@@ -73,6 +73,15 @@ que exista todavía cálculo, persistencia clínica ni recepción de glucosa rea
 Véanse el [ADR 0007](docs/adr/0007-legacy-android-navigation.md) y la
 [verificación en teléfono](docs/validation/android-navigation-2026-09-12.md).
 
+Mis platos y Comidas ya permiten crear, editar, guardar y recuperar borradores
+locales versionados. Vacío y cero explícito se conservan como estados distintos;
+un plato puede copiarse a un borrador independiente. El flujo usa el modelo KMP
+de `shared/meal-drafts` y SQLite Android, sin red. Guardar no registra una ingesta
+ni un tratamiento, y el uso para cálculo permanece bloqueado. Véanse el
+[ADR 0008](docs/adr/0008-local-meal-drafts.md), la
+[auditoría Legacy](docs/audit/legacy-meal-entry-2026-09-13.md) y la
+[validación](docs/validation/local-meal-drafts-2026-09-13.md).
+
 Fase 1 en curso: auditoría clínica y técnica de Legacy en modo de solo lectura.
 El inventario funcional y el primer trazado de cálculo, perfil, IOB y glucosa
 están documentados, pero ninguna regla clínica está aprobada todavía. El sistema

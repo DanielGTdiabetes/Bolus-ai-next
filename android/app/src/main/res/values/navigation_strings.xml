@@ -88,7 +88,6 @@
     <string name="basal_disabled">Registrar basal · bloqueado</string>
     <string name="foods_detail">Catálogo y búsqueda local pendientes. No se han importado alimentos ni valores nutricionales.</string>
     <string name="favorites_detail">Biblioteca personal pendiente. Los platos guardados en Legacy no se han importado a Next.</string>
-    <string name="new_meal_disabled">Nueva comida · pendiente</string>
     <string name="learning_detail">Patrones y absorción no disponibles. Faltan historial local y reglas aprobadas.</string>
     <string name="suggestions_detail">Recomendaciones para revisar no disponibles. Next todavía no genera ni aplica sugerencias.</string>
     <string name="body_map_detail">Rotación de zonas de inyección pendiente. No hay zonas recomendadas ni registros locales.</string>

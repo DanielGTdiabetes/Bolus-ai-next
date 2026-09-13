@@ -18,6 +18,7 @@ import org.bolusai.next.GlucoseStatusPresenter
 import org.bolusai.next.R
 import org.bolusai.next.application.UnavailableOverview
 import org.bolusai.next.navigation.Destination
+import org.bolusai.meals.MealKind
 
 /** Renders status and navigation only; has no calculation, persistence or integration port. */
 internal class ScreenRenderer(
@@ -25,6 +26,7 @@ internal class ScreenRenderer(
     private val content: LinearLayout,
     private val open: (Destination) -> Unit,
     private val selectSettings: (SettingsSection) -> Unit,
+    private val renderMeals: ((MealKind) -> Unit)? = null,
 ) {
     private fun dp(value: Int) = (value * context.resources.displayMetrics.density).toInt()
     private fun color(id: Int) = context.getColor(id)
@@ -159,10 +161,8 @@ internal class ScreenRenderer(
                 disabled(R.string.tare_disabled, "tare")
             }
             Destination.HISTORY -> info(R.string.history_pending, R.string.history_detail)
-            Destination.FAVORITES -> {
-                info(R.string.favorites, R.string.favorites_detail)
-                disabled(R.string.new_meal_disabled, "new_favorite")
-            }
+            Destination.FAVORITES -> renderMeals?.invoke(MealKind.DISH)
+                ?: info(R.string.favorites, R.string.favorites_detail)
             Destination.FOODS -> info(R.string.foods, R.string.foods_detail)
             Destination.FORECAST -> info(R.string.forecast, R.string.forecast_detail)
             Destination.BASAL -> {
@@ -194,7 +194,8 @@ internal class ScreenRenderer(
                 link(Destination.DIAGNOSTICS)
                 link(Destination.MOBILE_SETTINGS)
             }
-            Destination.MEALS -> info(R.string.meals, R.string.meals_detail)
+            Destination.MEALS -> renderMeals?.invoke(MealKind.DRAFT)
+                ?: info(R.string.meals, R.string.meals_detail)
             Destination.DIAGNOSTICS -> {
                 glucose(state)
                 info(R.string.diagnostics, R.string.sync_detail)
@@ -208,7 +209,8 @@ internal class ScreenRenderer(
                 link(Destination.SETTINGS)
             }
         }
-        if (destination !in listOf(Destination.HOME, Destination.MORE, Destination.STATUS)) {
+        if (destination !in listOf(Destination.HOME, Destination.MORE, Destination.STATUS,
+                Destination.FAVORITES, Destination.MEALS)) {
             text(content, R.string.screen_pending, 13f, ink = R.color.secondary_text)
         }
     }
@@ -294,9 +296,9 @@ internal class ScreenRenderer(
         heading(R.string.meal_title)
         info(R.string.meal_title, R.string.meal_detail)
         card().also { text(it, R.string.macros_absent, ink = R.color.secondary_text) }
+        link(Destination.MEALS, R.string.manual_drafts_link)
         link(Destination.FAVORITES)
         link(Destination.FOODS)
-        link(Destination.MEALS)
         disabled(R.string.confirm_disabled, "confirm")
         details(state)
     }

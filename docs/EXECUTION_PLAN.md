@@ -468,6 +468,16 @@ estados ausentes/pending visibles, cálculo y tratamiento bloqueados, restauraci
 y Atrás, verificación local/USB/CI, integración y árbol limpio. No completa
 recepción Dexcom, persistencia, perfil, IOB, motor, importación ni paridad clínica.
 
+### Entrega de borradores de comida — 2026-09-13
+
+Mis platos y la entrada manual desde Bolo disponen de creación/lectura y
+corrección por revisiones locales (sin borrado). `shared/meal-drafts` separa plato,
+borrador, recomendación y hecho clínico; SQLite Android persiste revisiones con IDs
+estables y fallos explícitos. Ausencia no equivale a cero. No incorpora catálogo,
+validación nutricional, cálculo, timestamps de ingesta, sync ni tratamiento. Véanse
+[ADR 0008](adr/0008-local-meal-drafts.md) y la
+[validación del incremento](validation/local-meal-drafts-2026-09-13.md).
+
 ### Secuencia de capacidades
 
 No intentar construir toda una fase en un solo cambio. Secuencia inicial:
