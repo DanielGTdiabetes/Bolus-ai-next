@@ -13,12 +13,13 @@ import org.bolusai.meals.*
 import java.io.Closeable
 
 /** Device adapter for the shared draft port. Never deletes or replaces an existing revision. */
-internal class SqliteMealRepository(context: Context, name: String? = "meal-drafts.db") : MealRepository, Closeable {
+internal class SqliteMealRepository(context: Context, name: String? = "meal-drafts.db") : MealRepository, MealSelectionRepository, Closeable {
     private class UnsupportedSchema : RuntimeException()
-    private val helper = object : SQLiteOpenHelper(context.applicationContext, name, null, 1,
+    private val helper = object : SQLiteOpenHelper(context.applicationContext, name, null, 2,
         DatabaseErrorHandler { throw SQLiteDatabaseCorruptException("meal.storage.corrupt") }) {
         override fun onConfigure(db: SQLiteDatabase) {
             db.execSQL("PRAGMA synchronous=FULL")
+            db.setForeignKeyConstraintsEnabled(true)
         }
 
         override fun onCreate(db: SQLiteDatabase) {
@@ -38,11 +39,77 @@ internal class SqliteMealRepository(context: Context, name: String? = "meal-draf
                         (kind = 'DRAFT' AND source_id IS NOT NULL AND source_revision > 0))
                 )
             """.trimIndent())
+            createSelectionTable(db)
         }
 
-        override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) { throw UnsupportedSchema() }
+        override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
+            if (oldVersion != 1 || newVersion != 2) throw UnsupportedSchema()
+            // Validate the known v1 shape before adding review state; no revisions are rewritten.
+            db.rawQuery("SELECT id, revision, schema_version, kind, basis, name, carbs, fat, protein, fiber, notes, source_id, source_revision FROM meal_revisions", null).use {
+                while (it.moveToNext()) decode(it)
+            }
+            createSelectionTable(db)
+        }
         override fun onDowngrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) { throw UnsupportedSchema() }
     }
+
+    private fun createSelectionTable(db: SQLiteDatabase) {
+        db.execSQL("""
+            CREATE TABLE meal_selection (
+                slot INTEGER PRIMARY KEY CHECK(slot = 1),
+                id TEXT NOT NULL, revision INTEGER NOT NULL,
+                FOREIGN KEY(id, revision) REFERENCES meal_revisions(id, revision)
+            )
+        """.trimIndent())
+    }
+
+    override fun readSelection(): MealSelection = try {
+        val db = helper.readableDatabase
+        var result: MealSelection = MealSelection.Missing
+        db.transaction {
+            db.rawQuery("SELECT id, revision FROM meal_selection WHERE slot = 1", null).use { selection ->
+                if (selection.moveToFirst()) {
+                    val id = selection.getString(0)
+                    val snapshot = db.rawQuery("SELECT * FROM meal_revisions WHERE id = ? AND revision = ?",
+                        arrayOf(id, selection.getLong(1).toString())).use {
+                        require(it.moveToFirst()); decode(it)
+                    }
+                    result = MealSelection.Reviewed(snapshot, requireNotNull(latest(db, id)))
+                }
+            }
+        }
+        result
+    } catch (failure: RuntimeException) {
+        MealSelection.Failed(reason(failure, MealFailure.READ_FAILED))
+    }
+
+    override fun select(record: MealRecord): MealSelection = try {
+        val db = helper.writableDatabase
+        var result: MealSelection = MealSelection.Failed(MealFailure.SAVE_FAILED)
+        db.transaction {
+            val current = latest(db, record.id)
+            result = when {
+                record.revision <= 0 -> MealSelection.Failed(MealFailure.INVALID_RECORD)
+                current != record -> MealSelection.Failed(MealFailure.CONFLICT)
+                else -> {
+                    val values = ContentValues().apply {
+                        put("slot", 1); put("id", record.id); put("revision", record.revision)
+                    }
+                    if (db.update("meal_selection", values, "slot = 1", null) == 0) {
+                        db.insertOrThrow("meal_selection", null, values)
+                    }
+                    MealSelection.Reviewed(record, current)
+                }
+            }
+        }
+        result
+    } catch (failure: RuntimeException) {
+        MealSelection.Failed(reason(failure, MealFailure.SAVE_FAILED))
+    }
+
+    private fun latest(db: SQLiteDatabase, id: String): MealRecord? =
+        db.rawQuery("SELECT * FROM meal_revisions WHERE id = ? ORDER BY revision DESC LIMIT 1",
+            arrayOf(id)).use { if (it.moveToFirst()) decode(it) else null }
 
     override fun read(kind: MealKind): MealRead = try {
         val records = helper.readableDatabase.rawQuery("""

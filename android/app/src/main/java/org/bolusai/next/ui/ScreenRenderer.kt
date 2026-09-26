@@ -27,6 +27,7 @@ internal class ScreenRenderer(
     private val open: (Destination) -> Unit,
     private val selectSettings: (SettingsSection) -> Unit,
     private val renderMeals: ((MealKind) -> Unit)? = null,
+    private val renderSelection: (() -> Unit)? = null,
 ) {
     private fun dp(value: Int) = (value * context.resources.displayMetrics.density).toInt()
     private fun color(id: Int) = context.getColor(id)
@@ -294,8 +295,10 @@ internal class ScreenRenderer(
         info(R.string.profile_absent, R.string.profile_detail)
         link(Destination.SETTINGS)
         heading(R.string.meal_title)
-        info(R.string.meal_title, R.string.meal_detail)
-        card().also { text(it, R.string.macros_absent, ink = R.color.secondary_text) }
+        if (renderSelection != null) renderSelection.invoke() else {
+            info(R.string.meal_title, R.string.meal_detail)
+            card().also { text(it, R.string.macros_absent, ink = R.color.secondary_text) }
+        }
         link(Destination.MEALS, R.string.manual_drafts_link)
         link(Destination.FAVORITES)
         link(Destination.FOODS)

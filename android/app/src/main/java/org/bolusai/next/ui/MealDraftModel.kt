@@ -14,6 +14,7 @@ internal class MealDraftModel(
     private val useCases: MealDrafts,
     private val storage: Closeable,
     restored: Bundle?,
+    private val review: ReviewMealSelection? = null,
 ) : ViewModel() {
     private val worker = Executors.newSingleThreadExecutor()
     private val disposed = AtomicBoolean(false)
@@ -30,6 +31,45 @@ internal class MealDraftModel(
         private set
     val dirty: Boolean get() = editor != null && editor != baseline
     val canSave: Boolean get() = !busy && editor?.let { it.revision == 0L || dirty } == true
+    var selection: MealSelection? = null
+        private set
+    private var readingSelection = false
+    private var selectionRequest = 0L
+
+    fun refreshSelection() {
+        if (disposed.get() || readingSelection || busy) return
+        readingSelection = true
+        val request = ++selectionRequest
+        selection = null
+        changed?.invoke()
+        worker.execute {
+            val result = review?.read() ?: MealSelection.Failed(MealFailure.READ_FAILED)
+            main.post {
+                if (disposed.get() || request != selectionRequest) return@post
+                selection = result
+                readingSelection = false
+                changed?.invoke()
+            }
+        }
+    }
+
+    fun select(record: MealRecord) {
+        if (disposed.get() || busy) return
+        busy = true
+        ++selectionRequest
+        readingSelection = false
+        selection = null
+        changed?.invoke()
+        worker.execute {
+            val result = review?.select(record) ?: MealSelection.Failed(MealFailure.SAVE_FAILED)
+            main.post {
+                if (disposed.get()) return@post
+                busy = false
+                selection = result
+                changed?.invoke()
+            }
+        }
+    }
 
     fun load(kind: MealKind) {
         if (lists.containsKey(kind) || !loading.add(kind)) return
@@ -81,6 +121,7 @@ internal class MealDraftModel(
                         editor = result.record
                         baseline = result.record
                         lists.remove(result.record.kind)
+                        refreshSelection()
                     }
                     is MealSave.Failed -> {
                         failure = result.reason
