@@ -45,6 +45,23 @@ recuperan la referencia durable. El botón de edición abre explícitamente la �
 revisión; guardar no cambia el snapshot seleccionado. Para adoptarla se requiere
 volver a pulsar «Usar esta revisión en Bolo».
 
+La reanudación solo refresca la selección si el destino actual es Bolo, manual o
+Bolo offline. Las notificaciones de lectura de selección se separan de las del
+editor y solo reconstruyen esos destinos, incluso si una lectura termina después
+de navegar a otra pantalla. Volver a un editor tras pausar conserva su vista,
+texto sin guardar, foco, cursor y scroll.
+La posición se captura en `onPause` y se restaura después del dibujo al volver a
+destinos ajenos a Bolo, comprobando que no se haya navegado entretanto.
+
+Los Views y el contenedor de scroll se miden según el espacio disponible, sin
+fijar un ancho de teléfono ni bloquear orientación. Se verifican Bolo y el editor
+en formatos anchos vertical/horizontal y texto ampliado; el estado de borradores
+y la selección siguen independientes del tamaño de pantalla. Android recrea la
+actividad ante cambios de configuración y recupera los datos con el ViewModel,
+estado guardado y referencia SQLite existentes. No se introduce dependencia de
+APIs específicas de Pixel; un cliente iOS futuro deberá adaptar su presentación
+manteniendo los contratos compartidos.
+
 La obsolescencia se refiere al registro seleccionado. Una copia de plato es un
 borrador independiente según ADR 0008; editar el plato de origen no modifica esa
 copia ni su referencia de procedencia.

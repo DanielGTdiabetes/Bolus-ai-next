@@ -31,7 +31,7 @@ la instrumentación USB con datos sintéticos. Se ejecuta también `git diff --c
 | Núcleo KMP/JVM | 11 | Contratos de bloqueo existentes. |
 | Borradores y selección KMP/JVM | 6 | Campos exactos, invariantes, obsolescencia, fallos y bloqueo universal. |
 | Android/JVM | 40 | Navegación y fronteras existentes. |
-| USB | 27 | 8 autenticación, 7 navegación, 6 UI/ciclo de vida de comidas, 6 SQLite. |
+| USB | 29 | 8 autenticación, 7 navegación, 8 UI/ciclo de vida/Fold de comidas, 6 SQLite. |
 
 SQLite se prueba con bases de nombre aleatorio: cierre/reapertura, reintento,
 conflicto, escritura abortada mediante trigger sintético y fallo de lectura. Una
@@ -63,9 +63,61 @@ ejecutor ya cerrado. Una prueba con barreras deterministas comprueba que el
 guardado termina y no se solicita esa lectura tras cerrar.
 
 Resultado final del arnés: código de salida 0, `BUILD SUCCESSFUL` y
-`OK (27 tests)` en USB (26,956 s). Las 57 pruebas JVM también pasan. Los APKs de
+`OK (29 tests)` en USB (33,547 s), incluido el ajuste de reanudación y la pantalla
+interior del Fold. Las 57 pruebas JVM también pasan. Los APKs de
 test y emisor sintético fueron retirados; `adb shell pm path` para ambos paquetes
 no devolvió rutas. Next queda instalada con la versión verificada.
+
+## Revisión de reanudación del editor
+
+La revisión de `d5902f5c19` detectó que refrescar la selección incondicionalmente
+en `onResume` reconstruía Comidas/Mis platos y perdía foco y scroll. Ahora se
+refresca al reanudar solo los destinos de Bolo. Las notificaciones de lectura de
+selección se separan y solo reconstruyen esos destinos; una lectura en vuelo
+tampoco reconstruye el editor después de navegar fuera de Bolo. Una regresión
+recorre los editores de plato y borrador con texto sin guardar, cursor, foco y
+scroll, pausa/reanuda y comprueba que se conserva la misma vista y su estado.
+
+Compilación, lint, las 57 pruebas JVM y la regresión USB del ajuste pasan. Una
+ejecución previa quedó detenida por la guarda de dispositivo único al haber dos
+dispositivos autorizados conectados; se repitió con el único teléfono autorizado
+cuando el propietario lo dejó conectado.
+
+La preparación de la regresión también reveló reposicionamientos durante el
+dibujo y al recuperar foco. Se descartó un cambio de tamaño por teclado mediante
+mediciones del viewport y de los insets. La prueba espera el dibujo antes de
+medir, y la app captura la posición al pausar y la restaura después del dibujo,
+sin relajar la igualdad de scroll ni las comprobaciones de identidad/foco/cursor.
+
+## Pantalla interior del Pixel 10 Pro Fold
+
+El propietario solicitó verificar la pantalla interior y desplegó el teléfono.
+Las consultas de solo lectura identificaron `Pixel 10 Pro Fold`, densidad 390 y
+pantalla exterior de 1080 × 2364 píxeles antes de abrirlo; después expuso
+2076 × 2152 píxeles. No se cambiaron resolución, orientación, fuente ni ajustes
+del dispositivo.
+
+Una prueba adicional mide shells completos de Bolo con selección sintética y
+editor local en viewports representativos de 840 × 900 y 900 × 840 dp, con
+fuente normal y escala 1,8. Comprueba scroll utilizable, navegación dentro de
+pantalla, textos sin recorte vertical ni elipsis, campos literales, selección
+inmutable y bloqueos. Guarda imágenes de esos Views sintéticos, no capturas del
+dispositivo ni datos personales. Se inspeccionaron visualmente las imágenes de
+Bolo y editor con fuente 1,8, sin recortes; el contenido inferior sigue accesible
+mediante scroll. Las pruebas existentes de recreación cubren
+recuperación de selección y navegación; no se afirma haber automatizado la bisagra
+ni todas las transiciones de plegado en pleno uso.
+
+## Memoria de verificación remota
+
+La ejecución [36214578011](https://github.com/DanielGTdiabetes/Bolus-ai-next/actions/runs/36214578011)
+de `d5902f5c19` quedó atascada tras `OutOfMemoryError: Metaspace` y se canceló para
+sustituirla por la verificación del ajuste. Su log confirma los límites implícitos
+de Gradle: heap de 512 MiB y metaspace de 384 MiB. `gradle.properties` fija límites
+técnicos de heap 2 GiB y metaspace 1 GiB, y `ExitOnOutOfMemoryError` para terminar
+con fallo en lugar de dejar un daemon agotado indefinidamente. No se suprimen
+tests, lint ni comprobaciones del workflow; estos valores no son parámetros
+clínicos.
 
 ## Aislamiento y límites
 

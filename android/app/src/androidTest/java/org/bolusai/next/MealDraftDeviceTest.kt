@@ -6,6 +6,8 @@ import android.widget.Button
 import android.widget.EditText
 import android.widget.TextView
 import androidx.test.core.app.ActivityScenario
+import androidx.core.graphics.createBitmap
+import androidx.core.view.isVisible
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import org.bolusai.meals.*
@@ -69,6 +71,30 @@ class MealDraftDeviceTest {
             SystemClock.sleep(25)
         }
         fail("Missing synthetic UI state: $tag")
+    }
+
+    private fun awaitEditorLayout(scenario: ActivityScenario<MainActivity>, input: EditText) {
+        val drawn = java.util.concurrent.CountDownLatch(1)
+        lateinit var root: View
+        lateinit var listener: android.view.ViewTreeObserver.OnPreDrawListener
+        scenario.onActivity { activity ->
+            root = activity.findViewById(R.id.app_shell)
+            val panel = activity.findViewById<View>(R.id.screen_scroll)
+            listener = android.view.ViewTreeObserver.OnPreDrawListener {
+                if (input.isLaidOut && !input.isLayoutRequested && input.height > 0 &&
+                    panel.isLaidOut && !panel.isLayoutRequested && panel.height > 0) {
+                    root.viewTreeObserver.removeOnPreDrawListener(listener)
+                    root.post { drawn.countDown() }
+                } else root.postInvalidateOnAnimation()
+                true
+            }
+            root.viewTreeObserver.addOnPreDrawListener(listener)
+            root.requestLayout()
+            root.postInvalidateOnAnimation()
+        }
+        val completed = drawn.await(5, java.util.concurrent.TimeUnit.SECONDS)
+        scenario.onActivity { root.viewTreeObserver.removeOnPreDrawListener(listener) }
+        assertTrue("Synthetic editor did not lay out before measuring scroll", completed)
     }
 
     @Test fun dishSelectionSurvivesRelaunchAndRequiresExplicitNewRevision() = selectionFlow(MealKind.DISH)
@@ -188,6 +214,156 @@ class MealDraftDeviceTest {
         instrumentation.waitForIdleSync()
         assertTrue(saved.get())
         assertEquals(0, reads.get())
+    }
+
+    @Test fun resumingMealAndDishEditorsPreservesUnsavedTextFocusAndScroll() {
+        val context = instrumentation.targetContext
+        for (kind in MealKind.entries) {
+            val name = "synthetic-resume-${UUID.randomUUID()}.db"
+            SqliteMealRepository(context, name).use {
+                it.save(MealRecord("resume-editor", 0, kind, MealContent()))
+            }
+            MainActivity.mealRepositoryFactory = { SqliteMealRepository(it, name) }
+            try {
+                launch().use { scenario ->
+                    scenario.onActivity { it.findViewById<View>(R.id.bottom_navigation)
+                        .findViewWithTag<View>("tab:/bolus").performClick() }
+                    awaitView(scenario, "selection:status", context.getString(R.string.meal_selection_missing))
+                    scenario.onActivity { view(it, if (kind == MealKind.DISH) "link:/favorites" else "link:native/meals").performClick() }
+                    awaitView(scenario, "meal:edit:resume-editor")
+                    scenario.onActivity { view(it, "meal:edit:resume-editor").performClick() }
+                    lateinit var input: EditText
+                    var scroll = 0
+                    var before = ""
+                    fun geometry(activity: MainActivity): String {
+                        val panel = activity.findViewById<View>(R.id.screen_scroll)
+                        val imeVisible = if (android.os.Build.VERSION.SDK_INT >= 30)
+                            panel.rootWindowInsets?.isVisible(android.view.WindowInsets.Type.ime()) else null
+                        return "panel=${panel.height}, field=${input.top}/${input.height}, ime=$imeVisible"
+                    }
+                    scenario.onActivity { activity ->
+                        input = view(activity, "meal:notes") as EditText
+                        input.append("Texto sintético sin guardar")
+                        assertTrue(input.requestFocus())
+                        input.setSelection(4)
+                    }
+                    awaitEditorLayout(scenario, input)
+                    scenario.onActivity { activity ->
+                        // Keep the focused field visible so Android need not scroll it back into view on resume.
+                        val panel = activity.findViewById<android.widget.ScrollView>(R.id.screen_scroll)
+                        panel.scrollTo(0, (input.top - (panel.height - input.height) / 2).coerceAtLeast(0))
+                    }
+                    awaitEditorLayout(scenario, input)
+                    scenario.onActivity { activity ->
+                        scroll = activity.findViewById<android.widget.ScrollView>(R.id.screen_scroll).scrollY
+                        before = geometry(activity)
+                        assertTrue(scroll > 0)
+                    }
+                    scenario.moveToState(androidx.lifecycle.Lifecycle.State.CREATED)
+                    scenario.moveToState(androidx.lifecycle.Lifecycle.State.RESUMED)
+                    awaitEditorLayout(scenario, input)
+                    scenario.onActivity { activity ->
+                        assertSame(input, view(activity, "meal:notes"))
+                        assertEquals("Texto sintético sin guardar", input.text.toString())
+                        assertTrue(input.hasFocus())
+                        assertEquals(4, input.selectionStart)
+                        assertEquals("Before: $before; after: ${geometry(activity)}", scroll,
+                            activity.findViewById<android.widget.ScrollView>(R.id.screen_scroll).scrollY)
+                        assertTrue(view(activity, "meal:save").isEnabled)
+                    }
+                }
+            } finally { context.deleteDatabase(name) }
+        }
+    }
+
+    @Test fun unfoldedLayoutsShowSelectionAndEditorWithoutClippingAtLargeFont() {
+        val record = MealRecord("synthetic-fold-selection", 1, MealKind.DRAFT,
+            MealContent(name = draftField("Plato sintético para revisar en pantalla interior"),
+                carbs = draftField("0"), protein = draftField("sin validar")),
+            DishReference("synthetic-source", 3))
+        val repository = object : MealRepository, MealSelectionRepository {
+            override fun read(kind: MealKind) = MealRead.Loaded(listOf(record).filter { it.kind == kind })
+            override fun save(editor: MealRecord) = MealSave.Failed(MealFailure.SAVE_FAILED)
+            override fun readSelection() = MealSelection.Reviewed(record, record)
+            override fun select(record: MealRecord) = MealSelection.Reviewed(record, record)
+        }
+        lateinit var model: MealDraftModel
+        val loaded = java.util.concurrent.CountDownLatch(1)
+        instrumentation.runOnMainSync {
+            model = MealDraftModel(MealDrafts(repository, MealIds { "synthetic-fold" }), Closeable {}, null,
+                ReviewMealSelection(repository))
+            model.selectionChanged = { if (model.selection != null) loaded.countDown() }
+            model.refreshSelection()
+        }
+        try {
+            assertTrue(loaded.await(5, java.util.concurrent.TimeUnit.SECONDS))
+            launch().use { scenario ->
+                scenario.onActivity { activity ->
+                    fun descendants(root: View): List<View> = listOf(root) + if (root is android.view.ViewGroup)
+                        (0 until root.childCount).flatMap { descendants(root.getChildAt(it)) } else emptyList()
+                    // Representative expanded portrait/landscape viewports, not a claim about hardware pixels.
+                    for ((widthDp, heightDp) in listOf(840 to 900, 900 to 840)) {
+                        for (scale in listOf(1f, 1.8f)) {
+                            val configuration = android.content.res.Configuration(activity.resources.configuration).apply {
+                                screenWidthDp = widthDp; screenHeightDp = heightDp; fontScale = scale
+                            }
+                            val context = activity.createConfigurationContext(configuration)
+                            for (editor in listOf(false, true)) {
+                                val shell = android.view.LayoutInflater.from(context).inflate(R.layout.activity_main, null)
+                                val panel = shell.findViewById<android.widget.LinearLayout>(R.id.screen_content)
+                                val renderer = org.bolusai.next.ui.ScreenRenderer(context, panel, {}, {},
+                                    renderSelection = { org.bolusai.next.ui.MealSelectionScreen(context, panel, model) {}.render() })
+                                if (editor) {
+                                    model.edit(record)
+                                    shell.findViewById<TextView>(R.id.screen_title).setText(R.string.draft_editor)
+                                    MealDraftScreen(context, panel, model) {}.render(MealKind.DRAFT)
+                                } else {
+                                    shell.findViewById<TextView>(R.id.screen_title).setText(R.string.bolus)
+                                    renderer.render(org.bolusai.next.navigation.Destination.BOLUS,
+                                        org.bolusai.next.application.ReadOverview(org.bolusai.next.glucose.ReadLocalGlucoseStatus(
+                                            org.bolusai.next.glucose.PendingDexcomSource)).execute(),
+                                        org.bolusai.next.ui.SettingsSection.NIGHTSCOUT)
+                                }
+                                org.bolusai.next.navigation.Destination.primary.forEach {
+                                    renderer.addTab(shell.findViewById(R.id.bottom_navigation), it,
+                                        it == org.bolusai.next.navigation.Destination.BOLUS) {}
+                                }
+                                val density = context.resources.displayMetrics.density
+                                val width = (widthDp * density).toInt()
+                                val height = (heightDp * density).toInt()
+                                shell.measure(View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY),
+                                    View.MeasureSpec.makeMeasureSpec(height, View.MeasureSpec.EXACTLY))
+                                shell.layout(0, 0, width, height)
+                                assertTrue(shell.findViewById<View>(R.id.screen_scroll).height > 0)
+                                assertTrue(shell.findViewById<View>(R.id.bottom_navigation).bottom <= height)
+                                descendants(shell).filterIsInstance<TextView>().filter { it.isVisible }.forEach {
+                                    assertTrue("No width: ${it.tag}", it.width > 0)
+                                    assertTrue("Clipped text: ${it.tag}", it.layout.height <=
+                                        it.height - it.compoundPaddingTop - it.compoundPaddingBottom)
+                                    for (line in 0 until it.layout.lineCount) assertEquals(0, it.layout.getEllipsisCount(line))
+                                }
+                                if (!editor) {
+                                    assertFalse(panel.findViewWithTag<View>("blocked:calculate").isEnabled)
+                                    assertFalse(panel.findViewWithTag<View>("blocked:confirm").isEnabled)
+                                    assertEquals("0", panel.findViewWithTag<TextView>("selection:carbs").text.toString())
+                                }
+                                if (widthDp == 840) {
+                                    val bitmap = createBitmap(width, height)
+                                    val canvas = android.graphics.Canvas(bitmap)
+                                    canvas.drawColor(context.getColor(R.color.page_background))
+                                    shell.draw(canvas)
+                                    val file = java.io.File(activity.filesDir, "ui-review/fold-${if (editor) "editor" else "bolus"}-$scale.png")
+                                    check(file.parentFile!!.mkdirs() || file.parentFile!!.isDirectory)
+                                    file.outputStream().use { check(bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it)) }
+                                    bitmap.recycle()
+                                }
+                            }
+                        }
+                    }
+                    assertEquals(MealSelection.Reviewed(record, record), model.selection)
+                }
+            }
+        } finally { instrumentation.runOnMainSync { model.dispose() } }
     }
 
     @Test fun editorSavesAndRecoversSyntheticDraftWithoutEnablingClinicalUse() {

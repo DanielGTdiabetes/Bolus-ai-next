@@ -20,6 +20,7 @@ internal class MealDraftModel(
     private val disposed = AtomicBoolean(false)
     private val main = Handler(Looper.getMainLooper())
     var changed: (() -> Unit)? = null
+    var selectionChanged: (() -> Unit)? = null
     val lists = mutableMapOf<MealKind, MealRead>()
     private val loading = mutableSetOf<MealKind>()
     var editor: MealRecord? = restored?.let { restore(it) }
@@ -41,14 +42,14 @@ internal class MealDraftModel(
         readingSelection = true
         val request = ++selectionRequest
         selection = null
-        changed?.invoke()
+        selectionChanged?.invoke()
         worker.execute {
             val result = review?.read() ?: MealSelection.Failed(MealFailure.READ_FAILED)
             main.post {
                 if (disposed.get() || request != selectionRequest) return@post
                 selection = result
                 readingSelection = false
-                changed?.invoke()
+                selectionChanged?.invoke()
             }
         }
     }
@@ -157,6 +158,7 @@ internal class MealDraftModel(
 
     override fun onCleared() {
         changed = null
+        selectionChanged = null
         dispose()
     }
 

@@ -10,6 +10,7 @@ import android.widget.ScrollView
 import android.widget.TextView
 import androidx.activity.ComponentActivity
 import androidx.activity.OnBackPressedCallback
+import androidx.core.view.doOnPreDraw
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import org.bolusai.meals.MealDrafts
@@ -35,6 +36,7 @@ class MainActivity : ComponentActivity() {
     private lateinit var renderer: ScreenRenderer
     private lateinit var meals: MealDraftModel
     private val scrollPositions = mutableMapOf<String, Int>()
+    private var pausedPosition: Pair<Destination, Int>? = null
     private var settingsSection = SettingsSection.NIGHTSCOUT
     private val overview = ReadOverview(ReadLocalGlucoseStatus(PendingDexcomSource))
     private val backCallback = object : OnBackPressedCallback(false) {
@@ -63,6 +65,7 @@ class MainActivity : ComponentActivity() {
         renderer = ScreenRenderer(this, findViewById(R.id.screen_content), ::open,
             { settingsSection = it; render() }, ::renderMeals, ::renderSelection)
         meals.changed = { render() }
+        meals.selectionChanged = { if (isReviewDestination(navigation.current)) render() }
         findViewById<Button>(R.id.back_button).setOnClickListener { goBack() }
         onBackPressedDispatcher.addCallback(this, backCallback)
         render()
@@ -86,13 +89,31 @@ class MainActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
-        meals.refreshSelection()
+        refreshReview(navigation.current)
+        val position = pausedPosition
+        pausedPosition = null
+        if (!isReviewDestination(navigation.current) && position != null) {
+            val scroll = findViewById<ScrollView>(R.id.screen_scroll)
+            // Restore after native focus/layout traversal without rebuilding the editor or its fields.
+            scroll.doOnPreDraw {
+                scroll.post {
+                    if (navigation.current == position.first) scroll.scrollTo(0, position.second)
+                }
+            }
+        }
     }
 
+    override fun onPause() {
+        rememberScroll()
+        pausedPosition = navigation.current to findViewById<ScrollView>(R.id.screen_scroll).scrollY
+        super.onPause()
+    }
+
+    private fun isReviewDestination(destination: Destination): Boolean =
+        destination in listOf(Destination.BOLUS, Destination.MANUAL, Destination.OFFLINE_BOLUS)
+
     private fun refreshReview(destination: Destination) {
-        if (destination in listOf(Destination.BOLUS, Destination.MANUAL, Destination.OFFLINE_BOLUS)) {
-            meals.refreshSelection()
-        }
+        if (isReviewDestination(destination)) meals.refreshSelection()
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
@@ -108,6 +129,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onDestroy() {
         meals.changed = null
+        meals.selectionChanged = null
         super.onDestroy()
     }
 
