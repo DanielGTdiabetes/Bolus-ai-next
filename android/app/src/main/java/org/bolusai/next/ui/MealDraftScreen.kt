@@ -20,6 +20,7 @@ internal class MealDraftScreen(
     private val context: Context,
     private val content: LinearLayout,
     private val model: MealDraftModel,
+    private val openBolus: () -> Unit = {},
     private val openDrafts: () -> Unit,
 ) {
     private fun dp(value: Int) = (value * context.resources.displayMetrics.density).toInt()
@@ -77,6 +78,9 @@ internal class MealDraftScreen(
                         label(context.getString(R.string.draft_revision, record.revision))
                         label(if (record.content.hasMissingCaptureFields) R.string.draft_incomplete else R.string.draft_unvalidated)
                         action(R.string.draft_review, "meal:edit:${record.id}") { replaceEditor { model.edit(record) } }
+                        action(R.string.meal_use_in_bolus, "meal:select:${record.id}") {
+                            replaceEditor { model.closeEditor(); model.select(record); openBolus() }
+                        }
                         if (kind == MealKind.DISH) {
                             action(R.string.draft_copy, "meal:copy:${record.id}") {
                                 replaceEditor { model.copy(record); openDrafts() }
@@ -146,6 +150,18 @@ internal class MealDraftScreen(
             "meal:save", model.canSave) { model.save() }
         fields.forEach { it.doAfterTextChanged { update(); saveButton.isEnabled = model.canSave } }
         basis.setOnCheckedChangeListener { _, _ -> update(); saveButton.isEnabled = model.canSave }
+        if (record.revision > 0 && !model.dirty) {
+            action(R.string.meal_use_in_bolus, "meal:select", !model.busy) {
+                // Text listeners can make this editor dirty without rebuilding the screen.
+                if (!model.dirty) { model.select(record); openBolus() }
+            }.also { selectButton ->
+                fields.forEach { it.doAfterTextChanged { selectButton.isEnabled = !model.busy && !model.dirty } }
+                basis.setOnCheckedChangeListener { _, _ ->
+                    update(); saveButton.isEnabled = model.canSave
+                    selectButton.isEnabled = !model.busy && !model.dirty
+                }
+            }
+        }
         action(R.string.draft_back_to_list, "meal:list") { replaceEditor { model.closeEditor() } }
         label(record.clinicalBlockCode, "meal:block_code")
     }

@@ -10,11 +10,14 @@ import android.widget.ScrollView
 import android.widget.TextView
 import androidx.activity.ComponentActivity
 import androidx.activity.OnBackPressedCallback
+import androidx.core.view.doOnPreDraw
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import org.bolusai.meals.MealDrafts
 import org.bolusai.meals.MealIds
 import org.bolusai.meals.MealKind
+import org.bolusai.meals.ReviewMealSelection
+import org.bolusai.next.ui.MealSelectionScreen
 import org.bolusai.next.application.ReadOverview
 import org.bolusai.next.glucose.PendingDexcomSource
 import org.bolusai.next.glucose.ReadLocalGlucoseStatus
@@ -33,6 +36,7 @@ class MainActivity : ComponentActivity() {
     private lateinit var renderer: ScreenRenderer
     private lateinit var meals: MealDraftModel
     private val scrollPositions = mutableMapOf<String, Int>()
+    private var pausedPosition: Pair<Destination, Int>? = null
     private var settingsSection = SettingsSection.NIGHTSCOUT
     private val overview = ReadOverview(ReadLocalGlucoseStatus(PendingDexcomSource))
     private val backCallback = object : OnBackPressedCallback(false) {
@@ -55,12 +59,13 @@ class MainActivity : ComponentActivity() {
                 val repository = mealRepositoryFactory?.invoke(applicationContext)
                     ?: SqliteMealRepository(applicationContext)
                 return MealDraftModel(MealDrafts(repository, MealIds { UUID.randomUUID().toString() }),
-                    repository, restoredEditor) as T
+                    repository, restoredEditor, ReviewMealSelection(repository)) as T
             }
         })[MealDraftModel::class.java]
         renderer = ScreenRenderer(this, findViewById(R.id.screen_content), ::open,
-            { settingsSection = it; render() }, ::renderMeals)
+            { settingsSection = it; render() }, ::renderMeals, ::renderSelection)
         meals.changed = { render() }
+        meals.selectionChanged = { if (isReviewDestination(navigation.current)) render() }
         findViewById<Button>(R.id.back_button).setOnClickListener { goBack() }
         onBackPressedDispatcher.addCallback(this, backCallback)
         render()
@@ -73,12 +78,42 @@ class MainActivity : ComponentActivity() {
     private fun open(destination: Destination) {
         rememberScroll()
         navigation.open(destination)
+        refreshReview(destination)
         render()
     }
 
     private fun goBack() {
         rememberScroll()
-        if (navigation.back()) render() else finish()
+        if (navigation.back()) { refreshReview(navigation.current); render() } else finish()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        refreshReview(navigation.current)
+        val position = pausedPosition
+        pausedPosition = null
+        if (!isReviewDestination(navigation.current) && position != null) {
+            val scroll = findViewById<ScrollView>(R.id.screen_scroll)
+            // Restore after native focus/layout traversal without rebuilding the editor or its fields.
+            scroll.doOnPreDraw {
+                scroll.post {
+                    if (navigation.current == position.first) scroll.scrollTo(0, position.second)
+                }
+            }
+        }
+    }
+
+    override fun onPause() {
+        rememberScroll()
+        pausedPosition = navigation.current to findViewById<ScrollView>(R.id.screen_scroll).scrollY
+        super.onPause()
+    }
+
+    private fun isReviewDestination(destination: Destination): Boolean =
+        destination in listOf(Destination.BOLUS, Destination.MANUAL, Destination.OFFLINE_BOLUS)
+
+    private fun refreshReview(destination: Destination) {
+        if (isReviewDestination(destination)) meals.refreshSelection()
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
@@ -94,13 +129,27 @@ class MainActivity : ComponentActivity() {
 
     override fun onDestroy() {
         meals.changed = null
+        meals.selectionChanged = null
         super.onDestroy()
     }
 
     private fun renderMeals(kind: MealKind) {
-        MealDraftScreen(this, findViewById(R.id.screen_content), meals) {
+        MealDraftScreen(this, findViewById(R.id.screen_content), meals, { open(Destination.BOLUS) }) {
             if (navigation.current != Destination.MEALS) open(Destination.MEALS) else render()
         }.render(kind)
+    }
+
+    private fun renderSelection() {
+        MealSelectionScreen(this, findViewById(R.id.screen_content), meals) { record ->
+            val edit = {
+                meals.edit(record)
+                open(if (record.kind == MealKind.DISH) Destination.FAVORITES else Destination.MEALS)
+            }
+            if (meals.dirty) android.app.AlertDialog.Builder(this).setMessage(R.string.draft_discard_question)
+                .setNegativeButton(R.string.draft_keep, null)
+                .setPositiveButton(R.string.draft_discard) { _, _ -> edit() }.show()
+            else edit()
+        }.render()
     }
 
     private fun render() {
@@ -119,6 +168,7 @@ class MainActivity : ComponentActivity() {
             renderer.addTab(bar, tab, destination.tab == tab) {
                 rememberScroll()
                 navigation.selectTab(tab)
+                refreshReview(tab)
                 render()
             }
         }

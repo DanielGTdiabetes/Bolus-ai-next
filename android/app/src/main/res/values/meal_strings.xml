@@ -40,4 +40,16 @@
     <string name="draft_unsaved">Editor abierto · cambios sin confirmar guardado</string>
     <string name="dish_unsaved">Editor de plato abierto · cambios sin confirmar guardado</string>
     <string name="manual_drafts_link">Comida manual y borradores locales</string>
+    <string name="meal_use_in_bolus">Usar esta revisión en Bolo</string>
+    <string name="meal_selection_safety">Revisión de entrada local · cálculo bloqueado. Seleccionar no registra una ingesta ni confirma un bolo. Los textos no tienen validación nutricional.</string>
+    <string name="meal_selection_missing">Sin revisión seleccionada. Elige un plato o borrador guardado. meal.selection.missing</string>
+    <string name="meal_selection_failed">No se pudo confirmar la selección local. No se muestra una revisión como vigente. Motivo: %1$s</string>
+    <string name="meal_selection_pinned">Revisión seleccionada: %1$d · coincide con la última guardada. Uso clínico bloqueado.</string>
+    <string name="meal_selection_obsolete">Selección obsoleta: se conserva la revisión %1$d; existe la revisión %2$d. Revisa el registro y selecciona explícitamente la nueva revisión.</string>
+    <string name="meal_selection_identity">%3$s\nID: %1$s\nRevisión: %2$d</string>
+    <string name="meal_selection_copy">Origen: copia independiente del plato %1$s, revisión %2$d.</string>
+    <string name="meal_selection_manual">Origen: entrada manual local.</string>
+    <string name="meal_selection_grams">Base declarada: macros totales en gramos (g) del plato/comida. Textos sin convertir ni validar.</string>
+    <string name="meal_selection_basis_missing">Base y unidades ausentes: no se infieren.</string>
+    <string name="meal_selection_edit">Revisar / editar la última revisión guardada</string>
 </resources>

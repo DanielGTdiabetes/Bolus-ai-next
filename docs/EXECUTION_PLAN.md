@@ -478,6 +478,16 @@ validación nutricional, cálculo, timestamps de ingesta, sync ni tratamiento. V
 [ADR 0008](adr/0008-local-meal-drafts.md) y la
 [validación del incremento](validation/local-meal-drafts-2026-09-13.md).
 
+### Entrega de selección para revisión en Bolo — 2026-09-26
+
+Incremento preparatorio de fases 2, 4 y 7: selección durable por ID/revisión desde
+Mis platos y Comidas, presentación literal de campos/origen/ausencias y detección
+de revisiones posteriores sin actualización silenciosa. SQLite v2 añade el slot
+de revisión sin reescribir comidas. Guardar una corrección exige reselección
+explícita. Cálculo y tratamiento permanecen bloqueados; no completa validación
+nutricional ni flujo clínico. Véanse [ADR 0009](adr/0009-local-meal-selection.md)
+y [validación](validation/local-meal-selection-2026-09-26.md).
+
 ### Secuencia de capacidades
 
 No intentar construir toda una fase en un solo cambio. Secuencia inicial:

@@ -69,6 +69,13 @@ el módulo no interpreta números ni aplica reglas. Guardar no crea recomendaci�
 ingesta confirmada, tratamiento ni item de sincronización. Véase el
 [ADR 0008](adr/0008-local-meal-drafts.md).
 
+La revisión de entrada de Bolo consume `ReviewMealSelection` del mismo módulo:
+SQLite v2 guarda una referencia a una revisión inmutable y la lee junto a la
+última revisión. La UI distingue selección ausente, fallo y obsolescencia sin
+reemplazar el snapshot. La selección sobrevive al relanzamiento y no constituye
+ingesta, cálculo ni confirmación. Véase el
+[ADR 0009](adr/0009-local-meal-selection.md).
+
 ## Conectividad
 
 Sin Internet deben seguir disponibles las funciones que solo requieren datos locales válidos.

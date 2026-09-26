@@ -82,6 +82,16 @@ ni un tratamiento, y el uso para cálculo permanece bloqueado. Véanse el
 [auditoría Legacy](docs/audit/legacy-meal-entry-2026-09-13.md) y la
 [validación](docs/validation/local-meal-drafts-2026-09-13.md).
 
+Desde Mis platos y Comidas se puede seleccionar una revisión guardada para
+revisarla en Bolo. La selección local conserva campos exactos, ausencias,
+identidad y origen tras reiniciar. Si el registro cambia, muestra la selección
+obsoleta y exige una nueva selección explícita. Cálculo y confirmación permanecen
+bloqueados. Véanse el [ADR 0009](docs/adr/0009-local-meal-selection.md) y la
+[validación](docs/validation/local-meal-selection-2026-09-26.md).
+Se ha verificado el flujo en la pantalla interior del Pixel 10 Pro Fold, además
+de layouts anchos vertical/horizontal con texto ampliado. Pausar y reanudar los
+editores conserva sus campos, foco y posición de desplazamiento.
+
 Fase 1 en curso: auditoría clínica y técnica de Legacy en modo de solo lectura.
 El inventario funcional y el primer trazado de cálculo, perfil, IOB y glucosa
 están documentados, pero ninguna regla clínica está aprobada todavía. El sistema
