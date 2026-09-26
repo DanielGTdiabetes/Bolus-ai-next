@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="page_background">#101722</color>
+    <color name="status_background">#182334</color>
+    <color name="status_border">#39485D</color>
+    <color name="primary_text">#E7EDF6</color>
+    <color name="secondary_text">#B5C2D6</color>
+    <color name="error_text">#FFB4A9</color>
+    <color name="non_authoritative_background">#392B14</color>
+    <color name="non_authoritative_text">#FFD995</color>
+    <color name="accent">#9CC2FF</color>
+    <color name="accent_surface">#243B5B</color>
+    <color name="hero_start">#17365D</color>
+    <color name="hero_end">#204D74</color>
+    <color name="on_hero">#FFFFFF</color>
+</resources>
