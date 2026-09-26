@@ -91,6 +91,9 @@ bloqueados. Véanse el [ADR 0009](docs/adr/0009-local-meal-selection.md) y la
 Se ha verificado el flujo en la pantalla interior del Pixel 10 Pro Fold, además
 de layouts anchos vertical/horizontal con texto ampliado. Pausar y reanudar los
 editores conserva sus campos, foco y posición de desplazamiento.
+La interfaz sigue además el modo claro u oscuro del sistema, con paletas
+explícitas para textos, controles y avisos. Véase la
+[validación del tema oscuro](docs/validation/android-dark-theme-2026-09-26.md).
 
 Fase 1 en curso: auditoría clínica y técnica de Legacy en modo de solo lectura.
 El inventario funcional y el primer trazado de cálculo, perfil, IOB y glucosa

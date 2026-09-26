@@ -15,6 +15,8 @@ exige reselección explícita. Guardar y seleccionar no crean ingesta, recomenda
 confirmación clínica, sync ni tratamiento. Cálculo y confirmación siguen bloqueados.
 La reanudación conserva el editor, foco y scroll. La última verificación incluye
 el Pixel 10 Pro Fold desplegado y layouts anchos con texto ampliado.
+La UI dispone de tema claro/oscuro según el sistema, sin selector propio ni
+cambios clínicos. Consulta docs/validation/android-dark-theme-2026-09-26.md.
 
 Consulta docs/adr/0009-local-meal-selection.md y
 docs/validation/local-meal-selection-2026-09-26.md, además del ADR 0008.

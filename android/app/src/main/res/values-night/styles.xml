@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <bool name="light_system_bars">true</bool>
-    <style name="Theme.BolusAiNext.Base" parent="android:style/Theme.Material.Light.NoActionBar">
+    <bool name="light_system_bars">false</bool>
+    <style name="Theme.BolusAiNext.Base" parent="android:style/Theme.Material.NoActionBar">
         <item name="android:fontFamily">sans</item>
         <item name="android:windowActionModeOverlay">true</item>
         <item name="android:colorAccent">@color/accent</item>
@@ -10,5 +10,4 @@
         <item name="android:statusBarColor">@color/page_background</item>
         <item name="android:windowBackground">@color/page_background</item>
     </style>
-    <style name="Theme.BolusAiNext" parent="Theme.BolusAiNext.Base" />
 </resources>
