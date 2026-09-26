@@ -108,6 +108,68 @@ class SqliteMealRepositoryDeviceTest {
         }
     }
 
+    @Test fun clearingMissingCurrentAndObsoleteSelectionIsDurableAndPreservesEveryRevision() = withDatabase { name ->
+        lateinit var original: MealRecord
+        lateinit var latest: MealRecord
+        lateinit var dish: MealRecord
+        SqliteMealRepository(context, name).use { repository ->
+            repeat(2) { assertEquals(MealSelection.Missing, repository.clearSelection()) }
+            original = (repository.save(MealRecord("clear-draft", 0, MealKind.DRAFT,
+                MealContent(carbs = draftField("0"), notes = draftField("  exacto  ")),
+                DishReference("clear-dish", 1))) as MealSave.Saved).record
+            dish = (repository.save(MealRecord("clear-dish", 0, MealKind.DISH,
+                MealContent(name = draftField("Plato sintético")))) as MealSave.Saved).record
+            repository.select(dish)
+            assertEquals(MealSelection.Missing, repository.clearSelection())
+            repository.select(original)
+            latest = (repository.save(original.copy(content = original.content.copy(
+                notes = draftField("revisión")))) as MealSave.Saved).record
+            assertEquals(MealSelection.Reviewed(original, latest), repository.readSelection())
+            repeat(2) { assertEquals(MealSelection.Missing, repository.clearSelection()) }
+        }
+        SqliteMealRepository(context, name).use { reopened ->
+            assertEquals(MealSelection.Missing, reopened.readSelection())
+            assertFalse(reopened.readSelection().allowsCalculation)
+            assertFalse(reopened.readSelection().allowsTreatment)
+            assertEquals(listOf(latest), (reopened.read(MealKind.DRAFT) as MealRead.Loaded).records)
+            assertEquals(listOf(dish), (reopened.read(MealKind.DISH) as MealRead.Loaded).records)
+            assertEquals(MealSelection.Reviewed(latest, latest), reopened.select(latest))
+        }
+        SQLiteDatabase.openDatabase(context.getDatabasePath(name).path, null, SQLiteDatabase.OPEN_READONLY).use { db ->
+            db.rawQuery("SELECT id, revision, carbs, fat, notes, source_id, source_revision FROM meal_revisions ORDER BY id, revision", null).use {
+                assertEquals(3, it.count)
+                assertTrue(it.moveToPosition(1))
+                assertEquals(original.id, it.getString(0)); assertEquals(1L, it.getLong(1))
+                assertEquals("0", it.getString(2)); assertTrue(it.isNull(3))
+                assertEquals("  exacto  ", it.getString(4))
+                assertEquals("clear-dish", it.getString(5)); assertEquals(1L, it.getLong(6))
+            }
+        }
+    }
+
+    @Test fun failedClearRollsBackAndRetryCanRemoveSelectionAfterRestart() = withDatabase { name ->
+        lateinit var record: MealRecord
+        SqliteMealRepository(context, name).use { repository ->
+            record = (repository.save(MealRecord("clear-failure", 0, MealKind.DISH, MealContent())) as MealSave.Saved).record
+            repository.select(record)
+            SQLiteDatabase.openDatabase(context.getDatabasePath(name).path, null, SQLiteDatabase.OPEN_READWRITE).use {
+                // Fail after deletion to exercise transaction rollback, not just a rejected precondition.
+                it.execSQL("CREATE TRIGGER fail_clear AFTER DELETE ON meal_selection BEGIN SELECT RAISE(ABORT, 'synthetic'); END")
+            }
+            assertEquals(MealSelection.Failed(MealFailure.SAVE_FAILED), repository.clearSelection())
+            assertEquals(MealSelection.Reviewed(record, record), repository.readSelection())
+        }
+        SqliteMealRepository(context, name).use { reopened ->
+            assertEquals(MealSelection.Reviewed(record, record), reopened.readSelection())
+            SQLiteDatabase.openDatabase(context.getDatabasePath(name).path, null, SQLiteDatabase.OPEN_READWRITE).use {
+                it.execSQL("DROP TRIGGER fail_clear")
+            }
+            assertEquals(MealSelection.Missing, reopened.clearSelection())
+            assertEquals(listOf(record), (reopened.read(MealKind.DISH) as MealRead.Loaded).records)
+        }
+        SqliteMealRepository(context, name).use { assertEquals(MealSelection.Missing, it.readSelection()) }
+    }
+
     @Test fun migrationFromV1PreservesEveryRevisionAndBackupCanBeRestored() = withDatabase { name ->
         withDatabase { backup ->
             SQLiteDatabase.openOrCreateDatabase(context.getDatabasePath(name), null).use { db ->

@@ -488,6 +488,16 @@ explícita. Cálculo y tratamiento permanecen bloqueados; no completa validació
 nutricional ni flujo clínico. Véanse [ADR 0009](adr/0009-local-meal-selection.md)
 y [validación](validation/local-meal-selection-2026-09-26.md).
 
+### Entrega de retirada de selección — 2026-09-26
+
+Continuación del ciclo de revisión local de fases 2, 4 y 7: Bolo permite retirar
+explícitamente la selección coincidente u obsoleta. El puerto compartido y SQLite
+confirman la ausencia solo tras persistir; reintentos son idempotentes y las
+revisiones de comida se conservan. Pruebas cubren ausencia, rollback, reinicio,
+reselección y lecturas en vuelo. Mantiene cálculo y tratamiento bloqueados, sin
+reglas nutricionales nuevas. Véanse la ampliación del [ADR 0009](adr/0009-local-meal-selection.md)
+y la [validación](validation/local-meal-selection-removal-2026-09-26.md).
+
 ### Secuencia de capacidades
 
 No intentar construir toda una fase en un solo cambio. Secuencia inicial:

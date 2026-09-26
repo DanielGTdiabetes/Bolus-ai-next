@@ -75,6 +75,9 @@ SQLite v2 guarda una referencia a una revisión inmutable y la lee junto a la
 reemplazar el snapshot. La selección sobrevive al relanzamiento y no constituye
 ingesta, cálculo ni confirmación. Véase el
 [ADR 0009](adr/0009-local-meal-selection.md).
+La retirada explícita usa el mismo puerto compartido: elimina solo el slot dentro
+de una transacción y devuelve ausencia tras confirmar el commit. No modifica
+revisiones ni esquema; fallos e intentos en curso mantienen el bloqueo.
 
 ## Conectividad
 

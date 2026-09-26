@@ -107,6 +107,17 @@ internal class SqliteMealRepository(context: Context, name: String? = "meal-draf
         MealSelection.Failed(reason(failure, MealFailure.SAVE_FAILED))
     }
 
+    override fun clearSelection(): MealSelection = try {
+        val db = helper.writableDatabase
+        db.transaction {
+            db.delete("meal_selection", "slot = 1", null)
+        }
+        // Missing is reported only after commit; meal revisions are never touched.
+        MealSelection.Missing
+    } catch (failure: RuntimeException) {
+        MealSelection.Failed(reason(failure, MealFailure.SAVE_FAILED))
+    }
+
     private fun latest(db: SQLiteDatabase, id: String): MealRecord? =
         db.rawQuery("SELECT * FROM meal_revisions WHERE id = ? ORDER BY revision DESC LIMIT 1",
             arrayOf(id)).use { if (it.moveToFirst()) decode(it) else null }
