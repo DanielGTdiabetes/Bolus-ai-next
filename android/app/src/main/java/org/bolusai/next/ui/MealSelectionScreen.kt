@@ -36,7 +36,8 @@ internal class MealSelectionScreen(
     fun render() {
         label(context.getString(R.string.meal_selection_safety), "selection:safety")
         when (val state = model.selection) {
-            null -> label(context.getString(R.string.draft_loading), "selection:loading")
+            null -> label(context.getString(if (model.busy) R.string.draft_saving
+                else R.string.draft_loading), "selection:loading")
             MealSelection.Missing -> label(context.getString(R.string.meal_selection_missing), "selection:status")
             is MealSelection.Failed -> {
                 label(context.getString(R.string.meal_selection_failed, state.reason.code), "selection:status")
@@ -69,6 +70,7 @@ internal class MealSelectionScreen(
                     // The editor reviews the latest record; the pinned snapshot stays unchanged.
                     edit(state.latest)
                 }
+                action(R.string.meal_selection_clear, "selection:clear") { model.clearSelection() }
             }
         }
     }

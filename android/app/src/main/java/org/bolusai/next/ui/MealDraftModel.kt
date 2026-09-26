@@ -72,6 +72,24 @@ internal class MealDraftModel(
         }
     }
 
+    fun clearSelection() {
+        if (disposed.get() || busy) return
+        busy = true
+        ++selectionRequest
+        readingSelection = false
+        selection = null
+        changed?.invoke()
+        worker.execute {
+            val result = review?.clear() ?: MealSelection.Failed(MealFailure.SAVE_FAILED)
+            main.post {
+                if (disposed.get()) return@post
+                busy = false
+                selection = result
+                changed?.invoke()
+            }
+        }
+    }
+
     fun load(kind: MealKind) {
         if (lists.containsKey(kind) || !loading.add(kind)) return
         worker.execute {

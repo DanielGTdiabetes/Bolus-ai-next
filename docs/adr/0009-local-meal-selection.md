@@ -73,9 +73,32 @@ sincronización ni red. No se consulta ni modifica Legacy. El futuro cliente iOS
 consumirá el mismo contrato KMP e implementará el puerto de selección con una
 transacción local equivalente. iOS sigue sin soporte verificado en este host.
 
-Quedan pendientes retirar explícitamente la selección, consultar revisiones
-históricas desde la UI y las reglas aprobadas para validación nutricional. La
-selección actual no autoriza completar ninguna fase clínica.
+Quedan pendientes consultar revisiones históricas desde la UI y las reglas
+aprobadas para validación nutricional. La selección actual no autoriza completar
+ninguna fase clínica.
+
+## Ampliación: retirada explícita de la selección — 2026-09-26
+
+`MealSelectionRepository.clearSelection` y `ReviewMealSelection.clear` retiran
+únicamente el slot de revisión. La operación es local, transaccional e idempotente:
+devuelve `MealSelection.Missing` después del commit, incluso si ya estaba ausente.
+Un fallo devuelve `MealSelection.Failed` con el motivo de almacenamiento y no se
+presenta como ausencia. Se conserva SQLite v2; no cambia el esquema ni se eliminan
+o reescriben filas de `meal_revisions`.
+
+Bolo ofrece «Retirar selección de Bolo · conservar comida guardada» tanto para
+selecciones coincidentes como obsoletas. Mientras se persiste muestra guardado en
+curso y bloquea otras escrituras del modelo. Invalida lecturas anteriores en
+vuelo para que no repongan la selección. Al terminar refresca la pantalla para
+restaurar también los controles si se navegó a una biblioteca durante la operación.
+Si falla, oculta los macros, muestra el motivo y permite releer el estado durable
+antes de volver a intentar la retirada explícitamente. Recreación y relanzamiento
+leen el slot persistido; volver a usar una comida exige seleccionarla de nuevo.
+
+Es una modificación reversible de estado de revisión, sin confirmación clínica
+ni borrado de historial. iOS deberá implementar la misma operación transaccional
+del puerto compartido; continúa sin verificación de plataforma. Véase la
+[validación de retirada](../validation/local-meal-selection-removal-2026-09-26.md).
 
 ## Verificación
 

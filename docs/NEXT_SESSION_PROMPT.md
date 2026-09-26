@@ -7,19 +7,18 @@ disponibilidad > comodidad.
 
 ESTADO REAL
 Mis platos y Comidas permiten crear, editar y recuperar borradores versionados.
-Ahora se puede usar una revisión guardada en Bolo para revisar sus campos exactos,
-ausencias, base declarada, ID, revisión y origen. La selección persiste en SQLite
-v2 como referencia a una revisión inmutable; meal_revisions conserva schema v1.
-Una corrección posterior marca la selección como obsoleta, conserva el snapshot y
-exige reselección explícita. Guardar y seleccionar no crean ingesta, recomendación,
-confirmación clínica, sync ni tratamiento. Cálculo y confirmación siguen bloqueados.
-La reanudación conserva el editor, foco y scroll. La última verificación incluye
-el Pixel 10 Pro Fold desplegado y layouts anchos con texto ampliado.
-La UI dispone de tema claro/oscuro según el sistema, sin selector propio ni
-cambios clínicos. Consulta docs/validation/android-dark-theme-2026-09-26.md.
+Bolo muestra una revisión seleccionada con campos exactos, ausencias, base,
+identidad y origen. La selección persiste en SQLite v2; una corrección posterior
+la marca obsoleta y exige reselección explícita. Ahora se puede retirar la
+selección coincidente u obsoleta desde Bolo, sin borrar platos, borradores ni
+revisiones. La ausencia se confirma tras el commit y persiste al relanzar. Un
+fallo muestra el motivo, permite releer y no aparenta éxito. Las lecturas previas
+en vuelo no pueden reponer una selección mientras se retira.
+La reanudación conserva el editor, foco y scroll. La UI sigue el tema claro/oscuro
+del sistema y dispone de pruebas de layouts anchos y texto ampliado.
 
-Consulta docs/adr/0009-local-meal-selection.md y
-docs/validation/local-meal-selection-2026-09-26.md, además del ADR 0008.
+Consulta docs/adr/0008-local-meal-drafts.md, docs/adr/0009-local-meal-selection.md
+y docs/validation/local-meal-selection-removal-2026-09-26.md.
 Comprueba el CI del SHA exacto integrado antes de empezar.
 Esta entrega no necesitó consultar ni modificar Legacy. Su última auditoría
 documentada continúa fijada en f5417721d8019a9831126f4d843edfc4de87653d; no afirmes
@@ -29,27 +28,28 @@ LÍMITES
 Los macros son textos sin validar/convertir; ausencia nunca equivale a cero. Solo
 se muestran gramos cuando el usuario declaró esa base. No hay recepción Dexcom,
 perfil confirmado, IOB local, catálogo ni historial clínico. iOS sigue pendiente
-de verificación. Una coincidencia con la última revisión no significa validez
-nutricional ni clínica. Las copias de platos siguen siendo borradores independientes.
+de verificación. Seleccionar o retirar no crea ingesta, recomendación, confirmación,
+sync ni tratamiento. Cálculo y confirmación clínica siguen bloqueados. Las copias
+de platos siguen siendo borradores independientes.
 
 SIGUIENTE INCREMENTO PROPUESTO
-Permitir retirar explícitamente la selección de entrada de Bolo, sin borrar ni
-reescribir platos, borradores o revisiones. Mostrar claramente que vuelve al
-estado sin selección y conservar esa decisión tras reiniciar. Es la continuación
-directa del ciclo de revisión local y no requiere inventar reglas nutricionales.
+Permitir consultar las revisiones guardadas de un plato o borrador desde su
+biblioteca. Mostrar sus textos, ausencias, identidad y origen de forma explícita
+sin sobrescribir registros ni sustituir automáticamente la selección de Bolo.
+Es consulta del historial de borradores, no historial clínico ni restauración.
 
 TRABAJO
 1. Lee AGENTS.md, README, arquitectura, plan y ADRs relacionados. Actualiza origin,
    verifica Git/CI y crea una rama corta desde origin/main.
-2. Añade la operación al puerto/caso de uso compartido. Debe ser local, atómica,
-   idempotente y devolver un resultado explícito solo tras persistir.
-3. Añade una acción inequívoca en Bolo para retirar la selección. Un fallo conserva
-   el bloqueo, muestra el motivo y nunca presenta como completada una escritura
-   fallida. No borres ni modifiques las revisiones de comida.
-4. Prueba ausencia, selección coincidente/obsoleta, reintento, fallo de escritura,
-   reinicio y reselección posterior; verifica que todos los bloqueos se mantienen.
-5. Mantén UI, caso de uso y SQLite separados. No añadas reglas clínicas, red,
-   Dexcom, MFP, NAS, Render, sync ni autoridad de tratamiento.
+2. Añade una consulta al puerto/caso de uso compartido para leer las revisiones
+   de un registro con orden explícito y fallos distinguibles de ausencia.
+3. Añade un acceso desde Mis platos y Comidas con presentación de solo lectura.
+   Conserva editor pendiente y selección; no habilites selección de revisiones
+   históricas, restauración, borrado ni reglas nutricionales.
+4. Prueba registro ausente, varias revisiones, campos ausentes frente a cero,
+   error de lectura, reinicio y navegación conservando selección y bloqueos.
+5. Mantén UI, caso de uso y SQLite separados. No añadas red, Dexcom, MFP,
+   NAS, Render, sync ni autoridad de tratamiento.
 6. Ejecuta scripts/verify.ps1 y pruebas USB si hay un único dispositivo autorizado;
    usa repositorios sintéticos aislados, sin datos personales ni cambios de red.
 7. Actualiza documentación, publica mediante PR, integra y verifica CI del SHA

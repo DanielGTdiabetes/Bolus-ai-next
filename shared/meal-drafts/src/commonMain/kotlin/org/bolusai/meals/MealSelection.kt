@@ -33,10 +33,13 @@ interface MealSelectionRepository {
     fun readSelection(): MealSelection
     /** Persist only if the exact reviewed record is still latest. Return after commit. */
     fun select(record: MealRecord): MealSelection
+    /** Remove only the review reference atomically. Missing is success, including retries, after commit. */
+    fun clearSelection(): MealSelection
 }
 
 class ReviewMealSelection(private val repository: MealSelectionRepository) {
     fun read(): MealSelection = repository.readSelection()
+    fun clear(): MealSelection = repository.clearSelection()
     fun select(record: MealRecord): MealSelection =
         if (record.revision <= 0) MealSelection.Failed(MealFailure.INVALID_RECORD)
         else repository.select(record)

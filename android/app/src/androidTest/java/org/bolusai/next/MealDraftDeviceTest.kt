@@ -156,6 +156,156 @@ class MealDraftDeviceTest {
         } finally { context.deleteDatabase(name) }
     }
 
+    @Test fun removingCurrentAndObsoleteSelectionSurvivesRelaunchAndAllowsExplicitReselection() {
+        val context = instrumentation.targetContext
+        for (obsolete in listOf(false, true)) {
+            val name = "synthetic-clear-ui-${UUID.randomUUID()}.db"
+            val latest = SqliteMealRepository(context, name).use {
+                val record = (it.save(MealRecord("clear-ui", 0, MealKind.DRAFT,
+                    MealContent(carbs = draftField("0")))) as MealSave.Saved).record
+                it.select(record)
+                if (obsolete) (it.save(record.copy(content = MealContent(carbs = draftField("nuevo")))) as MealSave.Saved).record
+                else record
+            }
+            MainActivity.mealRepositoryFactory = { SqliteMealRepository(it, name) }
+            try {
+                launch().use { scenario ->
+                    scenario.onActivity { it.findViewById<View>(R.id.bottom_navigation)
+                        .findViewWithTag<View>("tab:/bolus").performClick() }
+                    awaitView(scenario, "selection:block", if (obsolete) "meal.selection.obsolete" else "meal.draft.not_clinically_validated")
+                    scenario.onActivity { view(it, "selection:clear").performClick() }
+                    awaitView(scenario, "selection:status", context.getString(R.string.meal_selection_missing))
+                    scenario.onActivity {
+                        assertNull(viewOrNull(it, "selection:carbs"))
+                        assertNull(viewOrNull(it, "selection:clear"))
+                        assertFalse(view(it, "blocked:calculate").isEnabled)
+                        assertFalse(view(it, "blocked:confirm").isEnabled)
+                    }
+                    scenario.recreate()
+                    awaitView(scenario, "selection:status", context.getString(R.string.meal_selection_missing))
+                }
+                launch().use { scenario ->
+                    scenario.onActivity { it.findViewById<View>(R.id.bottom_navigation)
+                        .findViewWithTag<View>("tab:/bolus").performClick() }
+                    awaitView(scenario, "selection:status", context.getString(R.string.meal_selection_missing))
+                    scenario.onActivity { view(it, "link:native/meals").performClick() }
+                    awaitView(scenario, "meal:select:clear-ui")
+                    scenario.onActivity { view(it, "meal:select:clear-ui").performClick() }
+                    awaitView(scenario, "selection:carbs", if (obsolete) "nuevo" else "0")
+                    scenario.onActivity {
+                        assertFalse(view(it, "blocked:calculate").isEnabled)
+                        assertFalse(view(it, "blocked:confirm").isEnabled)
+                    }
+                }
+                SqliteMealRepository(context, name).use {
+                    assertEquals(MealSelection.Reviewed(latest, latest), it.readSelection())
+                }
+            } finally { context.deleteDatabase(name) }
+        }
+    }
+
+    @Test fun failedRemovalShowsFailureUntilReadAndExplicitRetry() {
+        val context = instrumentation.targetContext
+        val name = "synthetic-clear-failure-ui-${UUID.randomUUID()}.db"
+        val record = SqliteMealRepository(context, name).use {
+            val saved = (it.save(MealRecord("clear-failure-ui", 0, MealKind.DISH,
+                MealContent(carbs = draftField("0")))) as MealSave.Saved).record
+            it.select(saved)
+            saved
+        }
+        fun execute(sql: String) = android.database.sqlite.SQLiteDatabase.openDatabase(
+            context.getDatabasePath(name).path, null, android.database.sqlite.SQLiteDatabase.OPEN_READWRITE).use {
+            it.execSQL(sql)
+        }
+        execute("CREATE TRIGGER fail_clear AFTER DELETE ON meal_selection BEGIN SELECT RAISE(ABORT, 'synthetic'); END")
+        MainActivity.mealRepositoryFactory = { SqliteMealRepository(it, name) }
+        try {
+            launch().use { scenario ->
+                scenario.onActivity { it.findViewById<View>(R.id.bottom_navigation)
+                    .findViewWithTag<View>("tab:/bolus").performClick() }
+                awaitView(scenario, "selection:clear")
+                scenario.onActivity { view(it, "selection:clear").performClick() }
+                awaitView(scenario, "selection:status", context.getString(R.string.meal_selection_failed, MealFailure.SAVE_FAILED.code))
+                scenario.onActivity {
+                    assertNull(viewOrNull(it, "selection:carbs"))
+                    assertFalse(view(it, "blocked:calculate").isEnabled)
+                    assertFalse(view(it, "blocked:confirm").isEnabled)
+                }
+                SqliteMealRepository(context, name).use {
+                    assertEquals(MealSelection.Reviewed(record, record), it.readSelection())
+                }
+                execute("DROP TRIGGER fail_clear")
+                scenario.onActivity { view(it, "selection:retry").performClick() }
+                awaitView(scenario, "selection:carbs", "0")
+                scenario.onActivity { view(it, "selection:clear").performClick() }
+                awaitView(scenario, "selection:status", context.getString(R.string.meal_selection_missing))
+            }
+        } finally { context.deleteDatabase(name) }
+    }
+
+    @Test fun pendingReadCannotRestoreSelectionWhileRemovalWaitsForCommit() {
+        val readStarted = java.util.concurrent.CountDownLatch(1)
+        val releaseRead = java.util.concurrent.CountDownLatch(1)
+        val clearStarted = java.util.concurrent.CountDownLatch(1)
+        val releaseClear = java.util.concurrent.CountDownLatch(1)
+        val cleared = java.util.concurrent.CountDownLatch(1)
+        val clearCalls = java.util.concurrent.atomic.AtomicInteger(0)
+        val record = MealRecord("pending-read", 1, MealKind.DRAFT, MealContent())
+        val repository = object : MealRepository, MealSelectionRepository {
+            override fun read(kind: MealKind) = MealRead.Loaded(emptyList())
+            override fun save(editor: MealRecord) = MealSave.Failed(MealFailure.SAVE_FAILED)
+            override fun select(record: MealRecord): MealSelection = error("Cannot select during removal")
+            override fun readSelection(): MealSelection {
+                readStarted.countDown()
+                check(releaseRead.await(5, java.util.concurrent.TimeUnit.SECONDS))
+                return MealSelection.Reviewed(record, record)
+            }
+            override fun clearSelection(): MealSelection {
+                clearCalls.incrementAndGet()
+                clearStarted.countDown()
+                check(releaseClear.await(5, java.util.concurrent.TimeUnit.SECONDS))
+                return MealSelection.Missing
+            }
+        }
+        lateinit var model: MealDraftModel
+        instrumentation.runOnMainSync {
+            model = MealDraftModel(MealDrafts(repository, MealIds { "pending-read" }), Closeable {}, null,
+                ReviewMealSelection(repository))
+            model.changed = { if (model.selection == MealSelection.Missing) cleared.countDown() }
+            model.refreshSelection()
+        }
+        try {
+            assertTrue(readStarted.await(5, java.util.concurrent.TimeUnit.SECONDS))
+            instrumentation.runOnMainSync {
+                model.clearSelection()
+                model.clearSelection()
+                model.select(record)
+                model.refreshSelection()
+                assertTrue(model.busy)
+                assertNull(model.selection)
+            }
+            releaseRead.countDown()
+            assertTrue(clearStarted.await(5, java.util.concurrent.TimeUnit.SECONDS))
+            instrumentation.waitForIdleSync()
+            instrumentation.runOnMainSync {
+                assertNull(model.selection)
+                assertTrue(model.busy)
+            }
+            releaseClear.countDown()
+            assertTrue(cleared.await(5, java.util.concurrent.TimeUnit.SECONDS))
+            instrumentation.runOnMainSync {
+                assertEquals(MealSelection.Missing, model.selection)
+                assertFalse(model.busy)
+                assertFalse(requireNotNull(model.selection).allowsCalculation)
+                assertFalse(requireNotNull(model.selection).allowsTreatment)
+            }
+            assertEquals(1, clearCalls.get())
+        } finally {
+            releaseRead.countDown(); releaseClear.countDown()
+            instrumentation.runOnMainSync { model.dispose() }
+        }
+    }
+
     @Test fun failedSelectionReadIsVisibleAndCannotShowCachedMacros() {
         val context = instrumentation.targetContext
         val name = "synthetic-read-failure-${UUID.randomUUID()}.db"
@@ -198,6 +348,7 @@ class MealDraftDeviceTest {
                 return MealSelection.Missing
             }
             override fun select(record: MealRecord) = MealSelection.Reviewed(record, record)
+            override fun clearSelection() = MealSelection.Missing
         }
         lateinit var model: MealDraftModel
         instrumentation.runOnMainSync {
@@ -286,6 +437,7 @@ class MealDraftDeviceTest {
             override fun save(editor: MealRecord) = MealSave.Failed(MealFailure.SAVE_FAILED)
             override fun readSelection() = MealSelection.Reviewed(record, record)
             override fun select(record: MealRecord) = MealSelection.Reviewed(record, record)
+            override fun clearSelection() = MealSelection.Missing
         }
         lateinit var model: MealDraftModel
         val loaded = java.util.concurrent.CountDownLatch(1)

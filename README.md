@@ -88,6 +88,10 @@ identidad y origen tras reiniciar. Si el registro cambia, muestra la selección
 obsoleta y exige una nueva selección explícita. Cálculo y confirmación permanecen
 bloqueados. Véanse el [ADR 0009](docs/adr/0009-local-meal-selection.md) y la
 [validación](docs/validation/local-meal-selection-2026-09-26.md).
+También se puede retirar explícitamente la selección desde Bolo, conservando
+platos, borradores y revisiones. El estado sin selección persiste al relanzar;
+un fallo de escritura se muestra sin afirmar que se haya retirado. Véase la
+[validación de retirada](docs/validation/local-meal-selection-removal-2026-09-26.md).
 Se ha verificado el flujo en la pantalla interior del Pixel 10 Pro Fold, además
 de layouts anchos vertical/horizontal con texto ampliado. Pausar y reanudar los
 editores conserva sus campos, foco y posición de desplazamiento.
@@ -136,7 +140,7 @@ el emisor y aprobar las políticas clínicas restantes.
 
 ## Documentación para ejecutar el proyecto
 
-- [`docs/NEXT_SESSION_PROMPT.md`](docs/NEXT_SESSION_PROMPT.md): prompt preparado para continuar con borradores de comidas y Mis platos locales.
+- [`docs/NEXT_SESSION_PROMPT.md`](docs/NEXT_SESSION_PROMPT.md): estado y siguiente incremento de revisión local de comidas y Mis platos.
 - [`AGENTS.md`](AGENTS.md): contrato de trabajo, seguridad, arquitectura, pruebas y Git para Codex y otros agentes.
 - [`docs/EXECUTION_PLAN.md`](docs/EXECUTION_PLAN.md): plan completo por fases, puertas de seguridad, criterios de aceptación y comandos de entrega.
 - [`docs/LEGACY_SOURCE_MAP.md`](docs/LEGACY_SOURCE_MAP.md): mapa reproducible del GitHub de Bolus AI Legacy y fuentes concretas para la auditoría de solo lectura.

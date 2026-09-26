@@ -52,4 +52,5 @@
     <string name="meal_selection_grams">Base declarada: macros totales en gramos (g) del plato/comida. Textos sin convertir ni validar.</string>
     <string name="meal_selection_basis_missing">Base y unidades ausentes: no se infieren.</string>
     <string name="meal_selection_edit">Revisar / editar la última revisión guardada</string>
+    <string name="meal_selection_clear">Retirar selección de Bolo · conservar comida guardada</string>
 </resources>

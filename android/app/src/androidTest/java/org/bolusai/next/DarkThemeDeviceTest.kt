@@ -93,6 +93,7 @@ class DarkThemeDeviceTest {
             override fun save(editor: MealRecord) = MealSave.Failed(MealFailure.SAVE_FAILED)
             override fun readSelection() = MealSelection.Reviewed(record, record)
             override fun select(record: MealRecord) = MealSelection.Reviewed(record, record)
+            override fun clearSelection() = MealSelection.Missing
         }
         lateinit var model: MealDraftModel
         val loaded = CountDownLatch(1)
