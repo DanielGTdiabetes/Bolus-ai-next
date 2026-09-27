@@ -266,6 +266,33 @@ class SqliteClinicalProfileRepositoryDeviceTest {
         forged({ it.execSQL("UPDATE profile_versions SET schema_version = 2") }, ProfileFailure.UNSUPPORTED_SCHEMA)
     }
 
+    @Test fun saveRefusesToAppendToAnUnprovableHistory() {
+        fun damaged(setup: (SQLiteDatabase) -> Unit) = withDatabase { name ->
+            SqliteClinicalProfileRepository(context, name).use {
+                it.saved(write(0, content())); it.saved(write(1, content(ratio = entered("11"))))
+            }
+            raw(name) { db ->
+                listOf("profile_versions_immutable_update", "profile_versions_immutable_delete",
+                    "profile_segments_immutable_update", "profile_segments_immutable_delete")
+                    .forEach { db.execSQL("DROP TRIGGER $it") }
+                setup(db)
+            }
+            val before = dump(name)
+            SqliteClinicalProfileRepository(context, name).use {
+                // The latest row still decodes, but an older one does not: nothing may be appended.
+                assertEquals(ProfileSave.Failed(ProfileFailure.INVALID_RECORD),
+                    it.save(write(2, content(ratio = entered("12"))), 3, "w"))
+            }
+            assertEquals(before, dump(name))
+        }
+        damaged { it.execSQL("UPDATE profile_segments SET value = '9' WHERE version = 1 AND parameter = 'carb_ratio'") }
+        damaged {
+            it.execSQL("DELETE FROM profile_segments WHERE version = 1")
+            it.execSQL("DELETE FROM profile_versions WHERE version = 1")
+        }
+        damaged { it.execSQL("UPDATE profile_versions SET glucose_unit = 'mmol/L' WHERE version = 1") }
+    }
+
     @Test fun historyGapsAreRejectedByTheUseCase() = withDatabase { name ->
         SqliteClinicalProfileRepository(context, name).use {
             it.saved(write(0, content())); it.saved(write(1, content(ratio = entered("11"))))

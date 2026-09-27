@@ -62,6 +62,8 @@ internal class ClinicalProfileModel(
         get() {
             val current = editor ?: return false
             if (busy || errors.isNotEmpty()) return false
+            // Only against a proven stored state: a failed or pending read never allows saving (fail closed).
+            if (history !is ProfileHistory.Loaded && history != ProfileHistory.Missing) return false
             if (current.glucoseDependentValuesLocked && current.content.hasGlucoseDependentValues) return false
             return latest?.let { current.content != it.content } ?: current.changed
         }

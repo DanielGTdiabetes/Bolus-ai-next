@@ -56,13 +56,14 @@ internal class SqliteClinicalProfileRepository(context: Context, name: String? =
         val db = helper.writableDatabase
         var result: ProfileSave = ProfileSave.Failed(ProfileFailure.SAVE_FAILED)
         db.transaction {
-            val latestNumber = db.rawQuery("SELECT MAX(version) FROM profile_versions", null).use {
-                if (it.moveToFirst() && !it.isNull(0)) it.getLong(0) else null
-            }
-            val latest = latestNumber?.let { readVersion(db, it) }
+            // Never append to a history that cannot be proven: the whole chain is re-validated inside this
+            // transaction (contiguity, fingerprints, provenance, unit transitions) before the policy runs.
+            val history = readAll(db).takeIf { it.isNotEmpty() }
+                ?.let { ProfileHistory.Loaded(it.sortedByDescending { version -> version.version }) }
+            val latest = history?.latest
             val atBasePlusOne = if (write.baseVersion >= 0 && write.baseVersion < Long.MAX_VALUE)
-                readVersion(db, write.baseVersion + 1) else null
-            val source = write.restoredFrom?.let { readVersion(db, it) }
+                history?.version(write.baseVersion + 1) else null
+            val source = write.restoredFrom?.let { history?.version(it) }
             result = when (val decision = ProfileWritePolicy.evaluate(write, createdAtEpochMs, writer, latest,
                 atBasePlusOne, source)) {
                 is ProfileWriteDecision.Reject -> ProfileSave.Failed(decision.reason)

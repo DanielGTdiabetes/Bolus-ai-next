@@ -40,6 +40,7 @@ sistema, aprendizaje, conversión, exportación, importación, sync ni red.
 | Creación de base | `clinical-profile.db` v1 en la transacción del helper. Un fichero con objetos ajenos o `user_version` futura falla con `profile.storage.unsupported_schema` sin tocarse | `unknownFilesAndFutureSchemasFailClosedWithoutBeingTouched` |
 | Datos existentes | `meal-drafts.db` sigue en v3, sin objetos de perfil, con revisiones y selección intactas | `closedFileCopyReopensAndValidatesAndMealDatabaseIsIndependent` |
 | Inmutabilidad | triggers abortan `UPDATE`, `DELETE` e inserción de franjas en versiones antiguas. Filas comparadas byte a byte | `triggersKeepEveryVersionImmutable` |
+| Guardado sobre historial dañado | la transacción de guardado valida toda la cadena: una versión antigua alterada, borrada o con unidad cambiada impide añadir nada. Un editor recuperado tras la muerte del proceso no guarda si la lectura falla | `saveRefusesToAppendToAnUnprovableHistory`, `restoredEditorCannotSaveWhenTheStoredHistoryFailsToRead` |
 | Atomicidad | fallo a mitad de franjas revierte versión y franjas. El reintento funciona | `failedWriteRollsBackVersionAndSegmentsThenRetrySucceeds` |
 | Concurrencia | editor obsoleto → `revision_conflict` sin filas. Dos conexiones simultáneas: exactamente una escribe la versión siguiente | `identicalRetryAndStaleEditorAddNoRows`, `twoConnectionsCannotBothWriteTheNextVersion`, UI de conflicto |
 | Idempotencia | reintento idéntico devuelve la versión confirmada, también tras versiones posteriores | pruebas comunes y SQLite |
@@ -75,7 +76,8 @@ Comandos ejecutados en Windows desde la rama de trabajo:
   motor, workflow y `git diff --check`. Resultado: correcto.
 - `scripts/verify.ps1 -DeviceTests` en Pixel 10 Pro Fold (API 37), único
   dispositivo autorizado, desbloqueado y con `KEYCODE_WAKEUP` cada 10 s, sin
-  cambiar ajustes, red ni modo avión. Resultado: `OK (72 tests)` en 56,9 s.
+  cambiar ajustes, red ni modo avión. Resultado: `OK (74 tests)` en 58,2 s
+  tras la corrección de la revisión (primera entrega: `OK (72 tests)`).
 
 | Suite | Casos | Nuevos |
 |---|---:|---:|
@@ -83,7 +85,7 @@ Comandos ejecutados en Windows desde la rama de trabajo:
 | Borradores de comida KMP/JVM | 17 | 0 |
 | Perfil clínico KMP/JVM | 43 | 43 |
 | Android/JVM | 42 | 2 |
-| Instrumentación USB | 72 | 20 (12 SQLite, 8 UI/modelo) |
+| Instrumentación USB | 74 | 22 (13 SQLite, 9 UI/modelo) |
 
 Las clases nuevas `SqliteClinicalProfileRepositoryDeviceTest` y
 `ClinicalProfileDeviceTest` están en la lista `-e class` de `verify.ps1`.
@@ -94,6 +96,9 @@ Incidencias durante la entrega:
 
 - lint `PluralsCandidate` en tres textos con `%1$d` seguido de palabra. Se
   reformularon;
+- revisión automática de la PR #28: `save()` solo validaba la última versión y la
+  fuente de restauración. Ahora valida la cadena completa en la transacción y el
+  editor no guarda sin historial demostrado. Se añadieron dos pruebas USB;
 - primera ejecución USB con 71/72: una prueba insertaba desde una conexión sin
   claves foráneas y esperaba que la FK actuase. La prueba activa ahora las FK como
   el adaptador y añade el caso contrario: una fila colgante escrita sin FK falla

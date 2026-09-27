@@ -355,7 +355,10 @@ Reglas de origen:
 - Append-only: una versión y sus franjas se insertan una sola vez en una
   transacción. Triggers impiden `UPDATE` y `DELETE`.
 - `save(editor, createdAtEpochMs, writer)` en una transacción exclusiva:
-  1. valida el contenido y el origen (fuera y dentro de la transacción);
+  1. relee y valida la cadena completa de versiones (contigüidad, huellas,
+     procedencia y transiciones de unidad). Si no se puede demostrar, falla con
+     `profile.storage.invalid_record` y no añade nada. Valida el contenido y el
+     origen (fuera y dentro de la transacción);
   2. si existe la versión `baseVersion + 1` con la misma huella, origen y
      `restored_from`, devuelve `Saved` con esa versión (**reintento idéntico**,
      aunque después se hayan creado otras). No inserta nada;
@@ -584,7 +587,10 @@ Precisiones de la entrega, sin cambiar decisiones:
   (`ProfileRules`) viven en `shared/clinical-profile`. El adaptador SQLite solo
   lee las versiones implicadas en su transacción, aplica la decisión y relee lo
   insertado antes del commit. iOS reutilizará la misma política.
-- El adaptador también valida la cadena completa al leer, no solo el caso de uso.
+- El adaptador también valida la cadena completa al leer, no solo el caso de uso,
+  y la vuelve a validar dentro de la transacción de guardado antes de añadir
+  (revisión de la PR #28). El editor solo permite guardar con un historial
+  cargado o ausente demostrado, nunca con una lectura pendiente o fallida.
 - El estado del editor se guarda en `onSaveInstanceState` con la codificación
   canónica y se vuelve a validar al recrear.
 - Evidencia: [validación 2026-09-27](../validation/local-clinical-profile-2026-09-27.md).

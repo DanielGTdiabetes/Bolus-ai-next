@@ -316,6 +316,65 @@ class ClinicalProfileDeviceTest {
         assertEquals(2, stored().size)
     }
 
+    @Test fun restoredEditorCannotSaveWhenTheStoredHistoryFailsToRead() {
+        seed(ProfileWrite(0, content(), ProfileOrigin.MANUAL, null), ProfileWrite(1, content(ratio = entered("12")), ProfileOrigin.MANUAL, null))
+        lateinit var snapshot: android.os.Bundle
+        val first = SqliteClinicalProfileRepository(context, name)
+        lateinit var model: ClinicalProfileModel
+        instrumentation.runOnMainSync {
+            model = ClinicalProfileModel(ClinicalProfiles(first, ProfileClock { 0 }, "test/restore", AndroidTimeZoneRules), first, null)
+            model.ensureLoaded()
+        }
+        awaitHistory(model)
+        instrumentation.runOnMainSync {
+            model.startEdit(); model.setInput(ProfileParameter.CARB_RATIO.code, "13")
+            assertTrue(model.canSave)
+            snapshot = model.snapshot()
+            model.dispose()
+        }
+        // Damage an older version, then recreate the editor from saved state as after process death.
+        android.database.sqlite.SQLiteDatabase.openDatabase(context.getDatabasePath(name).path, null,
+            android.database.sqlite.SQLiteDatabase.OPEN_READWRITE).use { db ->
+            db.execSQL("DROP TRIGGER profile_segments_immutable_update")
+            db.execSQL("UPDATE profile_segments SET value = '9' WHERE version = 1 AND parameter = 'carb_ratio'")
+        }
+        val second = SqliteClinicalProfileRepository(context, name)
+        lateinit var restored: ClinicalProfileModel
+        instrumentation.runOnMainSync {
+            restored = ClinicalProfileModel(ClinicalProfiles(second, ProfileClock { 0 }, "test/restore", AndroidTimeZoneRules),
+                second, snapshot)
+            assertNotNull(restored.editor)
+            // Nothing is proven yet: no save while the read is pending.
+            assertFalse(restored.canSave)
+            restored.ensureLoaded()
+        }
+        val limit = SystemClock.uptimeMillis() + 5_000
+        var state: ProfileHistory? = null
+        while (state == null && SystemClock.uptimeMillis() < limit) {
+            instrumentation.runOnMainSync { state = restored.history }
+            if (state == null) SystemClock.sleep(20)
+        }
+        try {
+            assertEquals(ProfileHistory.Failed(ProfileFailure.INVALID_RECORD), state)
+            instrumentation.runOnMainSync {
+                assertFalse(restored.canSave)
+                restored.save()
+                assertFalse(restored.busy)
+            }
+            // Even bypassing the model, storage refuses to append to the damaged history.
+            val editor = restored.editor!!
+            assertEquals(ProfileSave.Failed(ProfileFailure.INVALID_RECORD),
+                ClinicalProfiles(second, ProfileClock { 0 }, "test/restore", AndroidTimeZoneRules).save(editor))
+        } finally { instrumentation.runOnMainSync { restored.dispose() } }
+        assertEquals(2L, storedVersionCount(name))
+    }
+
+    private fun storedVersionCount(file: String): Long =
+        android.database.sqlite.SQLiteDatabase.openDatabase(context.getDatabasePath(file).path, null,
+            android.database.sqlite.SQLiteDatabase.OPEN_READONLY).use {
+            android.database.DatabaseUtils.longForQuery(it, "SELECT count(*) FROM profile_versions", null)
+        }
+
     @Test fun multiSegmentVersionIsShownCompletelyAndNotEditable() {
         val split = ProfileContent(1, mgdl, madrid, listOf(
             ParameterSchedule(ProfileParameter.CARB_RATIO, listOf(TimeSegment(0, 360, entered("8")),
