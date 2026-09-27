@@ -170,6 +170,67 @@ class SqliteMealRepositoryDeviceTest {
         SqliteMealRepository(context, name).use { assertEquals(MealSelection.Missing, it.readSelection()) }
     }
 
+    @Test fun revisionHistoryIsReadAfterRestartWithoutChangingSelectionOrRevisions() = withDatabase { name ->
+        lateinit var first: MealRecord
+        lateinit var second: MealRecord
+        SqliteMealRepository(context, name).use { repository ->
+            assertEquals(MealRead.Loaded(emptyList()), repository.readRevisions("history"))
+            first = (repository.save(MealRecord("history", 0, MealKind.DRAFT,
+                MealContent(carbs = draftField("0"), notes = draftField("  exacto  ")),
+                DishReference("history-dish", 2))) as MealSave.Saved).record
+            repository.select(first)
+            second = (repository.save(first.copy(content = first.content.copy(
+                carbs = draftField("texto nuevo"), fat = draftField("0"),
+                basis = NutritionBasis.TOTAL_GRAMS))) as MealSave.Saved).record
+            repository.save(MealRecord("history-other", 0, MealKind.DISH, MealContent(name = draftField("otro"))))
+        }
+        SqliteMealRepository(context, name).use { reopened ->
+            assertEquals(MealRead.Loaded(listOf(first, second)), reopened.readRevisions("history"))
+            val useCase = ReadMealHistory(reopened)
+            val history = useCase.read("history", MealKind.DRAFT) as MealHistory.Loaded
+            assertEquals(listOf(second, first), history.revisions)
+            assertEquals(DraftField.Entered("0"), history.revisions.last().content.carbs)
+            assertEquals(DraftField.Missing, history.revisions.last().content.fat)
+            assertEquals(DraftField.Entered("0"), history.latest.content.fat)
+            assertEquals(DraftField.Entered("  exacto  "), history.revisions.last().content.notes)
+            assertEquals(DishReference("history-dish", 2), history.latest.copiedFrom)
+            assertFalse(history.allowsCalculation)
+            assertFalse(history.allowsTreatment)
+            assertEquals(MealHistory.Missing, useCase.read("absent", MealKind.DRAFT))
+            assertEquals(MealHistory.Failed(MealFailure.INVALID_RECORD), useCase.read("history", MealKind.DISH))
+            // Reading history is a query: selection, latest records and stored rows stay as they were.
+            assertEquals(MealSelection.Reviewed(first, second), reopened.readSelection())
+            assertEquals(listOf(second), (reopened.read(MealKind.DRAFT) as MealRead.Loaded).records)
+        }
+        SQLiteDatabase.openDatabase(context.getDatabasePath(name).path, null, SQLiteDatabase.OPEN_READONLY).use { db ->
+            db.rawQuery("SELECT COUNT(*) FROM meal_revisions", null).use { assertTrue(it.moveToFirst()); assertEquals(3, it.getInt(0)) }
+        }
+    }
+
+    @Test fun revisionHistoryReadFailuresAreNotReportedAsMissing() = withDatabase { name ->
+        SqliteMealRepository(context, name).use {
+            it.save(MealRecord("history-failure", 0, MealKind.DISH, MealContent()))
+        }
+        SQLiteDatabase.openDatabase(context.getDatabasePath(name).path, null, SQLiteDatabase.OPEN_READWRITE).use {
+            it.execSQL("DROP TABLE meal_selection")
+            it.execSQL("DROP TABLE meal_revisions")
+        }
+        SqliteMealRepository(context, name).use { repository ->
+            assertEquals(MealRead.Failed(MealFailure.READ_FAILED), repository.readRevisions("history-failure"))
+            assertEquals(MealHistory.Failed(MealFailure.READ_FAILED),
+                ReadMealHistory(repository).read("history-failure", MealKind.DISH))
+        }
+        withDatabase { unknown ->
+            SQLiteDatabase.openOrCreateDatabase(context.getDatabasePath(unknown), null).use {
+                it.execSQL("CREATE TABLE unknown_legacy_table(value TEXT)")
+            }
+            SqliteMealRepository(context, unknown).use {
+                assertEquals(MealHistory.Failed(MealFailure.UNSUPPORTED_SCHEMA),
+                    ReadMealHistory(it).read("history-failure", MealKind.DISH))
+            }
+        }
+    }
+
     @Test fun migrationFromV1PreservesEveryRevisionAndBackupCanBeRestored() = withDatabase { name ->
         withDatabase { backup ->
             SQLiteDatabase.openOrCreateDatabase(context.getDatabasePath(name), null).use { db ->

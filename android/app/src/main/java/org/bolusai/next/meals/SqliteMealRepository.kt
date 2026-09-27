@@ -13,7 +13,8 @@ import org.bolusai.meals.*
 import java.io.Closeable
 
 /** Device adapter for the shared draft port. Never deletes or replaces an existing revision. */
-internal class SqliteMealRepository(context: Context, name: String? = "meal-drafts.db") : MealRepository, MealSelectionRepository, Closeable {
+internal class SqliteMealRepository(context: Context, name: String? = "meal-drafts.db") :
+    MealRepository, MealSelectionRepository, MealHistoryRepository, Closeable {
     private class UnsupportedSchema : RuntimeException()
     private val helper = object : SQLiteOpenHelper(context.applicationContext, name, null, 2,
         DatabaseErrorHandler { throw SQLiteDatabaseCorruptException("meal.storage.corrupt") }) {
@@ -127,6 +128,17 @@ internal class SqliteMealRepository(context: Context, name: String? = "meal-draf
             SELECT * FROM meal_revisions m WHERE kind = ? AND revision =
                 (SELECT MAX(revision) FROM meal_revisions WHERE id = m.id) ORDER BY id
         """.trimIndent(), arrayOf(kind.name)).use { cursor ->
+            buildList { while (cursor.moveToNext()) add(decode(cursor)) }
+        }
+        MealRead.Loaded(records)
+    } catch (failure: RuntimeException) {
+        MealRead.Failed(reason(failure, MealFailure.READ_FAILED))
+    }
+
+    override fun readRevisions(id: String): MealRead = try {
+        // One statement is one consistent SQLite read; rows are decoded and never rewritten.
+        val records = helper.readableDatabase.rawQuery(
+            "SELECT * FROM meal_revisions WHERE id = ? ORDER BY revision", arrayOf(id)).use { cursor ->
             buildList { while (cursor.moveToNext()) add(decode(cursor)) }
         }
         MealRead.Loaded(records)

@@ -73,9 +73,10 @@ sincronización ni red. No se consulta ni modifica Legacy. El futuro cliente iOS
 consumirá el mismo contrato KMP e implementará el puerto de selección con una
 transacción local equivalente. iOS sigue sin soporte verificado en este host.
 
-Quedan pendientes consultar revisiones históricas desde la UI y las reglas
-aprobadas para validación nutricional. La selección actual no autoriza completar
-ninguna fase clínica.
+Quedan pendientes las reglas aprobadas para validación nutricional. La selección
+actual no autoriza completar ninguna fase clínica. La consulta de revisiones
+guardadas se resolvió en el [ADR 0010](0010-local-meal-revision-history.md), sin
+permitir seleccionar revisiones antiguas.
 
 ## Ampliación: retirada explícita de la selección — 2026-09-26
 

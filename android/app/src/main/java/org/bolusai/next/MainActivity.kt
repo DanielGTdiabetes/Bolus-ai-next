@@ -16,6 +16,7 @@ import androidx.lifecycle.ViewModelProvider
 import org.bolusai.meals.MealDrafts
 import org.bolusai.meals.MealIds
 import org.bolusai.meals.MealKind
+import org.bolusai.meals.ReadMealHistory
 import org.bolusai.meals.ReviewMealSelection
 import org.bolusai.next.ui.MealSelectionScreen
 import org.bolusai.next.application.ReadOverview
@@ -53,13 +54,15 @@ class MainActivity : ComponentActivity() {
         }
         setContentView(R.layout.activity_main)
         val restoredEditor = savedInstanceState?.getBundle("mealEditor")
+        val restoredHistory = savedInstanceState?.getBundle("mealHistory")
         meals = ViewModelProvider(this, object : ViewModelProvider.Factory {
             @Suppress("UNCHECKED_CAST")
             override fun <T : ViewModel> create(modelClass: Class<T>): T {
                 val repository = mealRepositoryFactory?.invoke(applicationContext)
                     ?: SqliteMealRepository(applicationContext)
                 return MealDraftModel(MealDrafts(repository, MealIds { UUID.randomUUID().toString() }),
-                    repository, restoredEditor, ReviewMealSelection(repository)) as T
+                    repository, restoredEditor, ReviewMealSelection(repository), ReadMealHistory(repository),
+                    restoredHistory) as T
             }
         })[MealDraftModel::class.java]
         renderer = ScreenRenderer(this, findViewById(R.id.screen_content), ::open,
@@ -84,6 +87,11 @@ class MainActivity : ComponentActivity() {
 
     private fun goBack() {
         rememberScroll()
+        if (isHistoryOpenHere()) {
+            // Leave the read-only query first; the library route and any pending editor stay.
+            meals.closeHistory()
+            return
+        }
         if (navigation.back()) { refreshReview(navigation.current); render() } else finish()
     }
 
@@ -109,6 +117,12 @@ class MainActivity : ComponentActivity() {
         super.onPause()
     }
 
+    private fun isHistoryOpenHere(): Boolean {
+        val target = meals.historyTarget ?: return false
+        return (navigation.current == Destination.FAVORITES && target.kind == MealKind.DISH) ||
+            (navigation.current == Destination.MEALS && target.kind == MealKind.DRAFT)
+    }
+
     private fun isReviewDestination(destination: Destination): Boolean =
         destination in listOf(Destination.BOLUS, Destination.MANUAL, Destination.OFFLINE_BOLUS)
 
@@ -124,6 +138,7 @@ class MainActivity : ComponentActivity() {
             scrollPositions.forEach { (route, position) -> putInt(route, position) }
         })
         meals.snapshot()?.let { outState.putBundle("mealEditor", it) }
+        meals.historySnapshot()?.let { outState.putBundle("mealHistory", it) }
         super.onSaveInstanceState(outState)
     }
 
@@ -154,13 +169,14 @@ class MainActivity : ComponentActivity() {
 
     private fun render() {
         val destination = navigation.current
-        backCallback.isEnabled = navigation.canGoBack
+        val canGoBack = navigation.canGoBack || isHistoryOpenHere()
+        backCallback.isEnabled = canGoBack
         findViewById<TextView>(R.id.screen_title).apply {
             setText(destination.title)
             tag = destination.route
             if (Build.VERSION.SDK_INT >= 28) isAccessibilityHeading = true
         }
-        findViewById<Button>(R.id.back_button).visibility = if (navigation.canGoBack) View.VISIBLE else View.GONE
+        findViewById<Button>(R.id.back_button).visibility = if (canGoBack) View.VISIBLE else View.GONE
         renderer.render(destination, overview.execute(), settingsSection)
         val bar = findViewById<LinearLayout>(R.id.bottom_navigation)
         bar.removeAllViews()

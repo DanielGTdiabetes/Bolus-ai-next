@@ -92,6 +92,12 @@ También se puede retirar explícitamente la selección desde Bolo, conservando
 platos, borradores y revisiones. El estado sin selección persiste al relanzar;
 un fallo de escritura se muestra sin afirmar que se haya retirado. Véase la
 [validación de retirada](docs/validation/local-meal-selection-removal-2026-09-26.md).
+Cada plato o borrador permite consultar sus revisiones guardadas en modo de solo
+lectura, de la más reciente a la más antigua, con textos exactos, ausencias,
+identidad y origen. La consulta no restaura, no edita ni cambia la selección de
+Bolo, y vuelve al editor abierto sin perder cambios. Véanse el
+[ADR 0010](docs/adr/0010-local-meal-revision-history.md) y la
+[validación](docs/validation/local-meal-revision-history-2026-09-27.md).
 Se ha verificado el flujo en la pantalla interior del Pixel 10 Pro Fold, además
 de layouts anchos vertical/horizontal con texto ampliado. Pausar y reanudar los
 editores conserva sus campos, foco y posición de desplazamiento.

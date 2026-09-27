@@ -55,8 +55,11 @@ internal class MealDraftScreen(
                 cornerRadius = dp(18).toFloat()
             }
         }
+        val target = model.historyTarget
         val editor = model.editor
-        if (editor != null && editor.kind == kind) {
+        if (target != null && target.kind == kind) {
+            history(target)
+        } else if (editor != null && editor.kind == kind) {
             editor(editor)
         } else {
             label(if (kind == MealKind.DISH) R.string.dish_library else R.string.draft_library)
@@ -78,6 +81,9 @@ internal class MealDraftScreen(
                         label(context.getString(R.string.draft_revision, record.revision))
                         label(if (record.content.hasMissingCaptureFields) R.string.draft_incomplete else R.string.draft_unvalidated)
                         action(R.string.draft_review, "meal:edit:${record.id}") { replaceEditor { model.edit(record) } }
+                        action(R.string.meal_history_open, "meal:history:${record.id}") {
+                            model.openHistory(record.id, record.kind)
+                        }
                         action(R.string.meal_use_in_bolus, "meal:select:${record.id}") {
                             replaceEditor { model.closeEditor(); model.select(record); openBolus() }
                         }
@@ -162,8 +168,64 @@ internal class MealDraftScreen(
                 }
             }
         }
+        if (record.revision > 0) {
+            // The pending editor stays in the model; the query returns to it unchanged.
+            action(R.string.meal_history_open, "meal:history", !model.busy) {
+                model.openHistory(record.id, record.kind)
+            }
+        }
         action(R.string.draft_back_to_list, "meal:list") { replaceEditor { model.closeEditor() } }
         label(record.clinicalBlockCode, "meal:block_code")
+    }
+
+    /** Read-only presentation of saved revisions: no selection, restoration, deletion or interpretation. */
+    private fun history(target: HistoryTarget) {
+        label(R.string.meal_history_title).setTypeface(null, Typeface.BOLD)
+        label(R.string.meal_history_safety, "history:safety")
+        model.ensureHistory()
+        when (val state = model.history) {
+            null -> label(R.string.draft_loading, "history:status")
+            MealHistory.Missing -> label(context.getString(R.string.meal_history_missing, target.id), "history:status")
+            is MealHistory.Failed -> {
+                label(context.getString(R.string.meal_history_failed, state.reason.code), "history:status")
+                action(R.string.draft_retry, "history:retry", true) { model.retryHistory() }
+            }
+            is MealHistory.Loaded -> {
+                label(context.getString(R.string.meal_history_status, state.revisions.size, state.latest.revision),
+                    "history:status")
+                label(context.getString(R.string.meal_selection_identity, state.id, state.latest.revision,
+                    context.getString(if (state.kind == MealKind.DISH) R.string.dish_library else R.string.draft_library)),
+                    "history:identity")
+                label(state.latest.copiedFrom?.let {
+                    context.getString(R.string.meal_selection_copy, it.id, it.revision)
+                } ?: context.getString(R.string.meal_selection_manual), "history:origin")
+                val labels = listOf(R.string.draft_name, R.string.draft_carbs, R.string.draft_fat,
+                    R.string.draft_protein, R.string.draft_fiber, R.string.draft_notes)
+                val tags = listOf("name", "carbs", "fat", "protein", "fiber", "notes")
+                state.revisions.forEach { record ->
+                    val prefix = "history:${record.revision}"
+                    label(context.getString(if (record == state.latest) R.string.meal_history_latest
+                        else R.string.meal_history_revision, record.revision), prefix).apply {
+                        setTypeface(null, Typeface.BOLD)
+                        if (android.os.Build.VERSION.SDK_INT >= 28) isAccessibilityHeading = true
+                    }
+                    record.content.fields.forEachIndexed { index, field ->
+                        label(labels[index], "$prefix:label:${tags[index]}")
+                        label(when (field) {
+                            DraftField.Missing -> context.getString(R.string.draft_missing)
+                            is DraftField.Entered -> field.text
+                        }, "$prefix:${tags[index]}")
+                    }
+                    label(if (record.content.basis == NutritionBasis.TOTAL_GRAMS) R.string.meal_selection_grams
+                        else R.string.meal_selection_basis_missing, "$prefix:basis")
+                }
+                label(state.blockCode, "history:block")
+            }
+        }
+        action(if (model.editor?.kind == target.kind)
+            R.string.meal_history_back_to_editor else R.string.draft_back_to_list, "history:close", true) {
+            model.closeHistory()
+        }
     }
 
     private fun statusText(): String = when {
