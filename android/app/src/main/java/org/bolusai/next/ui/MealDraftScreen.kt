@@ -109,6 +109,9 @@ internal class MealDraftScreen(
         label(if (record.kind == MealKind.DISH) R.string.dish_editor else R.string.draft_editor)
         label(R.string.draft_field_help)
         record.copiedFrom?.let { label(context.getString(R.string.draft_origin, it.revision)) }
+        model.restoreSource?.let {
+            label(context.getString(R.string.meal_restored_editor, it, record.revision + 1), "meal:restored_from")
+        }
         val status = label(statusText(), "meal:status").apply {
             accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE
         }
@@ -178,7 +181,10 @@ internal class MealDraftScreen(
         label(record.clinicalBlockCode, "meal:block_code")
     }
 
-    /** Read-only presentation of saved revisions: no selection, restoration, deletion or interpretation. */
+    /**
+     * Read-only presentation of saved revisions: no selection, deletion or interpretation. Restoration only
+     * loads the editor after an explicit in-screen confirmation; saving it is a separate action (ADR 0011).
+     */
     private fun history(target: HistoryTarget) {
         label(R.string.meal_history_title).setTypeface(null, Typeface.BOLD)
         label(R.string.meal_history_safety, "history:safety")
@@ -199,6 +205,9 @@ internal class MealDraftScreen(
                 label(state.latest.copiedFrom?.let {
                     context.getString(R.string.meal_selection_copy, it.id, it.revision)
                 } ?: context.getString(R.string.meal_selection_manual), "history:origin")
+                model.restoreFailure?.let {
+                    label(context.getString(R.string.meal_restore_failed, it.code), "restore:failure")
+                }
                 val labels = listOf(R.string.draft_name, R.string.draft_carbs, R.string.draft_fat,
                     R.string.draft_protein, R.string.draft_fiber, R.string.draft_notes)
                 val tags = listOf("name", "carbs", "fat", "protein", "fiber", "notes")
@@ -218,6 +227,10 @@ internal class MealDraftScreen(
                     }
                     label(if (record.content.basis == NutritionBasis.TOTAL_GRAMS) R.string.meal_selection_grams
                         else R.string.meal_selection_basis_missing, "$prefix:basis")
+                    record.restoredFrom?.let {
+                        label(context.getString(R.string.meal_history_restored_from, it), "$prefix:restored_from")
+                    }
+                    if (record.revision < state.latest.revision) restoreAction(record.revision, state.latest.revision)
                 }
                 label(state.blockCode, "history:block")
             }
@@ -226,6 +239,29 @@ internal class MealDraftScreen(
             R.string.meal_history_back_to_editor else R.string.draft_back_to_list, "history:close", true) {
             model.closeHistory()
         }
+    }
+
+    private fun restoreAction(revision: Long, latest: Long) {
+        if (model.restoreCandidate != revision) {
+            action(context.getString(R.string.meal_history_restore, revision), "history:$revision:restore") {
+                model.proposeRestore(revision)
+            }
+            return
+        }
+        val pending = model.dirty
+        label(context.getString(R.string.meal_restore_question, revision, latest + 1) +
+            if (pending) "\n" + context.getString(R.string.meal_restore_discard_warning) else "",
+            "restore:question").apply {
+            setPadding(dp(16), dp(16), dp(16), dp(16))
+            accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE
+            background = GradientDrawable().apply {
+                setColor(context.getColor(R.color.non_authoritative_background))
+                cornerRadius = dp(18).toFloat()
+            }
+        }
+        action(context.getString(if (pending) R.string.meal_restore_confirm_discard else R.string.meal_restore_confirm,
+            revision), "restore:confirm") { model.confirmRestore() }
+        action(R.string.meal_restore_cancel, "restore:cancel", true) { model.cancelRestore() }
     }
 
     private fun statusText(): String = when {

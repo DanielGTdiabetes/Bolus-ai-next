@@ -498,6 +498,16 @@ reselección y lecturas en vuelo. Mantiene cálculo y tratamiento bloqueados, si
 reglas nutricionales nuevas. Véanse la ampliación del [ADR 0009](adr/0009-local-meal-selection.md)
 y la [validación](validation/local-meal-selection-removal-2026-09-26.md).
 
+### Entrega de restauración de revisiones — 2026-09-27
+
+Continuación de fases 2, 4 y 7: una revisión anterior se restaura tras
+confirmación explícita como contenido de partida del editor. Guardar crea la
+revisión siguiente con procedencia `restored_from`, mismo control de conflicto e
+idempotencia. SQLite v3 migra desde v1 y v2 sin reescribir filas. La selección de
+Bolo no cambia. Cálculo y tratamiento siguen bloqueados. Véanse el
+[ADR 0011](adr/0011-restore-meal-revision.md) y la
+[validación](validation/local-meal-revision-restore-2026-09-27.md).
+
 ### Secuencia de capacidades
 
 No intentar construir toda una fase en un solo cambio. Secuencia inicial:

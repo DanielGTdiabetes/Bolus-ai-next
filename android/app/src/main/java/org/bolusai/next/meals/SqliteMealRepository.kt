@@ -16,7 +16,7 @@ import java.io.Closeable
 internal class SqliteMealRepository(context: Context, name: String? = "meal-drafts.db") :
     MealRepository, MealSelectionRepository, MealHistoryRepository, Closeable {
     private class UnsupportedSchema : RuntimeException()
-    private val helper = object : SQLiteOpenHelper(context.applicationContext, name, null, 2,
+    private val helper = object : SQLiteOpenHelper(context.applicationContext, name, null, SCHEMA_VERSION,
         DatabaseErrorHandler { throw SQLiteDatabaseCorruptException("meal.storage.corrupt") }) {
         override fun onConfigure(db: SQLiteDatabase) {
             db.execSQL("PRAGMA synchronous=FULL")
@@ -35,6 +35,7 @@ internal class SqliteMealRepository(context: Context, name: String? = "meal-draf
                     basis TEXT NOT NULL CHECK(basis IN ('UNSPECIFIED','TOTAL_GRAMS')),
                     name TEXT, carbs TEXT, fat TEXT, protein TEXT, fiber TEXT, notes TEXT,
                     source_id TEXT, source_revision INTEGER,
+                    $RESTORED_FROM_COLUMN,
                     PRIMARY KEY(id, revision),
                     CHECK((source_id IS NULL AND source_revision IS NULL) OR
                         (kind = 'DRAFT' AND source_id IS NOT NULL AND source_revision > 0))
@@ -43,13 +44,18 @@ internal class SqliteMealRepository(context: Context, name: String? = "meal-draf
             createSelectionTable(db)
         }
 
+        /**
+         * Runs inside the helper's upgrade transaction: any invalid row rolls everything back.
+         * v1 -> v3 and v2 -> v3 add restoration provenance as NULL, which is exact because restoration
+         * did not exist before v3. No revision is rewritten.
+         */
         override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
-            if (oldVersion != 1 || newVersion != 2) throw UnsupportedSchema()
-            // Validate the known v1 shape before adding review state; no revisions are rewritten.
-            db.rawQuery("SELECT id, revision, schema_version, kind, basis, name, carbs, fat, protein, fiber, notes, source_id, source_revision FROM meal_revisions", null).use {
+            if (oldVersion !in 1..2 || newVersion != SCHEMA_VERSION) throw UnsupportedSchema()
+            db.execSQL("ALTER TABLE meal_revisions ADD COLUMN $RESTORED_FROM_COLUMN")
+            db.rawQuery("SELECT * FROM meal_revisions", null).use {
                 while (it.moveToNext()) decode(it)
             }
-            createSelectionTable(db)
+            if (oldVersion == 1) createSelectionTable(db)
         }
         override fun onDowngrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) { throw UnsupportedSchema() }
     }
@@ -158,6 +164,9 @@ internal class SqliteMealRepository(context: Context, name: String? = "meal-draf
                 (previous?.revision ?: 0) != editor.revision -> MealSave.Failed(MealFailure.CONFLICT)
                 previous != null && (previous.kind != editor.kind || previous.copiedFrom != editor.copiedFrom) ->
                     MealSave.Failed(MealFailure.INVALID_RECORD)
+                // Provenance must name an existing revision older than the one being replaced.
+                !next.hasValidSavedProvenance || next.restoredFrom?.let { !exists(db, editor.id, it) } == true ->
+                    MealSave.Failed(MealFailure.INVALID_RECORD)
                 else -> {
                     db.insertOrThrow("meal_revisions", null, encode(next))
                     MealSave.Saved(next)
@@ -169,6 +178,10 @@ internal class SqliteMealRepository(context: Context, name: String? = "meal-draf
     } catch (failure: RuntimeException) {
         MealSave.Failed(reason(failure, MealFailure.SAVE_FAILED))
     }
+
+    private fun exists(db: SQLiteDatabase, id: String, revision: Long): Boolean =
+        db.rawQuery("SELECT 1 FROM meal_revisions WHERE id = ? AND revision = ?",
+            arrayOf(id, revision.toString())).use { it.moveToFirst() }
 
     private fun reason(failure: RuntimeException, fallback: MealFailure): MealFailure = when (failure) {
         is UnsupportedSchema -> MealFailure.UNSUPPORTED_SCHEMA
@@ -191,6 +204,7 @@ internal class SqliteMealRepository(context: Context, name: String? = "meal-draf
             }
         }
         record.copiedFrom?.let { put("source_id", it.id); put("source_revision", it.revision) }
+        record.restoredFrom?.let { put("restored_from", it) }
     }
 
     private fun decode(cursor: Cursor): MealRecord {
@@ -207,12 +221,17 @@ internal class SqliteMealRepository(context: Context, name: String? = "meal-draf
         return MealRecord(value("id")!!, revision, MealKind.valueOf(value("kind")!!),
             MealContent(field("name"), field("carbs"), field("fat"), field("protein"), field("fiber"),
                 field("notes"), NutritionBasis.valueOf(value("basis")!!)),
-            sourceId?.let { DishReference(it, sourceRevision!!.toLong()) })
+            sourceId?.let { DishReference(it, sourceRevision!!.toLong()) },
+            value("restored_from")?.toLong()).also { require(it.hasValidSavedProvenance) }
     }
 
     override fun close() = helper.close()
 
     private companion object {
+        const val SCHEMA_VERSION = 3
+        /** Shared by onCreate and the v1/v2 upgrade so both paths enforce the same invariant. */
+        const val RESTORED_FROM_COLUMN = "restored_from INTEGER CHECK(restored_from IS NULL OR " +
+            "(restored_from > 0 AND restored_from < revision - 1))"
         val fieldNames = listOf("name", "carbs", "fat", "protein", "fiber", "notes")
     }
 }
