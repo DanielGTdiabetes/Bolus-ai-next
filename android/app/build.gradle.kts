@@ -41,6 +41,7 @@ dependencies {
     }
     implementation(project(":shared:bolus-engine"))
     implementation(project(":shared:meal-drafts"))
+    implementation(project(":shared:clinical-profile"))
 
     testImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test:runner:1.7.0")

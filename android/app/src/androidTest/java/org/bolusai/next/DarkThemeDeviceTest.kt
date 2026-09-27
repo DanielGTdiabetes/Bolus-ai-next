@@ -106,6 +106,7 @@ class DarkThemeDeviceTest {
             model.update(record.content.copy(notes = draftField("Texto sin guardar")))
         }
         MainActivity.mealRepositoryFactory = { SqliteMealRepository(it, null) }
+        MainActivity.profileRepositoryFactory = { org.bolusai.next.profile.SqliteClinicalProfileRepository(it, null) }
         try {
             assertTrue(loaded.await(5, TimeUnit.SECONDS))
             ActivityScenario.launch(MainActivity::class.java).use { scenario ->
@@ -162,6 +163,7 @@ class DarkThemeDeviceTest {
             }
         } finally {
             MainActivity.mealRepositoryFactory = null
+            MainActivity.profileRepositoryFactory = null
             instrumentation.runOnMainSync { model.dispose() }
         }
     }

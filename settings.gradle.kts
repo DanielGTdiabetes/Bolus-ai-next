@@ -18,5 +18,6 @@ rootProject.name = "bolus-ai-next"
 
 include(":shared:bolus-engine")
 include(":shared:meal-drafts")
+include(":shared:clinical-profile")
 include(":android:app")
 include(":android:sender-fixture")

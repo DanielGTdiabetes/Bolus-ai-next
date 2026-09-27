@@ -84,6 +84,15 @@ de forma pura una revisión anterior como editor; guardar usa el mismo puerto y
 SQLite v3 registra `restored_from` sin reescribir revisiones
 ([ADR 0011](adr/0011-restore-meal-revision.md)).
 
+### Perfil clínico local
+
+`shared/clinical-profile` define contenido, catálogo, decimal canónico, huella
+SHA-256, reglas de transición, política de escritura y casos de uso. Android lo
+persiste en `clinical-profile.db`, independiente de `meal-drafts.db`, con
+versiones append-only protegidas por triggers. Cada versión lleva su unidad de
+glucosa junto a sus valores. Ni el motor ni `ReadOverview` dependen del módulo, y
+`verify.ps1` lo comprueba. Véase el [ADR 0012](adr/0012-local-clinical-profile.md).
+
 ## Conectividad
 
 Sin Internet deben seguir disponibles las funciones que solo requieren datos locales válidos.
@@ -108,8 +117,8 @@ La estructura de UI usa Views/XML y AndroidX Activity para el ciclo de vida y
 Atrás. `AppNavigation` mantiene destinos/pila sin Android ni lógica clínica;
 `ScreenRenderer` presenta estados y enlaces internos. `MainActivity` compone
 `ReadOverview`, que consume el caso de uso de glucosa y los contratos compartidos
-de entradas no disponibles, y `MealDraftModel`, que llama al módulo compartido y
-al adaptador SQLite. No hay WebView ni acceso remoto. La pila, el scroll, el editor
+de entradas no disponibles, `MealDraftModel`, que llama al módulo compartido y
+al adaptador SQLite, y `ClinicalProfileModel`, que hace lo mismo para el perfil. No hay WebView ni acceso remoto. La pila, el scroll, el editor
 de borrador y la sección de Ajustes se restauran; las revisiones confirmadas viven
 en SQLite.
 La implementación y los límites están en el [ADR 0007](adr/0007-legacy-android-navigation.md).

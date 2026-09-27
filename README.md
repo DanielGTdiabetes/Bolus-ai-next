@@ -105,6 +105,15 @@ ninguna revisión ni cambia la selección de Bolo, y el guardado conserva el
 control de conflicto. SQLite pasa a v3 con migración probada desde v1 y v2.
 Véanse el [ADR 0011](docs/adr/0011-restore-meal-revision.md) y la
 [validación](docs/validation/local-meal-revision-restore-2026-09-27.md).
+Ajustes → Cálculo permite capturar el perfil clínico local como versiones
+inmutables: unidad de glucosa, zona horaria y un valor de día completo para ratio,
+sensibilidad y objetivo, sin valores por defecto y con «sin configurar» distinto
+de `0`. Cada versión guarda fecha, origen, escritor y huella. Se pueden consultar
+y restaurar versiones anteriores como versión nueva. Cambiar de unidad nunca
+reinterpreta valores: la versión que cambia la unidad se guarda sin sensibilidad
+ni objetivo. El perfil no se usa para calcular, recomendar ni tratar. Véanse el
+[ADR 0012](docs/adr/0012-local-clinical-profile.md) y la
+[validación](docs/validation/local-clinical-profile-2026-09-27.md).
 Se ha verificado el flujo en la pantalla interior del Pixel 10 Pro Fold, además
 de layouts anchos vertical/horizontal con texto ampliado. Pausar y reanudar los
 editores conserva sus campos, foco y posición de desplazamiento.

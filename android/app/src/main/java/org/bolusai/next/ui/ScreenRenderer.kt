@@ -28,6 +28,7 @@ internal class ScreenRenderer(
     private val selectSettings: (SettingsSection) -> Unit,
     private val renderMeals: ((MealKind) -> Unit)? = null,
     private val renderSelection: (() -> Unit)? = null,
+    private val renderProfile: (() -> Unit)? = null,
 ) {
     private fun dp(value: Int) = (value * context.resources.displayMetrics.density).toInt()
     private fun color(id: Int) = context.getColor(id)
@@ -325,8 +326,11 @@ internal class ScreenRenderer(
         text(content, R.string.settings_detail, 14f, ink = R.color.secondary_text)
         when (selected) {
             SettingsSection.CALCULATION -> {
-                info(R.string.clinical_parameters, R.string.clinical_fields)
-                disabled(R.string.save_profile_disabled, "save_profile")
+                // Local capture only (ADR 0012). Bolo keeps reporting the profile as unavailable for calculation.
+                if (renderProfile != null) renderProfile.invoke() else {
+                    info(R.string.clinical_parameters, R.string.clinical_fields)
+                    disabled(R.string.save_profile_disabled, "save_profile")
+                }
             }
             SettingsSection.GLUCOSE, SettingsSection.DEXCOM -> glucose(state)
             SettingsSection.NIGHTSCOUT -> {
