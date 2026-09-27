@@ -32,6 +32,10 @@ internal class MealDraftModel(
     var editor: MealRecord? = restored?.let { restore(it) }
         private set
     private var baseline: MealRecord? = editor?.takeIf { restored?.getBoolean("dirty", true) == false }
+
+    /** Revision whose content started this editor session through an explicit restoration (ADR 0011). */
+    var restoreSource: Long? = editor?.restoredFrom?.takeIf { baseline == null }
+        private set
     var busy = false
         private set
     var failure: MealFailure? = null
@@ -51,10 +55,52 @@ internal class MealDraftModel(
     private var readingHistory = false
     private var historyRequest = 0L
 
+    /** Revision awaiting explicit confirmation before it is loaded into the editor. Nothing is written. */
+    var restoreCandidate: Long? = historyTarget?.let {
+        restoredHistory?.getLong("restoreCandidate", 0L)?.takeIf { it > 0 }
+    }
+        private set
+    var restoreFailure: MealFailure? = null
+        private set
+
     fun openHistory(id: String, kind: MealKind) {
         if (disposed.get()) return
         historyTarget = HistoryTarget(id, kind)
+        restoreCandidate = null
+        restoreFailure = null
         readHistory()
+    }
+
+    fun proposeRestore(revision: Long) {
+        if (busy || history !is MealHistory.Loaded) return
+        restoreCandidate = revision
+        restoreFailure = null
+        changed?.invoke()
+    }
+
+    fun cancelRestore() {
+        if (restoreCandidate == null && restoreFailure == null) return
+        restoreCandidate = null
+        restoreFailure = null
+        changed?.invoke()
+    }
+
+    /**
+     * Loads the confirmed revision into the editor, replacing any pending editor the user agreed to discard.
+     * No revision or Bolo selection changes until an explicit save, which keeps the conflict check.
+     */
+    fun confirmRestore() {
+        val revision = restoreCandidate ?: return
+        val loaded = history as? MealHistory.Loaded ?: return
+        if (busy || disposed.get()) return
+        when (val result = useCases.restore(loaded, revision)) {
+            is MealRestore.Rejected -> {
+                restoreCandidate = null
+                restoreFailure = result.reason
+                changed?.invoke()
+            }
+            is MealRestore.Ready -> open(result.editor, result.baseline, revision)
+        }
     }
 
     /** Starts the read for a restored target; an in-flight or completed read is kept. */
@@ -70,6 +116,8 @@ internal class MealDraftModel(
         readingHistory = false
         historyTarget = null
         history = null
+        restoreCandidate = null
+        restoreFailure = null
         changed?.invoke()
     }
 
@@ -79,6 +127,7 @@ internal class MealDraftModel(
         val request = ++historyRequest
         readingHistory = true
         history = null
+        restoreFailure = null
         changed?.invoke()
         worker.execute {
             val result = historyReader?.read(target.id, target.kind) ?: MealHistory.Failed(MealFailure.READ_FAILED)
@@ -93,7 +142,10 @@ internal class MealDraftModel(
     }
 
     fun historySnapshot(): Bundle? = historyTarget?.let {
-        Bundle().apply { putString("id", it.id); putString("kind", it.kind.name) }
+        Bundle().apply {
+            putString("id", it.id); putString("kind", it.kind.name)
+            restoreCandidate?.let { revision -> putLong("restoreCandidate", revision) }
+        }
     }
 
     private fun restoreHistory(bundle: Bundle): HistoryTarget? = try {
@@ -163,26 +215,29 @@ internal class MealDraftModel(
     }
 
     fun retry(kind: MealKind) { lists.remove(kind); load(kind); changed?.invoke() }
-    fun new(kind: MealKind) = open(useCases.new(kind), persisted = false)
-    fun edit(record: MealRecord) = open(record, persisted = true)
-    fun copy(record: MealRecord) = open(useCases.copyDish(record), persisted = false)
+    fun new(kind: MealKind) = open(useCases.new(kind), null, null)
+    fun edit(record: MealRecord) = open(record, record, null)
+    fun copy(record: MealRecord) = open(useCases.copyDish(record), null, null)
 
-    private fun open(record: MealRecord, persisted: Boolean) {
+    private fun open(record: MealRecord, saved: MealRecord?, restoredFrom: Long?) {
         if (busy) return
         // Opening an editor explicitly leaves the read-only query of the library.
         ++historyRequest
         readingHistory = false
         historyTarget = null
         history = null
+        restoreCandidate = null
+        restoreFailure = null
         editor = record
-        baseline = record.takeIf { persisted }
+        baseline = saved
+        restoreSource = restoredFrom
         failure = null
         changed?.invoke()
     }
 
     fun update(content: MealContent) {
         if (busy) return
-        editor = editor?.copy(content = content)
+        editor = editor?.let { useCases.change(it, content, baseline, restoreSource) }
         failure = null
     }
 
@@ -190,6 +245,7 @@ internal class MealDraftModel(
         if (busy) return
         editor = null
         baseline = null
+        restoreSource = null
         failure = null
         changed?.invoke()
     }
@@ -208,6 +264,8 @@ internal class MealDraftModel(
                     is MealSave.Saved -> {
                         editor = result.record
                         baseline = result.record
+                        // Later edits start from this saved revision, not from the restored one.
+                        restoreSource = null
                         lists.remove(result.record.kind)
                         refreshSelection()
                     }
@@ -230,6 +288,7 @@ internal class MealDraftModel(
             putStringArrayList("fields", ArrayList(record.content.fields.map { it.editText() }))
             putBoolean("dirty", dirty)
             record.copiedFrom?.let { putString("source", it.id); putLong("sourceRevision", it.revision) }
+            record.restoredFrom?.let { putLong("restoredFrom", it) }
         }
     }
 
@@ -240,7 +299,8 @@ internal class MealDraftModel(
             MealKind.valueOf(requireNotNull(bundle.getString("kind"))),
             MealContent(fields[0], fields[1], fields[2], fields[3], fields[4], fields[5],
                 NutritionBasis.valueOf(requireNotNull(bundle.getString("basis")))),
-            bundle.getString("source")?.let { DishReference(it, bundle.getLong("sourceRevision")) })
+            bundle.getString("source")?.let { DishReference(it, bundle.getLong("sourceRevision")) },
+            if (bundle.containsKey("restoredFrom")) bundle.getLong("restoredFrom") else null)
     } catch (_: IllegalArgumentException) { null }
 
     override fun onCleared() {

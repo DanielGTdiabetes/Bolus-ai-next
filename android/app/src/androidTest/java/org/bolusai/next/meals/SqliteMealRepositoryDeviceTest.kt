@@ -263,14 +263,162 @@ class SqliteMealRepositoryDeviceTest {
                     assertEquals(MealSelection.Reviewed(latest, latest), migrated.select(latest))
                 }
                 SQLiteDatabase.openDatabase(context.getDatabasePath(database).path, null, SQLiteDatabase.OPEN_READONLY).use { db ->
-                    assertEquals(2, db.version)
-                    db.rawQuery("SELECT carbs FROM meal_revisions WHERE id='v1' ORDER BY revision", null).use {
+                    assertEquals(3, db.version)
+                    db.rawQuery("SELECT carbs, restored_from FROM meal_revisions WHERE id='v1' ORDER BY revision", null).use {
                         assertEquals(2, it.count)
-                        assertTrue(it.moveToFirst()); assertEquals("0", it.getString(0))
-                        assertTrue(it.moveToNext()); assertEquals("  nuevo  ", it.getString(0))
+                        assertTrue(it.moveToFirst()); assertEquals("0", it.getString(0)); assertTrue(it.isNull(1))
+                        assertTrue(it.moveToNext()); assertEquals("  nuevo  ", it.getString(0)); assertTrue(it.isNull(1))
                     }
                 }
             }
+        }
+    }
+
+    /** Frozen v2 schema, independent of the production onCreate implementation. */
+    private fun createV2(db: SQLiteDatabase) {
+        db.execSQL("""
+            CREATE TABLE meal_revisions (
+                id TEXT NOT NULL, revision INTEGER NOT NULL CHECK(revision > 0),
+                schema_version INTEGER NOT NULL CHECK(schema_version = 1),
+                kind TEXT NOT NULL CHECK(kind IN ('DRAFT','DISH')),
+                basis TEXT NOT NULL CHECK(basis IN ('UNSPECIFIED','TOTAL_GRAMS')),
+                name TEXT, carbs TEXT, fat TEXT, protein TEXT, fiber TEXT, notes TEXT,
+                source_id TEXT, source_revision INTEGER,
+                PRIMARY KEY(id, revision),
+                CHECK((source_id IS NULL AND source_revision IS NULL) OR
+                    (kind = 'DRAFT' AND source_id IS NOT NULL AND source_revision > 0))
+            )
+        """.trimIndent())
+        db.execSQL("""
+            CREATE TABLE meal_selection (
+                slot INTEGER PRIMARY KEY CHECK(slot = 1),
+                id TEXT NOT NULL, revision INTEGER NOT NULL,
+                FOREIGN KEY(id, revision) REFERENCES meal_revisions(id, revision)
+            )
+        """.trimIndent())
+    }
+
+    @Test fun migrationFromV2PreservesRevisionsAndSelectionAndBackupCanBeRestored() = withDatabase { name ->
+        withDatabase { backup ->
+            SQLiteDatabase.openOrCreateDatabase(context.getDatabasePath(name), null).use { db ->
+                createV2(db)
+                db.execSQL("INSERT INTO meal_revisions(id,revision,schema_version,kind,basis,carbs,source_id,source_revision) VALUES ('v2',1,1,'DRAFT','UNSPECIFIED','0','v2-dish',3)")
+                db.execSQL("INSERT INTO meal_revisions(id,revision,schema_version,kind,basis,carbs,fat,source_id,source_revision) VALUES ('v2',2,1,'DRAFT','TOTAL_GRAMS','  nuevo  ','0','v2-dish',3)")
+                db.execSQL("INSERT INTO meal_revisions(id,revision,schema_version,kind,basis,carbs,source_id,source_revision) VALUES ('v2',3,1,'DRAFT','UNSPECIFIED','tercera','v2-dish',3)")
+                db.execSQL("INSERT INTO meal_selection(slot,id,revision) VALUES (1,'v2',2)")
+                db.version = 2
+            }
+            context.getDatabasePath(name).copyTo(context.getDatabasePath(backup))
+            for (database in listOf(name, backup)) {
+                SqliteMealRepository(context, database).use { migrated ->
+                    val history = ReadMealHistory(migrated).read("v2", MealKind.DRAFT) as MealHistory.Loaded
+                    assertEquals(listOf(3L, 2L, 1L), history.revisions.map { it.revision })
+                    assertTrue(history.revisions.all { it.restoredFrom == null })
+                    assertEquals(DraftField.Entered("0"), history.revisions.last().content.carbs)
+                    assertEquals(DraftField.Missing, history.revisions.last().content.fat)
+                    val selection = migrated.readSelection() as MealSelection.Reviewed
+                    assertEquals(2, selection.snapshot.revision)
+                    assertEquals(history.latest, selection.latest)
+                    // The migrated store accepts a restoration with provenance.
+                    val editor = (MealDrafts(migrated, MealIds { error("unused") }).restore(history, 1) as MealRestore.Ready).editor
+                    val saved = (migrated.save(editor) as MealSave.Saved).record
+                    assertEquals(4, saved.revision); assertEquals(1L, saved.restoredFrom)
+                }
+                SQLiteDatabase.openDatabase(context.getDatabasePath(database).path, null, SQLiteDatabase.OPEN_READONLY).use { db ->
+                    assertEquals(3, db.version)
+                    db.rawQuery("SELECT revision, restored_from FROM meal_revisions WHERE id='v2' ORDER BY revision", null).use {
+                        assertEquals(4, it.count)
+                        repeat(3) { _ -> assertTrue(it.moveToNext()); assertTrue(it.isNull(1)) }
+                        assertTrue(it.moveToNext()); assertEquals(1L, it.getLong(1))
+                    }
+                    db.rawQuery("SELECT id, revision FROM meal_selection", null).use {
+                        assertTrue(it.moveToFirst()); assertEquals("v2", it.getString(0)); assertEquals(2L, it.getLong(1))
+                    }
+                }
+            }
+        }
+    }
+
+    @Test fun invalidV2RowRollsBackMigrationAndFailsClosed() = withDatabase { name ->
+        SQLiteDatabase.openOrCreateDatabase(context.getDatabasePath(name), null).use { db ->
+            createV2(db)
+            // A row the v2 schema allowed but the decoder rejects: unknown record schema.
+            db.execSQL("DROP TABLE meal_selection")
+            db.execSQL("ALTER TABLE meal_revisions RENAME TO old_revisions")
+            db.execSQL("CREATE TABLE meal_revisions AS SELECT * FROM old_revisions")
+            db.execSQL("DROP TABLE old_revisions")
+            db.execSQL("INSERT INTO meal_revisions(id,revision,schema_version,kind,basis) VALUES ('bad',1,9,'DRAFT','UNSPECIFIED')")
+            db.execSQL("CREATE TABLE meal_selection (slot INTEGER PRIMARY KEY, id TEXT NOT NULL, revision INTEGER NOT NULL)")
+            db.version = 2
+        }
+        SqliteMealRepository(context, name).use {
+            assertEquals(MealFailure.UNSUPPORTED_SCHEMA, (it.read(MealKind.DRAFT) as MealRead.Failed).reason)
+        }
+        SQLiteDatabase.openDatabase(context.getDatabasePath(name).path, null, SQLiteDatabase.OPEN_READONLY).use { db ->
+            assertEquals(2, db.version)
+            db.rawQuery("SELECT * FROM meal_revisions", null).use { assertEquals(-1, it.getColumnIndex("restored_from")) }
+        }
+    }
+
+    @Test fun restoredRevisionPersistsProvenanceAcrossRestartWithoutTouchingSelection() = withDatabase { name ->
+        lateinit var first: MealRecord
+        lateinit var second: MealRecord
+        lateinit var third: MealRecord
+        SqliteMealRepository(context, name).use { repository ->
+            first = (repository.save(MealRecord("restore", 0, MealKind.DRAFT,
+                MealContent(carbs = draftField("0"), notes = draftField("  exacto  ")),
+                DishReference("restore-dish", 2))) as MealSave.Saved).record
+            second = (repository.save(first.copy(content = first.content.copy(carbs = draftField("nuevo"),
+                fat = draftField("0")))) as MealSave.Saved).record
+            repository.select(second)
+            val history = ReadMealHistory(repository).read("restore", MealKind.DRAFT) as MealHistory.Loaded
+            val editor = (MealDrafts(repository, MealIds { error("unused") }).restore(history, 1) as MealRestore.Ready).editor
+            third = (repository.save(editor) as MealSave.Saved).record
+            // Identical retry returns the committed revision instead of appending again.
+            assertEquals(MealSave.Saved(third), repository.save(editor))
+        }
+        SqliteMealRepository(context, name).use { reopened ->
+            assertEquals(MealRead.Loaded(listOf(first, second, third)), reopened.readRevisions("restore"))
+            assertEquals(1L, third.restoredFrom)
+            assertEquals(first.content, third.content)
+            assertEquals(DraftField.Missing, third.content.fat)
+            assertEquals(DraftField.Entered("0"), third.content.carbs)
+            assertEquals(MealSelection.Reviewed(second, third), reopened.readSelection())
+            assertFalse(reopened.readSelection().allowsCalculation)
+            // A stale restoration after a later revision is a conflict and appends nothing.
+            val staleEditor = MealRecord("restore", 2, MealKind.DRAFT, first.content.copy(name = draftField("otra")),
+                DishReference("restore-dish", 2), 1)
+            assertEquals(MealSave.Failed(MealFailure.CONFLICT), reopened.save(staleEditor))
+            assertEquals(MealRead.Loaded(listOf(first, second, third)), reopened.readRevisions("restore"))
+        }
+        SQLiteDatabase.openDatabase(context.getDatabasePath(name).path, null, SQLiteDatabase.OPEN_READWRITE).use { db ->
+            // The storage invariant rejects provenance that is not older than the replaced revision.
+            assertThrows(android.database.SQLException::class.java) {
+                db.execSQL("INSERT INTO meal_revisions(id,revision,schema_version,kind,basis,source_id,source_revision,restored_from) VALUES ('restore',4,1,'DRAFT','UNSPECIFIED','restore-dish',2,3)")
+            }
+        }
+    }
+
+    @Test fun restoredSaveWriteFailureRollsBackAndRetrySucceeds() = withDatabase { name ->
+        SqliteMealRepository(context, name).use { repository ->
+            val first = (repository.save(MealRecord("restore-failure", 0, MealKind.DISH,
+                MealContent(carbs = draftField("0")))) as MealSave.Saved).record
+            val second = (repository.save(first.copy(content = MealContent(carbs = draftField("nuevo")))) as MealSave.Saved).record
+            repository.select(second)
+            val history = ReadMealHistory(repository).read(first.id, MealKind.DISH) as MealHistory.Loaded
+            val editor = (MealDrafts(repository, MealIds { error("unused") }).restore(history, 1) as MealRestore.Ready).editor
+            SQLiteDatabase.openDatabase(context.getDatabasePath(name).path, null, SQLiteDatabase.OPEN_READWRITE).use {
+                it.execSQL("CREATE TRIGGER fail_restore AFTER INSERT ON meal_revisions BEGIN SELECT RAISE(ABORT, 'synthetic'); END")
+            }
+            assertEquals(MealSave.Failed(MealFailure.SAVE_FAILED), repository.save(editor))
+            assertEquals(MealRead.Loaded(listOf(first, second)), repository.readRevisions(first.id))
+            assertEquals(MealSelection.Reviewed(second, second), repository.readSelection())
+            SQLiteDatabase.openDatabase(context.getDatabasePath(name).path, null, SQLiteDatabase.OPEN_READWRITE).use {
+                it.execSQL("DROP TRIGGER fail_restore")
+            }
+            val third = (repository.save(editor) as MealSave.Saved).record
+            assertEquals(3L, third.revision); assertEquals(1L, third.restoredFrom)
+            assertEquals(MealSelection.Reviewed(second, third), repository.readSelection())
         }
     }
 }

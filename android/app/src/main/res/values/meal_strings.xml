@@ -55,11 +55,20 @@
     <string name="meal_selection_clear">Retirar selección de Bolo · conservar comida guardada</string>
     <string name="meal_history_open">Ver revisiones guardadas · solo lectura</string>
     <string name="meal_history_title">Revisiones guardadas</string>
-    <string name="meal_history_safety">Consulta de solo lectura del historial de borradores. No es historial clínico, no restaura revisiones, no cambia la selección de Bolo ni registra una ingesta. Los textos no tienen validación nutricional.</string>
+    <string name="meal_history_safety">Consulta de solo lectura del historial de borradores. No es historial clínico, no cambia la selección de Bolo ni registra una ingesta. Restaurar solo carga el editor; guardar crea una revisión nueva. Los textos no tienen validación nutricional.</string>
     <string name="meal_history_missing">No hay revisiones guardadas para el registro %1$s. meal.history.missing</string>
     <string name="meal_history_failed">No se pudieron leer las revisiones. No se puede afirmar que no existan. Motivo: %1$s</string>
     <string name="meal_history_status">Revisiones guardadas: %1$d · última: %2$d. Orden: de la más reciente a la más antigua.</string>
     <string name="meal_history_latest">Revisión %1$d · última guardada</string>
     <string name="meal_history_revision">Revisión %1$d · anterior</string>
     <string name="meal_history_back_to_editor">Volver al editor abierto · conserva cambios sin guardar</string>
+    <string name="meal_history_restored_from">Restaurada a partir de la revisión %1$d. Puede incluir cambios posteriores.</string>
+    <string name="meal_history_restore">Restaurar como nueva revisión · revisión %1$d</string>
+    <string name="meal_restore_question">Se cargará en el editor, como contenido de partida, la revisión %1$d. Al guardar se creará una revisión nueva, la %2$d, que registra como origen la revisión %1$d. No cambia ninguna revisión guardada ni la selección de Bolo. No registra una ingesta ni valida los textos.</string>
+    <string name="meal_restore_discard_warning">Hay cambios sin guardar en el editor abierto: se descartarán.</string>
+    <string name="meal_restore_confirm">Cargar la revisión %1$d en el editor</string>
+    <string name="meal_restore_confirm_discard">Descartar cambios y cargar la revisión %1$d</string>
+    <string name="meal_restore_cancel">Cancelar · seguir consultando</string>
+    <string name="meal_restore_failed">No se pudo preparar la restauración. No se cargó nada en el editor. Motivo: %1$s</string>
+    <string name="meal_restored_editor">Contenido de partida: revisión %1$d, restaurada. Al guardar se creará la revisión %2$d. Hasta entonces no cambia nada guardado.</string>
 </resources>

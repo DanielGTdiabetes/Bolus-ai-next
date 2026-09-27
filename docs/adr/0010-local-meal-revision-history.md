@@ -9,6 +9,8 @@
 - Evidencia clínica requerida: no aplica. No se introduce ninguna regla ni
   parámetro clínico.
 - Base Next: `dcb3a3d` (PR #24 integrada).
+- Ampliado por el [ADR 0011](0011-restore-meal-revision.md): restauración
+  explícita como nueva revisión. La consulta sigue sin escribir.
 
 ## Contexto
 

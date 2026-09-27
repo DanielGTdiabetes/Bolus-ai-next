@@ -70,7 +70,7 @@ ingesta confirmada, tratamiento ni item de sincronización. Véase el
 [ADR 0008](adr/0008-local-meal-drafts.md).
 
 La revisión de entrada de Bolo consume `ReviewMealSelection` del mismo módulo:
-SQLite v2 guarda una referencia a una revisión inmutable y la lee junto a la
+SQLite (v2 en adelante) guarda una referencia a una revisión inmutable y la lee junto a la
 última revisión. La UI distingue selección ausente, fallo y obsolescencia sin
 reemplazar el snapshot. La selección sobrevive al relanzamiento y no constituye
 ingesta, cálculo ni confirmación. Véase el
@@ -78,6 +78,11 @@ ingesta, cálculo ni confirmación. Véase el
 La retirada explícita usa el mismo puerto compartido: elimina solo el slot dentro
 de una transacción y devuelve ausencia tras confirmar el commit. No modifica
 revisiones ni esquema; fallos e intentos en curso mantienen el bloqueo.
+`ReadMealHistory` consulta todas las revisiones de un registro sin escribir
+([ADR 0010](adr/0010-local-meal-revision-history.md)). `MealDrafts.restore` carga
+de forma pura una revisión anterior como editor; guardar usa el mismo puerto y
+SQLite v3 registra `restored_from` sin reescribir revisiones
+([ADR 0011](adr/0011-restore-meal-revision.md)).
 
 ## Conectividad
 

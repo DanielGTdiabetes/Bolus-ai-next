@@ -2,7 +2,8 @@ package org.bolusai.meals
 
 /**
  * Read-only query of the saved capture revisions of one dish or draft.
- * It is not clinical history, restoration or selection, and never unlocks calculation.
+ * It is not clinical history or selection, never writes and never unlocks calculation.
+ * Restoration (ADR 0011) is a separate, explicit editor action built on a loaded history.
  */
 sealed interface MealHistory {
     val allowsCalculation: Boolean get() = false
@@ -21,6 +22,8 @@ sealed interface MealHistory {
             // Compare count and neighbours only: a corrupt huge revision must fail without expanding a range.
             require(newest.revision == revisions.size.toLong() && revisions.last().revision == 1L)
             require(revisions.zipWithNext().all { (newer, older) -> newer.revision - 1 == older.revision })
+            // Restoration provenance must name an existing revision older than the one it replaced.
+            require(revisions.all { it.hasValidSavedProvenance })
         }
         val latest: MealRecord get() = revisions.first()
         override val blockCode: String get() = READ_ONLY_CODE

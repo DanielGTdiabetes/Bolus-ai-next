@@ -37,19 +37,28 @@ data class DishReference(val id: String, val revision: Long) {
     init { require(id.isNotBlank() && revision > 0) }
 }
 
-/** Revision zero is an unsaved editor. Persisted revisions start at one. No consumption time exists. */
+/**
+ * Revision zero is an unsaved editor. Persisted revisions start at one. No consumption time exists.
+ * [restoredFrom] is the earlier revision of this same record whose content was loaded as the starting
+ * point (ADR 0011); null means the revision was not created from a restoration. In an editor, [revision]
+ * is the latest saved revision it will replace, so the source is always older than that one.
+ */
 data class MealRecord(
     val id: String,
     val revision: Long,
     val kind: MealKind,
     val content: MealContent,
     val copiedFrom: DishReference? = null,
+    val restoredFrom: Long? = null,
     val schemaVersion: Int = 1,
 ) {
     init {
         require(id.isNotBlank() && revision >= 0 && schemaVersion == 1)
         require(kind != MealKind.DISH || copiedFrom == null)
+        require(restoredFrom == null || restoredFrom in 1 until revision)
     }
+    /** Persisted-revision invariant: the source predates the revision this one replaced. */
+    val hasValidSavedProvenance: Boolean get() = restoredFrom == null || restoredFrom < revision - 1
     val clinicalBlockCode: String get() = "meal.draft.not_clinically_validated"
     val allowsCalculation: Boolean get() = false
     val allowsTreatment: Boolean get() = false
@@ -88,4 +97,41 @@ class MealDrafts(private val repository: MealRepository, private val ids: MealId
         return MealRecord(ids.next(), 0, MealKind.DRAFT, dish.content,
             DishReference(dish.id, dish.revision))
     }
+
+    /**
+     * Pure: loads an older saved revision as the editor's starting content. Nothing is read or written;
+     * saving goes through [save] with the usual revision conflict control (ADR 0011).
+     */
+    fun restore(history: MealHistory.Loaded, revision: Long): MealRestore {
+        val latest = history.latest
+        val source = history.revisions.firstOrNull { it.revision == revision }
+        if (source == null || revision >= latest.revision) return MealRestore.Rejected(MealFailure.INVALID_RECORD)
+        return MealRestore.Ready(latest.copy(content = source.content, restoredFrom = revision), latest)
+    }
+
+    /**
+     * Applies an editor change. Provenance is kept only while the editor started from a restoration
+     * ([restoreSource]); an editor opened on a saved revision drops inherited provenance once it changes,
+     * and returning to the saved content yields exactly the saved revision again.
+     */
+    fun change(editor: MealRecord, content: MealContent, baseline: MealRecord?, restoreSource: Long?): MealRecord =
+        if (restoreSource == null && baseline != null && baseline.id == editor.id && content == baseline.content) baseline
+        else editor.copy(content = content, restoredFrom = restoreSource)
+}
+
+/** Outcome of preparing a restoration. Never a write, intake, recommendation or selection. */
+sealed interface MealRestore {
+    val allowsCalculation: Boolean get() = false
+    val allowsTreatment: Boolean get() = false
+
+    /** [editor] carries the older content; [baseline] is the latest saved revision it will replace. */
+    data class Ready(val editor: MealRecord, val baseline: MealRecord) : MealRestore {
+        init {
+            val source = requireNotNull(editor.restoredFrom)
+            require(editor.id == baseline.id && editor.kind == baseline.kind && editor.copiedFrom == baseline.copiedFrom)
+            require(editor.revision == baseline.revision && source < baseline.revision)
+        }
+    }
+
+    data class Rejected(val reason: MealFailure) : MealRestore
 }

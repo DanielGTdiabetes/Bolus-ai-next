@@ -109,8 +109,10 @@ class MealHistoryDeviceTest {
                     // Newest first is the declared order.
                     val panel = activity.findViewById<android.widget.LinearLayout>(R.id.screen_content)
                     assertTrue(panel.indexOfChild(view(activity, "history:2")) < panel.indexOfChild(view(activity, "history:1")))
-                    // No selection, editing, restoration or deletion from the query.
-                    listOf("meal:select", "meal:select:$id", "meal:edit:$id", "meal:save", "meal:new").forEach {
+                    // No selection, editing or deletion from the query; restoring needs an explicit request
+                    // and confirmation (ADR 0011) and the latest revision offers none.
+                    listOf("meal:select", "meal:select:$id", "meal:edit:$id", "meal:save", "meal:new",
+                        "history:2:restore", "restore:question", "restore:confirm").forEach {
                         assertNull(it, viewOrNull(activity, it))
                     }
                     assertEquals(context.getString(R.string.draft_back_to_list), text(activity, "history:close"))
