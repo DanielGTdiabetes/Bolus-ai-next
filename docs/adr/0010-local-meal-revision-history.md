@@ -25,9 +25,11 @@ un fallo de lectura como «sin revisiones».
 
 - `Loaded`: todas las revisiones, ordenadas de la más reciente a la más antigua.
   El caso de uso ordena de forma explícita y exige que sean contiguas hasta la 1,
-  con la misma identidad, clase y referencia de copia. Huecos, duplicados o deriva
-  de identidad devuelven `meal.storage.invalid_record`; nunca se muestra una
-  historia parcial como completa.
+  con la misma identidad, clase y referencia de copia. La continuidad se comprueba
+  con el recuento y pares adyacentes, sin expandir rangos a partir de un valor
+  almacenado. Huecos, duplicados o deriva de identidad devuelven
+  `meal.storage.invalid_record`; nunca se muestra una historia parcial como
+  completa.
 - `Missing` (`meal.history.missing`): la lectura terminó bien y no existe ninguna
   revisión para ese ID.
 - `Failed`: conserva el motivo de almacenamiento. Nunca equivale a ausencia.

@@ -63,3 +63,20 @@ modifica la biblioteca normal del teléfono. No se consulta ni modifica Legacy.
 La recreación se prueba con el `ViewModel` retenido; la restauración tras muerte
 del proceso usa el mismo `Bundle` que el editor pero no se simula. iOS sigue
 pendiente de verificación.
+
+## Corrección tras revisión de la PR #25
+
+La revisión automática de Codex señaló que la continuidad se comprobaba
+expandiendo `newest.revision downTo 1`. Una fila corrupta con una revisión
+positiva enorme, admitida por la restricción SQLite, podía agotar memoria o
+bloquear la app antes de detectar el hueco. La validación compara ahora el
+recuento con la revisión más reciente, exige que la más antigua sea 1 y revisa
+solo pares adyacentes. Una prueba común con `Long.MAX_VALUE`,
+`Int.MAX_VALUE + 1` y 50 000 000, solas y tras revisiones válidas, confirma
+`meal.storage.invalid_record` sin expandir el rango.
+
+Verificación de la corrección con `scripts/verify.ps1 -DeviceTests`: 63 pruebas
+JVM sin fallos y `OK (44 tests)` en USB (42,467 s). Un intento previo repitió el
+fallo de `NavigationDeviceTest` porque la pantalla entró en reposo durante la
+compilación; la ejecución válida envió `KEYCODE_WAKEUP` cada 10 s, sin cambiar
+ajustes del teléfono.
