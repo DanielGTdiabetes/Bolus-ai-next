@@ -1,0 +1,63 @@
+package org.bolusai.meals
+
+/**
+ * Read-only query of the saved capture revisions of one dish or draft.
+ * It is not clinical history, restoration or selection, and never unlocks calculation.
+ */
+sealed interface MealHistory {
+    val allowsCalculation: Boolean get() = false
+    val allowsTreatment: Boolean get() = false
+    val blockCode: String
+
+    /**
+     * Every persisted revision, ordered newest first and contiguous down to revision one.
+     * Identity, class and copy reference are immutable across revisions.
+     */
+    data class Loaded(val id: String, val kind: MealKind, val revisions: List<MealRecord>) : MealHistory {
+        init {
+            require(id.isNotBlank() && revisions.isNotEmpty())
+            val newest = revisions.first()
+            require(revisions.all { it.id == id && it.kind == kind && it.copiedFrom == newest.copiedFrom })
+            require(revisions.map { it.revision } == (newest.revision downTo 1L).toList())
+        }
+        val latest: MealRecord get() = revisions.first()
+        override val blockCode: String get() = READ_ONLY_CODE
+    }
+
+    /** The store answered successfully and holds no revision for this identity. */
+    data object Missing : MealHistory {
+        override val blockCode = "meal.history.missing"
+    }
+
+    /** The store could not prove the revisions; never presented as missing or empty. */
+    data class Failed(val reason: MealFailure) : MealHistory {
+        override val blockCode: String get() = reason.code
+    }
+
+    companion object {
+        const val READ_ONLY_CODE = "meal.history.read_only"
+    }
+}
+
+interface MealHistoryRepository {
+    /**
+     * Read every persisted revision of [id] in one consistent local read, in any order.
+     * An empty list means the identity has no saved revision; failures stay explicit.
+     */
+    fun readRevisions(id: String): MealRead
+}
+
+class ReadMealHistory(private val repository: MealHistoryRepository) {
+    fun read(id: String, kind: MealKind): MealHistory {
+        if (id.isBlank()) return MealHistory.Failed(MealFailure.INVALID_RECORD)
+        return when (val result = repository.readRevisions(id)) {
+            is MealRead.Failed -> MealHistory.Failed(result.reason)
+            is MealRead.Loaded -> if (result.records.isEmpty()) MealHistory.Missing else try {
+                MealHistory.Loaded(id, kind, result.records.sortedByDescending { it.revision })
+            } catch (_: IllegalArgumentException) {
+                // Gaps, duplicates or identity drift cannot be shown as a trustworthy history.
+                MealHistory.Failed(MealFailure.INVALID_RECORD)
+            }
+        }
+    }
+}

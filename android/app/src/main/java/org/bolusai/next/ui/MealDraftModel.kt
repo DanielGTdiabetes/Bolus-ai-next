@@ -9,12 +9,18 @@ import java.io.Closeable
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
 
+internal data class HistoryTarget(val id: String, val kind: MealKind) {
+    init { require(id.isNotBlank()) }
+}
+
 /** Lifecycle state and worker dispatch only. Shared use cases own the draft operations. */
 internal class MealDraftModel(
     private val useCases: MealDrafts,
     private val storage: Closeable,
     restored: Bundle?,
     private val review: ReviewMealSelection? = null,
+    private val historyReader: ReadMealHistory? = null,
+    restoredHistory: Bundle? = null,
 ) : ViewModel() {
     private val worker = Executors.newSingleThreadExecutor()
     private val disposed = AtomicBoolean(false)
@@ -36,6 +42,64 @@ internal class MealDraftModel(
         private set
     private var readingSelection = false
     private var selectionRequest = 0L
+
+    /** Read-only revision query target. It never changes the editor, a record or the Bolo selection. */
+    var historyTarget: HistoryTarget? = restoredHistory?.let { restoreHistory(it) }
+        private set
+    var history: MealHistory? = null
+        private set
+    private var readingHistory = false
+    private var historyRequest = 0L
+
+    fun openHistory(id: String, kind: MealKind) {
+        if (disposed.get()) return
+        historyTarget = HistoryTarget(id, kind)
+        readHistory()
+    }
+
+    /** Starts the read for a restored target; an in-flight or completed read is kept. */
+    fun ensureHistory() {
+        if (historyTarget != null && history == null && !readingHistory) readHistory()
+    }
+
+    fun retryHistory() { if (historyTarget != null) readHistory() }
+
+    fun closeHistory() {
+        if (historyTarget == null) return
+        ++historyRequest
+        readingHistory = false
+        historyTarget = null
+        history = null
+        changed?.invoke()
+    }
+
+    private fun readHistory() {
+        val target = historyTarget ?: return
+        if (disposed.get()) return
+        val request = ++historyRequest
+        readingHistory = true
+        history = null
+        changed?.invoke()
+        worker.execute {
+            val result = historyReader?.read(target.id, target.kind) ?: MealHistory.Failed(MealFailure.READ_FAILED)
+            main.post {
+                // A closed or replaced query must not show another record's revisions.
+                if (disposed.get() || request != historyRequest) return@post
+                readingHistory = false
+                history = result
+                changed?.invoke()
+            }
+        }
+    }
+
+    fun historySnapshot(): Bundle? = historyTarget?.let {
+        Bundle().apply { putString("id", it.id); putString("kind", it.kind.name) }
+    }
+
+    private fun restoreHistory(bundle: Bundle): HistoryTarget? = try {
+        HistoryTarget(requireNotNull(bundle.getString("id")),
+            MealKind.valueOf(requireNotNull(bundle.getString("kind"))))
+    } catch (_: IllegalArgumentException) { null }
 
     fun refreshSelection() {
         if (disposed.get() || readingSelection || busy) return
@@ -105,6 +169,11 @@ internal class MealDraftModel(
 
     private fun open(record: MealRecord, persisted: Boolean) {
         if (busy) return
+        // Opening an editor explicitly leaves the read-only query of the library.
+        ++historyRequest
+        readingHistory = false
+        historyTarget = null
+        history = null
         editor = record
         baseline = record.takeIf { persisted }
         failure = null
