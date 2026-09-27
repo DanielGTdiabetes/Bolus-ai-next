@@ -69,4 +69,13 @@ class MealHistoryTest {
         }
         assertFailsWith<IllegalArgumentException> { MealHistory.Loaded("synthetic", MealKind.DRAFT, emptyList()) }
     }
+
+    @Test fun corruptHugeRevisionFailsExplicitlyWithoutExpandingTheRange() {
+        listOf(Long.MAX_VALUE, Int.MAX_VALUE.toLong() + 1, 50_000_000L).forEach { huge ->
+            listOf(listOf(first.copy(revision = huge)), listOf(first, second, first.copy(revision = huge))).forEach { records ->
+                assertEquals(MealHistory.Failed(MealFailure.INVALID_RECORD),
+                    ReadMealHistory(Repository(MealRead.Loaded(records))).read("synthetic", MealKind.DRAFT))
+            }
+        }
+    }
 }

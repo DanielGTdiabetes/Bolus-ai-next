@@ -18,7 +18,9 @@ sealed interface MealHistory {
             require(id.isNotBlank() && revisions.isNotEmpty())
             val newest = revisions.first()
             require(revisions.all { it.id == id && it.kind == kind && it.copiedFrom == newest.copiedFrom })
-            require(revisions.map { it.revision } == (newest.revision downTo 1L).toList())
+            // Compare count and neighbours only: a corrupt huge revision must fail without expanding a range.
+            require(newest.revision == revisions.size.toLong() && revisions.last().revision == 1L)
+            require(revisions.zipWithNext().all { (newer, older) -> newer.revision - 1 == older.revision })
         }
         val latest: MealRecord get() = revisions.first()
         override val blockCode: String get() = READ_ONLY_CODE

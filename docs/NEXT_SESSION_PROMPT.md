@@ -34,8 +34,10 @@ perfil confirmado, IOB local, catálogo ni historial clínico. iOS sigue pendien
 de verificación. Seleccionar, retirar o consultar revisiones no crea ingesta,
 recomendación, confirmación, sync ni tratamiento. No se pueden seleccionar ni
 restaurar revisiones antiguas. Cálculo y confirmación clínica siguen bloqueados.
-Las pruebas USB necesitan el Pixel desplegado, desbloqueado y con pantalla
-encendida; plegado y apagado falla la medición de la barra inferior.
+Las pruebas USB necesitan el Pixel desbloqueado y con la pantalla encendida
+durante toda la ejecución; en reposo falla NavigationDeviceTest al no dibujar.
+Enviar `adb shell input keyevent KEYCODE_WAKEUP` cada 10 s mientras corre
+verify.ps1 lo evita sin cambiar ajustes.
 
 SIGUIENTE INCREMENTO PROPUESTO
 Restaurar explícitamente una revisión antigua como nueva revisión de trabajo.
