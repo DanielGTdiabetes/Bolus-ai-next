@@ -1,7 +1,7 @@
 # ADR 0013: editor de franjas horarias del perfil clínico
 
-- Estado: propuesto. El propietario fijó las decisiones T1 a T5 el 2026-09-28
-  (sección 12). Pendiente de aprobación final antes de implementar.
+- Estado: aceptado. El propietario fijó las decisiones T1 a T5 y aprobó el
+  diseño el 2026-09-28 (sección 12). No habilita uso clínico.
 - Fecha: 2026-09-28.
 - Fase y criterio de aceptación: segundo paso del hito 6. Editar en la UI
   perfiles con varias franjas horarias por parámetro (crear, dividir, unir,
@@ -72,8 +72,8 @@ Cada parámetro muestra sus franjas como lista ordenada. Cada fila:
   en esa franja. No se marca como valor nuevo ni se propone otro.
 - Hora igual al inicio o al fin, o fuera de la franja:
   `profile.edit.split_out_of_range`, sin cambios.
-- Con 48 franjas en el parámetro, «Dividir» se deshabilita y la operación
-  devuelve `profile.edit.segment_limit_reached` (T2).
+- Si el parámetro tiene 48 franjas o más, «Dividir» se deshabilita y la
+  operación devuelve `profile.edit.segment_limit_reached` (T2).
 
 ### 3.2 Unir franjas
 
@@ -146,7 +146,7 @@ Cada parámetro muestra sus franjas como lista ordenada. Cada fila:
 | Franjas adyacentes iguales | se conservan tal cual al editar, guardar, leer, restaurar y recrear. La huella las distingue de una franja única. La UI ofrece «Unir con la siguiente» sin aplicarla |
 | Guardar solo estructura | dividir o unir sin cambiar valores es un contenido distinto y se guarda como versión nueva. `profile.edit.unchanged` solo si la huella coincide |
 | Valores | `Sin configurar` permitido en cualquier franja. La cobertura estructural es obligatoria, la de valores no, porque el perfil no autoriza nada |
-| Máximo de franjas | 48 por parámetro, solo en el editor (T2). Es un límite técnico de usabilidad, no clínico. Modelo, huella, política de escritura, SQLite y lectura no lo comprueban, para no invalidar versiones ya guardadas. Una versión con más de 48 se lee, se restaura y se edita, pero no admite divisiones hasta bajar de 48 uniendo |
+| Máximo de franjas | 48 por parámetro (T2). Límite técnico de usabilidad, no clínico, que se aplica **solo a la operación «Dividir»**: si el parámetro tiene 48 franjas o más, «Dividir» está deshabilitado y devuelve `profile.edit.segment_limit_reached`. Leer, restaurar, editar valores, mover límites y hacer uniones válidas (T4) sigue permitido con cualquier número de franjas. No se exige reducir a 48 una versión existente, que con valores distintos puede no admitir ninguna unión. Modelo, huella, almacenamiento, política de escritura y lectura no imponen el límite |
 | Resolución | 1 minuto, sin redondeo (T1) |
 
 ## 5. `Sin configurar` frente a `0` dentro de una franja
@@ -269,7 +269,7 @@ hora (P4 del ADR 0012), plantillas de franjas y copiar franjas entre parámetros
 | Id | Pregunta | Decisión |
 |---|---|---|
 | T1 | Resolución de horas | 1 minuto, sin redondeo |
-| T2 | Máximo de franjas por parámetro | 48, aplicado solo en el editor |
+| T2 | Máximo de franjas por parámetro | 48, aplicado solo a «Dividir» en el editor. No obliga a reducir versiones existentes |
 | T3 | Estructura al cambiar de unidad | conservar exactamente las fronteras de ISF y objetivo y pasar todos sus valores a `Sin configurar`. No reducir a una franja ni fusionar (§6) |
 | T4 | Unir con valores distintos | no permitido (§3.2) |
 | T5 | Franjas cambiadas durante la edición | indicador visual `Modificada`, solo de UI/editor, fuera del contenido persistente y de la huella (§8) |
@@ -340,9 +340,11 @@ concurrencia, idempotencia de guardado, SQLite, backup ni bloqueo de cálculo.
   conservadas, bloqueo de valores y estructura, volver a la unidad inicial no
   recupera valores, `carb_ratio` intacto, la versión que cambia la unidad se
   guarda con las fronteras y la política la acepta.
-- límite de 48 (T2): dividir en la franja 48 rechazado, versión sintética con más
-  de 48 legible, restaurable y editable salvo dividir, política y lectura no
-  aplican el límite.
+- límite de 48 (T2): con 47 franjas dividir funciona, con 48 o más se rechaza
+  con `segment_limit_reached`. Una versión sintética con más de 48 franjas y
+  valores todos distintos se lee, se restaura, admite editar valores y mover
+  límites, no ofrece ninguna unión y se guarda sin reducirse. Política y lectura
+  no aplican el límite.
 - indicador `Modificada` (T5): aparece al dividir, mover, unir y editar valor,
   desaparece al deshacer, no altera huella ni origen.
 - restauración: dividir y unir vuelve a `restored`, cualquier otro cambio da
