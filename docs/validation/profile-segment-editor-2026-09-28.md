@@ -54,6 +54,7 @@ esquema nuevo, migración, red, límites clínicos, DIA, IOB, conversión ni syn
 | Restauración | copia exacta con varias franjas. Dividir y unir vuelve a `restored` con la misma huella | `splitThenMergeReturnsToAnExactRestoration`, UI `restoredMultiSegment…` |
 | Concurrencia | conflicto conserva todas las franjas. Reintento idéntico y conflicto con varias franjas no añaden filas | UI `conflictKeepsEverySegmentInTheEditor`, SQLite `editedSegmentStructures…` |
 | Recreación | contenido, textos pendientes y panel abierto sobreviven con la misma huella. Panel sobre intervalo inexistente se cierra con `stale_segment`. Estado que no decodifica se descarta con `invalid_record` visible | UI `recreationKeepsSegments…`, `savedStateIsRevalidated…` |
+| Texto no válido con panel abierto | revisión de la PR #30: si un valor del parámetro pasa a no válido con un panel abierto, «Aplicar» se deshabilita, un clic forzado no aplica nada y muestra el código, y ningún valor anterior ya interpretado se usa en su lugar | UI `invalidValueTypedWhileAPanelIsOpenBlocksApplying` |
 | Layout | 8 franjas por parámetro con panel abierto, aviso de unidad y unión, 840×900, 900×840 y 411×914 dp, texto 1,0× y 1,8×, claro y oscuro, sin recortes | `segmentEditorFitsExpandedLayoutsWithEightSegmentsAtLargeFont` |
 | Sin uso clínico | todas las versiones y el historial siguen con `allowsCalculation = false`. Bolo no lee el perfil | `everyEditingResultStillBlocksCalculation`, `bolusStaysBlockedAndDoesNotUseTheSavedProfile`, `verify.ps1` |
 
@@ -67,7 +68,8 @@ Comandos ejecutados en Windows desde la rama de trabajo:
   independencia del motor, workflow y `git diff --check`. Resultado: correcto.
 - `scripts/verify.ps1 -DeviceTests` en Pixel 10 Pro Fold, único dispositivo
   autorizado, con `KEYCODE_WAKEUP` cada 10 s, sin cambiar ajustes, red ni modo
-  avión, API 37. Resultado: `OK (83 tests)` en 69,9 s (74 antes de esta entrega,
-  menos 1 sustituida y 10 nuevas: 9 de UI y 1 de SQLite).
+  avión, API 37. Resultado: `OK (84 tests)` en 72,5 s (74 antes de esta entrega,
+  menos 1 sustituida y 11 nuevas: 10 de UI y 1 de SQLite). Primera entrega:
+  `OK (83 tests)`. La prueba adicional cubre la corrección de la revisión.
 
 Ninguna prueba usa datos personales. Todas las bases son sintéticas y se borran.

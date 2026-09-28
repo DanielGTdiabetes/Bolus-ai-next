@@ -474,6 +474,41 @@ class ClinicalProfileDeviceTest {
         assertEquals(content().schedule(isf), stored().last().content.schedule(isf))
     }
 
+    /** PR #30 review: a value made invalid after a panel opened blocks Apply; a stale parsed value is never used. */
+    @Test fun invalidValueTypedWhileAPanelIsOpenBlocksApplying() {
+        seed(ProfileWrite(0, content(), ProfileOrigin.MANUAL, null))
+        launch().use { scenario ->
+            editLatest(scenario)
+            panelAction(scenario, "profile:split:${key(ratio, 0, 1440)}", "06:00")
+            awaitView(scenario, "profile:value:${key(ratio, 360, 1440)}")
+            click(scenario, "profile:move_end:${key(ratio, 0, 360)}")
+            awaitView(scenario, "profile:panel:time")
+            scenario.onActivity {
+                type(it, "profile:panel:time", "07:00")
+                assertTrue(view(it, "profile:panel:apply").isEnabled)
+                type(it, "profile:value:${key(ratio, 360, 1440)}", "1.000")
+                assertFalse(view(it, "profile:panel:apply").isEnabled)
+                assertEquals(s(R.string.profile_preview_error, ProfileFailure.AMBIGUOUS_DECIMAL.code), text(it, "profile:panel:result"))
+                // Even a forced click applies nothing.
+                view(it, "profile:panel:apply").performClick()
+            }
+            awaitView(scenario, "profile:edit_failure", s(R.string.profile_edit_failed, ProfileFailure.AMBIGUOUS_DECIMAL.code))
+            scenario.onActivity {
+                assertNotNull(viewOrNull(it, "profile:segment:${key(ratio, 360, 1440)}"))
+                assertNull(viewOrNull(it, "profile:segment:${key(ratio, 420, 1440)}"))
+                assertEquals("1.000", text(it, "profile:value:${key(ratio, 360, 1440)}"))
+                assertFalse(view(it, "profile:save").isEnabled)
+                type(it, "profile:value:${key(ratio, 360, 1440)}", "12")
+                assertTrue(view(it, "profile:panel:apply").isEnabled)
+            }
+            click(scenario, "profile:panel:apply")
+            awaitView(scenario, "profile:value:${key(ratio, 420, 1440)}", "12")
+            click(scenario, "profile:save")
+            awaitView(scenario, "profile:saved", s(R.string.profile_saved, 2))
+        }
+        assertEquals(listOf(seg(0, 420, entered("10")), seg(420, 1440, entered("12"))), stored().last().content.schedule(ratio).segments)
+    }
+
     @Test fun adjacentEqualSegmentsAreKeptAndAStructureOnlyChangeIsANewVersion() {
         seed(ProfileWrite(0, content(), ProfileOrigin.MANUAL, null))
         launch().use { scenario ->

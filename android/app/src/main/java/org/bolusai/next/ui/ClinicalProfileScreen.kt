@@ -383,6 +383,8 @@ internal class ClinicalProfileScreen(
             content.addView(this, LinearLayout.LayoutParams(-1, -2))
         }
         action(R.string.profile_panel_cancel, "profile:panel:cancel") { model.cancelPanel() }
+        // Typing an invalid value anywhere in this parameter disables Apply at once.
+        refreshers.add { update() }
         update()
     }
 

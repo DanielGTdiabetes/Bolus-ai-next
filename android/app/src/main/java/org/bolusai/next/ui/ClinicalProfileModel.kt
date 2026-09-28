@@ -162,6 +162,16 @@ internal class ClinicalProfileModel(
 
     fun hasErrors(parameter: ProfileParameter): Boolean = errors.keys.any { it.startsWith("${parameter.code}@") }
 
+    /**
+     * Why a structural edit of [parameter] cannot be applied right now, or null. Checked again when a panel is
+     * previewed or applied: a value typed after the panel opened must never be bypassed by a stale parsed value.
+     */
+    private fun structureBlock(parameter: ProfileParameter): ProfileFailure? {
+        val current = editor ?: return ProfileFailure.STALE_SEGMENT
+        if (current.scheduleLocked(parameter)) return ProfileFailure.SCHEDULE_LOCKED
+        return errors.entries.firstOrNull { it.key.startsWith("${parameter.code}@") }?.value
+    }
+
     /** Opens the panel for one explicit action on the interval the user sees. Nothing changes until it is applied. */
     fun openPanel(kind: PanelKind, parameter: ProfileParameter, segment: SegmentRef) {
         val current = editor ?: return
@@ -197,6 +207,7 @@ internal class ClinicalProfileModel(
     fun panelPreview(): ProfileEditorEdit? {
         val open = panel ?: return null
         val current = editor ?: return null
+        structureBlock(open.parameter)?.let { return ProfileEditorEdit.Rejected(it) }
         val operation = when (val parsed = operation(open)) {
             is PanelOperation.Ready -> parsed.operation
             is PanelOperation.Invalid -> return ProfileEditorEdit.Rejected(parsed.reason)
@@ -209,6 +220,7 @@ internal class ClinicalProfileModel(
         val open = panel ?: return
         val current = editor ?: return
         if (busy) return
+        structureBlock(open.parameter)?.let { reject(it); return }
         val operation = when (val parsed = operation(open)) {
             is PanelOperation.Ready -> parsed.operation
             is PanelOperation.Invalid -> { editFailure = parsed.reason; changed?.invoke(); return }

@@ -400,6 +400,9 @@ Precisiones de la entrega, sin cambiar decisiones:
   Unir también pide confirmación con vista previa.
 - Con un panel abierto «Guardar» queda deshabilitado, porque su texto aún no se
   ha aplicado.
+- La vista previa y «Aplicar» de un panel revalidan el parámetro en el momento:
+  si un valor de ese parámetro pasó a no válido después de abrir el panel, la
+  operación se rechaza con el código de ese valor (revisión de la PR #30).
 - Un estado guardado que no decodifica se descarta con
   `profile.storage.invalid_record` visible. Un texto pendiente cuya clave no
   corresponde a una franja actual, o un panel sobre un intervalo que ya no
