@@ -99,28 +99,18 @@ data class ProfileContent(
         get() = schedules.any { it.parameter.glucoseDependent && it.hasEnteredValue }
 
     /**
-     * Declares a unit. When it differs from the current one, every glucose-dependent schedule is reset to a single
-     * not-configured day: values typed under one unit are never kept under another (section 4.4). No conversion.
+     * Declares a unit. When it differs from the current one, every segment of every glucose-dependent schedule becomes
+     * not configured while its boundaries stay exactly as they are (ADR 0013, section 6). Values typed under one unit
+     * are never kept under another, nothing is converted and no segment is merged, even when all end up equal.
      */
     fun withGlucoseUnit(unit: Setting<GlucoseUnit>): ProfileContent =
         if (unit == glucoseUnit) this
-        else copy(glucoseUnit = unit, schedules = schedules.map {
-            if (it.parameter.glucoseDependent) ParameterSchedule.allDay(it.parameter) else it
+        else copy(glucoseUnit = unit, schedules = schedules.map { schedule ->
+            if (!schedule.parameter.glucoseDependent) schedule
+            else schedule.copy(segments = schedule.segments.map { it.copy(value = ProfileValue.NotConfigured) })
         })
 
     fun withTimeZone(zone: Setting<ProfileTimeZone>): ProfileContent = copy(timeZone = zone)
-
-    /** Only a single all-day segment is editable in this phase; multi-segment schedules stay read-only. */
-    fun withAllDayValue(parameter: ProfileParameter, value: ProfileValue): ProfileEdit {
-        val current = schedule(parameter)
-        if (current.singleAllDay == null) return ProfileEdit.Rejected(ProfileFailure.SEGMENTS_UI_UNAVAILABLE)
-        if (parameter.glucoseDependent && value is ProfileValue.Entered && glucoseUnit !is Setting.Declared) {
-            return ProfileEdit.Rejected(ProfileFailure.UNIT_REQUIRED)
-        }
-        return ProfileEdit.Changed(copy(schedules = schedules.map {
-            if (it.parameter == parameter) ParameterSchedule.allDay(parameter, value) else it
-        }))
-    }
 
     companion object {
         /** A new profile: every value and declaration not configured, one full-day segment per parameter. */
