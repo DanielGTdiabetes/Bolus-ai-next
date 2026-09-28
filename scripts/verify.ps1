@@ -49,6 +49,34 @@ try {
         (Select-String -LiteralPath $releaseManifest -Pattern 'senderfixture|android.permission.INTERNET|<receiver\b|com\.dexcom\.' -Quiet)) {
         throw "Release manifest must stay isolated from fixtures, receivers and clinical/network permissions"
     }
+    foreach ($manifest in @($mergedManifest, $releaseManifest)) {
+        $manifestText = Get-Content -Raw -LiteralPath $manifest
+        if ($manifestText -notmatch 'android:allowBackup="false"' -or
+            $manifestText -notmatch 'android:fullBackupContent="false"' -or
+            $manifestText -notmatch 'android:dataExtractionRules="@xml/data_extraction_rules"') {
+            throw "Local clinical data must stay excluded from Android backup and device transfer (ADR 0012)"
+        }
+    }
+    [xml]$extractionRules = Get-Content -Raw -LiteralPath (Join-Path $repositoryRoot "android\app\src\main\res\xml\data_extraction_rules.xml")
+    foreach ($section in @("cloud-backup", "device-transfer")) {
+        $databaseExclusions = @($extractionRules.'data-extraction-rules'.$section.exclude |
+            Where-Object { $_.domain -in @("database", "device_database") -and $_.path -eq "." })
+        if ($databaseExclusions.Count -ne 2) {
+            throw "Database files must stay excluded from $section (ADR 0012)"
+        }
+    }
+
+    # ADR 0012: the clinical profile is capture only. The engine and the Bolo overview must not depend on it.
+    $engineReferences = @(Get-ChildItem -LiteralPath (Join-Path $repositoryRoot "shared\bolus-engine") -Recurse -File |
+        Where-Object { $_.FullName -notmatch '\\build\\' } |
+        Select-String -Pattern 'clinical-profile|org\.bolusai\.profile' -List)
+    if ($engineReferences.Count -gt 0) {
+        throw "The bolus engine must not depend on the clinical profile: $($engineReferences.Path -join ', ')"
+    }
+    $overviewSource = Join-Path $repositoryRoot "android\app\src\main\java\org\bolusai\next\application\ReadOverview.kt"
+    if (Select-String -LiteralPath $overviewSource -Pattern 'org\.bolusai\.profile|ClinicalProfile' -Quiet) {
+        throw "The Bolo overview must keep reporting the profile as unavailable (ADR 0012)"
+    }
 
     $workflowDirectory = Join-Path $repositoryRoot ".github\workflows"
     $canonicalWorkflow = Join-Path $workflowDirectory "verify.yml"
@@ -152,7 +180,7 @@ jobs:
             }
             # Direct instrumentation avoids collecting unrelated device logcat or clinical data.
             $instrumentation = @(adb shell am instrument -w -r `
-                -e class org.bolusai.next.glucose.dexcom.AndroidDexcomSenderEvidenceTest,org.bolusai.next.NavigationDeviceTest,org.bolusai.next.MealDraftDeviceTest,org.bolusai.next.MealHistoryDeviceTest,org.bolusai.next.MealRestoreDeviceTest,org.bolusai.next.meals.SqliteMealRepositoryDeviceTest,org.bolusai.next.DarkThemeDeviceTest `
+                -e class org.bolusai.next.glucose.dexcom.AndroidDexcomSenderEvidenceTest,org.bolusai.next.NavigationDeviceTest,org.bolusai.next.MealDraftDeviceTest,org.bolusai.next.MealHistoryDeviceTest,org.bolusai.next.MealRestoreDeviceTest,org.bolusai.next.meals.SqliteMealRepositoryDeviceTest,org.bolusai.next.DarkThemeDeviceTest,org.bolusai.next.profile.SqliteClinicalProfileRepositoryDeviceTest,org.bolusai.next.ClinicalProfileDeviceTest `
                 org.bolusai.next.test/androidx.test.runner.AndroidJUnitRunner)
             $instrumentationExit = $LASTEXITCODE
             $instrumentation | Write-Output

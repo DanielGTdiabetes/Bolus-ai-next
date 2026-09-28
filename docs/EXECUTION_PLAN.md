@@ -508,6 +508,17 @@ Bolo no cambia. Cálculo y tratamiento siguen bloqueados. Véanse el
 [ADR 0011](adr/0011-restore-meal-revision.md) y la
 [validación](validation/local-meal-revision-restore-2026-09-27.md).
 
+### Entrega de perfil clínico local — 2026-09-27
+
+Primer paso de la fase 6 (trabajo 1 y 3): captura local del perfil como
+versiones inmutables con unidad y zona declaradas, franjas completas en el
+modelo, ausencia distinta de cero, huella canónica, origen auditado, restauración
+como versión nueva y conflicto explícito. Un cambio de unidad nunca reinterpreta
+valores. Base propia `clinical-profile.db` v1, comidas intactas. Sin límites,
+DIA, conversión, propuestas, exportación ni uso clínico: cálculo y confirmación
+siguen bloqueados. Véanse el [ADR 0012](adr/0012-local-clinical-profile.md) y la
+[validación](validation/local-clinical-profile-2026-09-27.md).
+
 ### Secuencia de capacidades
 
 No intentar construir toda una fase en un solo cambio. Secuencia inicial:

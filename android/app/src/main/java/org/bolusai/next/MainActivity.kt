@@ -30,12 +30,19 @@ import org.bolusai.next.ui.MealDraftModel
 import org.bolusai.next.ui.MealDraftScreen
 import org.bolusai.next.meals.SqliteMealRepository
 import org.bolusai.next.ui.title
+import org.bolusai.next.ui.ClinicalProfileModel
+import org.bolusai.next.ui.ClinicalProfileScreen
+import org.bolusai.next.profile.AndroidTimeZoneRules
+import org.bolusai.next.profile.SqliteClinicalProfileRepository
+import org.bolusai.profile.ClinicalProfiles
+import org.bolusai.profile.ProfileClock
 import java.util.UUID
 
 class MainActivity : ComponentActivity() {
     private lateinit var navigation: AppNavigation
     private lateinit var renderer: ScreenRenderer
     private lateinit var meals: MealDraftModel
+    private lateinit var profile: ClinicalProfileModel
     private val scrollPositions = mutableMapOf<String, Int>()
     private var pausedPosition: Pair<Destination, Int>? = null
     private var settingsSection = SettingsSection.NIGHTSCOUT
@@ -65,9 +72,22 @@ class MainActivity : ComponentActivity() {
                     restoredHistory) as T
             }
         })[MealDraftModel::class.java]
+        val restoredProfile = savedInstanceState?.getBundle("clinicalProfile")
+        profile = ViewModelProvider(this, object : ViewModelProvider.Factory {
+            @Suppress("UNCHECKED_CAST")
+            override fun <T : ViewModel> create(modelClass: Class<T>): T {
+                val repository = profileRepositoryFactory?.invoke(applicationContext)
+                    ?: SqliteClinicalProfileRepository(applicationContext)
+                val clock = profileClock ?: ProfileClock { System.currentTimeMillis() }
+                return ClinicalProfileModel(ClinicalProfiles(repository, clock, writer(), AndroidTimeZoneRules),
+                    repository, restoredProfile) as T
+            }
+        })[ClinicalProfileModel::class.java]
         renderer = ScreenRenderer(this, findViewById(R.id.screen_content), ::open,
-            { settingsSection = it; render() }, ::renderMeals, ::renderSelection)
+            { settingsSection = it; render() }, ::renderMeals, ::renderSelection, ::renderProfile)
         meals.changed = { render() }
+        // Keep the reading position while the profile section rebuilds after a model change.
+        profile.changed = { if (navigation.current == Destination.SETTINGS) { rememberScroll(); render() } }
         meals.selectionChanged = { if (isReviewDestination(navigation.current)) render() }
         findViewById<Button>(R.id.back_button).setOnClickListener { goBack() }
         onBackPressedDispatcher.addCallback(this, backCallback)
@@ -139,12 +159,14 @@ class MainActivity : ComponentActivity() {
         })
         meals.snapshot()?.let { outState.putBundle("mealEditor", it) }
         meals.historySnapshot()?.let { outState.putBundle("mealHistory", it) }
+        outState.putBundle("clinicalProfile", profile.snapshot())
         super.onSaveInstanceState(outState)
     }
 
     override fun onDestroy() {
         meals.changed = null
         meals.selectionChanged = null
+        profile.changed = null
         super.onDestroy()
     }
 
@@ -152,6 +174,18 @@ class MainActivity : ComponentActivity() {
         MealDraftScreen(this, findViewById(R.id.screen_content), meals, { open(Destination.BOLUS) }) {
             if (navigation.current != Destination.MEALS) open(Destination.MEALS) else render()
         }.render(kind)
+    }
+
+    private fun renderProfile() {
+        val zone = java.util.TimeZone.getDefault().id.takeIf { AndroidTimeZoneRules.exists(it) }
+        ClinicalProfileScreen(this, findViewById(R.id.screen_content), profile, zone).render()
+    }
+
+    /** Audit metadata only: application build, no device identifier or personal data. */
+    private fun writer(): String {
+        val info = packageManager.getPackageInfo(packageName, 0)
+        val code = androidx.core.content.pm.PackageInfoCompat.getLongVersionCode(info)
+        return "android/${info.versionName ?: "unknown"}($code)".filter { it.code in 0x20..0x7e }.take(128)
     }
 
     private fun renderSelection() {
@@ -196,5 +230,8 @@ class MainActivity : ComponentActivity() {
     internal companion object {
         /** Process-local test seam. No Intent or external caller can select volatile storage. */
         var mealRepositoryFactory: ((Context) -> SqliteMealRepository)? = null
+        /** Process-local test seams for the clinical profile; production always uses the app database and clock. */
+        var profileRepositoryFactory: ((Context) -> SqliteClinicalProfileRepository)? = null
+        var profileClock: ProfileClock? = null
     }
 }

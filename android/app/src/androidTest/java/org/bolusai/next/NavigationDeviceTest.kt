@@ -40,6 +40,8 @@ class NavigationDeviceTest {
 
     private fun launch(): ActivityScenario<MainActivity> {
         MainActivity.mealRepositoryFactory = { SqliteMealRepository(it, null) }
+        // Settings → Cálculo reads the clinical profile; keep it in memory, never the app's file.
+        MainActivity.profileRepositoryFactory = { org.bolusai.next.profile.SqliteClinicalProfileRepository(it, null) }
         return ActivityScenario.launch(MainActivity::class.java).also { scenario ->
             scenario.onActivity { activity ->
                 // Test window only: no device settings, keyguard dismissal or production behavior change.
@@ -53,7 +55,10 @@ class NavigationDeviceTest {
         }
     }
 
-    @After fun clearTestStorageFactory() { MainActivity.mealRepositoryFactory = null }
+    @After fun clearTestStorageFactory() {
+        MainActivity.mealRepositoryFactory = null
+        MainActivity.profileRepositoryFactory = null
+    }
 
     private fun views(root: View): List<View> = listOf(root) + if (root is ViewGroup) {
         (0 until root.childCount).flatMap { views(root.getChildAt(it)) }
