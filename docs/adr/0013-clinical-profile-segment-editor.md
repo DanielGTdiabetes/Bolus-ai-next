@@ -1,6 +1,7 @@
 # ADR 0013: editor de franjas horarias del perfil clínico
 
-- Estado: propuesto. Pendiente de revisión del propietario antes de implementar.
+- Estado: propuesto. El propietario fijó las decisiones T1 a T5 el 2026-09-28
+  (sección 12). Pendiente de aprobación final antes de implementar.
 - Fecha: 2026-09-28.
 - Fase y criterio de aceptación: segundo paso del hito 6. Editar en la UI
   perfiles con varias franjas horarias por parámetro (crear, dividir, unir,
@@ -14,7 +15,8 @@
   [Verify 36447049411](https://github.com/DanielGTdiabetes/Bolus-ai-next/actions/runs/36447049411),
   conclusión `success`.
 - Relacionados: ADR 0012 (modelo, SQLite, huella, unidad, restauración,
-  concurrencia). Este ADR cierra su pendiente P5 y no cambia el esquema.
+  concurrencia). Este ADR complementa el ADR 0012 sin editarlo, cierra su
+  pendiente P5 y no cambia el esquema. La sección 14 lista lo que sustituye.
 
 ## 1. Contexto
 
@@ -42,12 +44,16 @@ Riesgos que el diseño debe cerrar:
 2. La cobertura 00:00–24:00 es una invariante que ninguna operación puede
    romper, ni siquiera de forma transitoria. No existe un estado «editor con
    hueco» que haya que arreglar antes de guardar.
-3. Solo hay cuatro operaciones estructurales: **dividir**, **unir con la
-   siguiente**, **mover límite** y **editar valor**. «Crear franja» es dividir.
-   «Borrar franja» es unir.
+3. Solo hay tres operaciones estructurales, **dividir**, **unir con la
+   siguiente** y **mover límite**, y una de valor, **editar valor**. «Crear
+   franja» es dividir. «Borrar franja» es unir.
 4. Nada se normaliza al guardar. El contenido guardado es exactamente el del
    editor.
-5. `withAllDayValue` y `profile.edit.segments_ui_unavailable` dejan de usarse. El
+5. **Regla general**: la estructura horaria expresa intención del usuario y solo
+   cambia mediante una acción explícita suya (dividir, unir o mover límite).
+   Ninguna otra operación, incluido el cambio de unidad, añade, quita, fusiona ni
+   desplaza fronteras.
+6. `withAllDayValue` y `profile.edit.segments_ui_unavailable` dejan de usarse. El
    código se conserva reservado en el enum y no se reutiliza.
 
 ## 3. Interacción
@@ -66,6 +72,8 @@ Cada parámetro muestra sus franjas como lista ordenada. Cada fila:
   en esa franja. No se marca como valor nuevo ni se propone otro.
 - Hora igual al inicio o al fin, o fuera de la franja:
   `profile.edit.split_out_of_range`, sin cambios.
+- Con 48 franjas en el parámetro, «Dividir» se deshabilita y la operación
+  devuelve `profile.edit.segment_limit_reached` (T2).
 
 ### 3.2 Unir franjas
 
@@ -121,7 +129,8 @@ Cada parámetro muestra sus franjas como lista ordenada. Cada fila:
 - Entrada aceptada: `H:MM` o `HH:MM`, horas `0..23`, minutos `00..59`. Se
   rechazan `600`, `6`, `6.00`, `6h`, `06:00 h` y segundos:
   `profile.edit.invalid_time`. La hora canónica se muestra antes de aplicar.
-- Resolución de minuto (pendiente T1). Sin redondeo silencioso.
+- Resolución de 1 minuto (T1). Sin redondeo en ninguna operación ni en la
+  lectura.
 
 ## 4. Reglas de estructura
 
@@ -137,6 +146,8 @@ Cada parámetro muestra sus franjas como lista ordenada. Cada fila:
 | Franjas adyacentes iguales | se conservan tal cual al editar, guardar, leer, restaurar y recrear. La huella las distingue de una franja única. La UI ofrece «Unir con la siguiente» sin aplicarla |
 | Guardar solo estructura | dividir o unir sin cambiar valores es un contenido distinto y se guarda como versión nueva. `profile.edit.unchanged` solo si la huella coincide |
 | Valores | `Sin configurar` permitido en cualquier franja. La cobertura estructural es obligatoria, la de valores no, porque el perfil no autoriza nada |
+| Máximo de franjas | 48 por parámetro, solo en el editor (T2). Es un límite técnico de usabilidad, no clínico. Modelo, huella, política de escritura, SQLite y lectura no lo comprueban, para no invalidar versiones ya guardadas. Una versión con más de 48 se lee, se restaura y se edita, pero no admite divisiones hasta bajar de 48 uniendo |
+| Resolución | 1 minuto, sin redondeo (T1) |
 
 ## 5. `Sin configurar` frente a `0` dentro de una franja
 
@@ -152,25 +163,37 @@ Cada parámetro muestra sus franjas como lista ordenada. Cada fila:
 ## 6. Cambio de unidad de glucosa con varias franjas
 
 Se mantiene todo el §4.4 del ADR 0012: nada se convierte, la versión que cambia
-la unidad no lleva valores dependientes, los valores de la unidad nueva van en
-la versión siguiente.
+la unidad no lleva valores dependientes y los valores de la unidad nueva van en
+la versión siguiente. Este ADR precisa qué significa «vaciar» cuando hay varias
+franjas (T3, decisión del propietario):
 
-Decisión nueva para franjas (pendiente T3, recomendación):
+- Al cambiar la unidad, `insulin_sensitivity` y `glucose_target` **conservan
+  exactamente sus fronteras** (las del contenido actual del editor, incluidas
+  divisiones aún no guardadas) y **todas** sus franjas pasan a `Sin configurar`.
+- El horario **no** se reduce a una franja 00:00–24:00. Las franjas que quedan
+  adyacentes con el mismo valor `Sin configurar` **no** se fusionan. Aplica la
+  regla general del §2.5.
+- Ejemplo obligatorio (también como prueba):
 
-- Al cambiar la unidad, ISF y objetivo **conservan sus límites horarios** y todas
-  sus franjas pasan a `Sin configurar`. Los límites no dependen de la unidad y
-  representan intención del usuario.
-- Mientras la unidad no se guarde, esos dos parámetros quedan bloqueados en
-  valores **y** estructura.
-- Volver a la unidad inicial en el mismo editor no recupera valores. Los límites
-  siguen siendo los que había.
-- `carb_ratio` no se ve afectado.
-- La confirmación del cambio de unidad dice cuántas franjas de cada parámetro se
-  vacían.
+  | Antes (mg/dL) | Después de cambiar a mmol/L |
+  |---|---|
+  | 00:00–06:00 → 40 mg/dL/U | 00:00–06:00 → Sin configurar |
+  | 06:00–12:00 → 45 mg/dL/U | 06:00–12:00 → Sin configurar |
+  | 12:00–24:00 → 50 mg/dL/U | 12:00–24:00 → Sin configurar |
 
-Alternativa: volver a una franja única 00:00–24:00 (comportamiento actual de
-`withGlucoseUnit`). Más simple, pero destruye estructura, justo lo que este ADR
-evita en franjas adyacentes.
+- Mientras el cambio de unidad no se guarde, esos dos parámetros quedan
+  bloqueados en valores **y** estructura. La versión que cambia la unidad guarda
+  las fronteras conservadas con todos sus valores `Sin configurar`. Unir o
+  dividir esas franjas es posible en la versión siguiente, como acción explícita.
+- Los textos pendientes de ISF y objetivo (escritos con la unidad anterior y aún
+  no aplicados) se descartan al cambiar la unidad. Nunca se aplican con la
+  unidad nueva.
+- Volver a la unidad inicial en el mismo editor no recupera valores. Las
+  fronteras siguen siendo las mismas.
+- `carb_ratio` no se ve afectado: fronteras y valores intactos.
+- Un parámetro dependiente que ya estaba entero `Sin configurar` queda igual.
+- La confirmación del cambio de unidad dice cuántas franjas de cada parámetro
+  pasan a `Sin configurar` y que sus horas se conservan.
 
 ## 7. Restauración con varias franjas
 
@@ -184,7 +207,26 @@ evita en franjas adyacentes.
 - Restaurar una versión con otra unidad sigue la advertencia del ADR 0012.
 - El historial muestra todas las franjas de cada versión en solo lectura.
 
-## 8. Concurrencia e idempotencia
+## 8. Indicador `Modificada` (T5)
+
+- Cada franja del editor muestra `Modificada` cuando su intervalo `[inicio, fin)`
+  no existe en el mismo parámetro del contenido de partida del editor, o existe
+  con otro valor (`Sin configurar` y `0` cuentan como distintos).
+- El contenido de partida es la última versión, la versión restaurada o el
+  perfil vacío, igual que `ProfileEditor.start`.
+- Es estado **derivado** de UI/editor: se calcula comparando `start` y
+  `content`. No se guarda en SQLite, no forma parte de `ProfileContent`, de la
+  huella ni de la procedencia, y no influye en el origen `restored`/`manual`.
+- No se guarda en el estado de la actividad. Al recrear se recalcula desde
+  `start` y `content`, que sí se guardan.
+- Si el usuario deshace un cambio y la franja vuelve a coincidir con la de
+  partida, el indicador desaparece.
+- Tras un cambio de unidad, las franjas dependientes que tenían valor aparecen
+  como `Modificada`.
+- Tras guardar, el editor se cierra o parte de la versión nueva, y ninguna
+  franja aparece como `Modificada`.
+
+## 9. Concurrencia e idempotencia
 
 - Sin cambios en almacenamiento: `baseVersion`, transacción exclusiva, conflicto
   `profile.storage.revision_conflict`, reintento idéntico en `baseVersion + 1`.
@@ -197,13 +239,15 @@ evita en franjas adyacentes.
 - Tras un conflicto el editor conserva todas las franjas y textos. No hay fusión
   de estructuras entre versiones ni «última escritura gana».
 
-## 9. Rotación y recreación de la actividad
+## 10. Rotación y recreación de la actividad
 
 - El estado guardado incluye el contenido completo con la codificación canónica
   existente (`ProfileCodec`), por lo que conserva límites, orden, adyacentes
   iguales, `Sin configurar` y `0` byte a byte.
-- Los textos pendientes se guardan por clave `parámetro@inicio` y se restauran
-  como texto, sin interpretarlos.
+- Los textos pendientes se guardan por clave `parámetro@inicio-fin` y se
+  restauran como texto, sin interpretarlos. Un texto cuya clave no corresponde a
+  una franja actual se descarta con error visible.
+- El indicador `Modificada` no se guarda. Se recalcula (§8).
 - Un diálogo abierto (dividir, mover límite, unir) guarda su tipo, el intervalo
   objetivo y el texto escrito. Al recrear se reabre igual. Si el intervalo ya no
   existe, el diálogo se cierra con `profile.edit.stale_segment` visible.
@@ -213,24 +257,24 @@ evita en franjas adyacentes.
 - Prueba obligatoria: comparación de la huella del contenido del editor antes y
   después de recrear, con franjas adyacentes iguales, `0` y `Sin configurar`.
 
-## 10. Fuera de alcance
+## 11. Fuera de alcance
 
 Uso del perfil por el motor, significado de perfil confirmado, límites clínicos,
 DIA, IOB, Dexcom, aprendizaje, propuestas automáticas, conversión de unidades,
 exportación/importación, sincronización, resolución de franjas en cambios de
 hora (P4 del ADR 0012), plantillas de franjas y copiar franjas entre parámetros.
 
-## 11. Decisiones pendientes del propietario
+## 12. Decisiones del propietario (2026-09-28)
 
-| Id | Pregunta | Recomendación |
+| Id | Pregunta | Decisión |
 |---|---|---|
-| T1 | Resolución de horas | 1 minuto, la que ya admite el modelo. Sin redondeo. Alternativa: 15 o 30 min solo en la UI, pero una versión restaurada con minutos sueltos no sería editable sin redondear |
-| T2 | Máximo de franjas por parámetro | 48 solo en el editor, como límite técnico de usabilidad (dividir se deshabilita). Sin límite en modelo ni lectura para no invalidar versiones ya guardadas |
-| T3 | Estructura al cambiar de unidad | conservar límites y vaciar valores (§6) |
-| T4 | Unir con valores distintos | no permitido. El usuario iguala antes el valor (§3.2) |
-| T5 | Marcar en el editor franjas cambiadas respecto a la versión de partida | sí, indicador «modificada» por franja y parámetro, sin diff completo |
+| T1 | Resolución de horas | 1 minuto, sin redondeo |
+| T2 | Máximo de franjas por parámetro | 48, aplicado solo en el editor |
+| T3 | Estructura al cambiar de unidad | conservar exactamente las fronteras de ISF y objetivo y pasar todos sus valores a `Sin configurar`. No reducir a una franja ni fusionar (§6) |
+| T4 | Unir con valores distintos | no permitido (§3.2) |
+| T5 | Franjas cambiadas durante la edición | indicador visual `Modificada`, solo de UI/editor, fuera del contenido persistente y de la huella (§8) |
 
-## 12. Alternativas consideradas
+## 13. Alternativas consideradas
 
 - **Fusionar adyacentes iguales al guardar**: destruye intención estructural.
   Rechazada por decisión del propietario.
@@ -242,23 +286,39 @@ hora (P4 del ADR 0012), plantillas de franjas y copiar franjas entre parámetros
   0012. Rechazada.
 - **Identificar franjas por posición**: un toque repetido o tardío actúa sobre
   otra franja. Rechazada frente a identidad por intervalo.
+- **Reducir ISF y objetivo a una franja 00:00–24:00 al cambiar de unidad**
+  (comportamiento actual de `withGlucoseUnit`): más simple, pero destruye
+  estructura sin acción explícita. Rechazada (T3).
+- **Persistir el indicador `Modificada`**: mezcla estado de edición con
+  contenido clínico y alteraría la huella. Rechazada (T5).
 - **Editor de línea temporal con arrastre**: más rápido, pero impreciso y difícil
   con texto 1,8× y accesibilidad. Posible mejora posterior sobre las mismas
   operaciones.
 
-## 13. Consecuencias
+## 14. Consecuencias y relación con decisiones anteriores
 
 - Sin cambios de esquema SQLite, huella, política de escritura ni lectura. Sin
   migración. Rollback: revertir el commit. Las versiones guardadas con varias
   franjas se siguen leyendo con la versión anterior (en solo lectura).
 - Nuevos códigos estables: `profile.edit.split_out_of_range`,
   `profile.edit.boundary_out_of_range`, `profile.edit.merge_values_differ`,
-  `profile.edit.stale_segment`, `profile.edit.invalid_time`.
-- `withGlucoseUnit` cambia de comportamiento si se acepta T3. Las pruebas del ADR
-  0012 sobre cambio de unidad se actualizan en el mismo commit.
+  `profile.edit.stale_segment`, `profile.edit.invalid_time`,
+  `profile.edit.segment_limit_reached`.
 - iOS reutilizará las mismas operaciones puras.
 
-## 14. Pruebas previstas
+Lo que este ADR sustituye o precisa del ADR 0012:
+
+| ADR 0012 | Cambio |
+|---|---|
+| §12 P5: UI de una franja por parámetro, varias franjas en solo lectura con `profile.edit.segments_ui_unavailable` | sustituido. Las versiones con varias franjas se editan. El código queda reservado sin uso |
+| §15 UI: «versión con varias franjas: se muestra completa y no se puede editar» | sustituida por las pruebas de edición de la sección 15 |
+| §4.4: «al cambiar la unidad en el editor se vacían ISF y objetivo» | precisado, no cambiado: vaciar significa pasar cada franja a `Sin configurar` conservando fronteras. El resto del §4.4 queda igual |
+| Implementación de `withGlucoseUnit` (no fijada por el ADR 0012) | cambia: deja de reducir a `ParameterSchedule.allDay` y conserva fronteras. La prueba `ProfileUnitTest` que espera una franja única se actualiza en el mismo commit |
+
+No cambia ninguna decisión sobre huella, procedencia, origen `restored`,
+concurrencia, idempotencia de guardado, SQLite, backup ni bloqueo de cálculo.
+
+## 15. Pruebas previstas
 
 ### Comunes
 
@@ -275,8 +335,16 @@ hora (P4 del ADR 0012), plantillas de franjas y copiar franjas entre parámetros
   devuelve `stale_segment` sin cambios.
 - horas: `H:MM`, `HH:MM`, rechazo de `24:00`, `00:00` como límite, `600`, `6`,
   `6.00`, AM/PM, segundos.
-- unidad con varias franjas (T3): límites conservados, valores vaciados, bloqueo,
-  volver a la unidad inicial no recupera, `carb_ratio` intacto.
+- unidad con varias franjas (T3): el ejemplo del §6 exacto (tres franjas
+  conservadas, todas `Sin configurar`, sin fusión), fronteras no guardadas
+  conservadas, bloqueo de valores y estructura, volver a la unidad inicial no
+  recupera valores, `carb_ratio` intacto, la versión que cambia la unidad se
+  guarda con las fronteras y la política la acepta.
+- límite de 48 (T2): dividir en la franja 48 rechazado, versión sintética con más
+  de 48 legible, restaurable y editable salvo dividir, política y lectura no
+  aplican el límite.
+- indicador `Modificada` (T5): aparece al dividir, mover, unir y editar valor,
+  desaparece al deshacer, no altera huella ni origen.
 - restauración: dividir y unir vuelve a `restored`, cualquier otro cambio da
   `manual` con `restored_from`.
 - guardar solo estructura crea versión nueva, sin cambios da `unchanged`.
@@ -296,7 +364,11 @@ hora (P4 del ADR 0012), plantillas de franjas y copiar franjas entre parámetros
 - doble toque en dividir y unir no duplica.
 - rotar y recrear con diálogo abierto, texto pendiente y varias franjas.
 - conflicto con varias franjas: error visible y franjas conservadas.
-- cambio de unidad con varias franjas y aviso de franjas vaciadas.
+- cambio de unidad con el ejemplo del §6: tres franjas visibles como
+  `Sin configurar`, bloqueadas, guardadas y releídas con sus fronteras.
+- indicador `Modificada` visible, recalculado tras recrear y ausente tras
+  guardar.
+- con 48 franjas «Dividir» deshabilitado.
 - restaurar versión con varias franjas y editarla.
 - Bolo sigue bloqueado y no lee el perfil.
 - layouts 840×900, 900×840 y 411×914 dp con texto 1,0× y 1,8×, tema claro y
@@ -308,7 +380,7 @@ hora (P4 del ADR 0012), plantillas de franjas y copiar franjas entre parámetros
 - `scripts/verify.ps1 -DeviceTests` en el Pixel.
 - evidencia en `docs/validation/profile-segment-editor-<fecha>.md`.
 
-## 15. Condiciones para revisar este ADR
+## 16. Condiciones para revisar este ADR
 
 Resolución de franjas en cambios de hora, uso del perfil por el motor, límites
 clínicos, plantillas o copia entre parámetros, un segundo esquema de contenido,
