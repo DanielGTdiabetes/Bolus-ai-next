@@ -196,6 +196,41 @@ class SqliteClinicalProfileRepositoryDeviceTest {
         SqliteClinicalProfileRepository(context, name).use { assertEquals(listOf(v1), it.all()) }
     }
 
+    /** ADR 0013: edited structures persist exactly; retries, conflicts and unit changes add nothing unexpected. */
+    @Test fun editedSegmentStructuresPersistExactlyWithRetryConflictAndUnitChange() = withDatabase { name ->
+        fun schedule(parameter: ProfileParameter, vararg segments: TimeSegment) = ParameterSchedule(parameter, segments.toList())
+        val single = content()
+        val split = ProfileContent(1, mgdl, madrid, listOf(
+            schedule(ProfileParameter.CARB_RATIO, TimeSegment(0, 360, entered("10")), TimeSegment(360, 1440, entered("10"))),
+            schedule(ProfileParameter.INSULIN_SENSITIVITY, TimeSegment(0, 360, entered("40")),
+                TimeSegment(360, 720, entered("45")), TimeSegment(720, 1440, entered("50"))),
+            schedule(ProfileParameter.GLUCOSE_TARGET, TimeSegment(0, 727, ProfileValue.NotConfigured),
+                TimeSegment(727, 1440, entered("0")))))
+        SqliteClinicalProfileRepository(context, name).use { repository ->
+            val v1 = repository.saved(write(0, single))
+            val v2 = repository.saved(write(1, split))
+            assertNotEquals(v1.contentSha256, v2.contentSha256)
+            val rows = dump(name)
+            // Identical retry returns the committed version; a stale editor is a conflict. Neither adds rows.
+            assertEquals(ProfileSave.Saved(v2), repository.save(write(1, split), 99, "w"))
+            assertEquals(ProfileSave.Failed(ProfileFailure.CONFLICT), repository.save(write(1, single), 99, "w"))
+            assertEquals(rows, dump(name))
+            // A unit change keeps every boundary with no values and merges nothing.
+            val v3 = repository.saved(write(2, split.withGlucoseUnit(mmol)))
+            assertEquals(listOf(TimeSegment(0, 360, ProfileValue.NotConfigured), TimeSegment(360, 720, ProfileValue.NotConfigured),
+                TimeSegment(720, 1440, ProfileValue.NotConfigured)), v3.content.schedule(ProfileParameter.INSULIN_SENSITIVITY).segments)
+            assertEquals(2, v3.content.schedule(ProfileParameter.GLUCOSE_TARGET).segments.size)
+            // More than 48 segments is never rejected by storage.
+            val many = split.withGlucoseUnit(mmol).copy(schedules = split.withGlucoseUnit(mmol).schedules.map {
+                if (it.parameter != ProfileParameter.CARB_RATIO) it
+                else ParameterSchedule(it.parameter, (0 until 60).map { i -> TimeSegment(i * 24, (i + 1) * 24, entered("${i + 1}")) })
+            })
+            val v4 = repository.saved(write(3, many))
+            assertEquals(listOf(v1, v2, v3, v4), repository.all())
+        }
+        SqliteClinicalProfileRepository(context, name).use { assertEquals(4, it.all().size) }
+    }
+
     @Test fun unitChangeNeverReinterpretsStoredValues() = withDatabase { name ->
         SqliteClinicalProfileRepository(context, name).use { repository ->
             val v1 = repository.saved(write(0, content()))

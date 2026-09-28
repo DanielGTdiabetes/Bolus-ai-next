@@ -19,5 +19,13 @@ enum class ProfileFailure(val code: String) {
     UNIT_CHANGE_WITH_VALUES("profile.edit.unit_change_with_values"),
     INVALID_ORIGIN("profile.edit.invalid_origin"),
     ORIGIN_NOT_ENABLED("profile.origin.not_enabled"),
+    /** Reserved (ADR 0012 P5, superseded by ADR 0013). Never produced again and never reused. */
     SEGMENTS_UI_UNAVAILABLE("profile.edit.segments_ui_unavailable"),
+    SPLIT_OUT_OF_RANGE("profile.edit.split_out_of_range"),
+    BOUNDARY_OUT_OF_RANGE("profile.edit.boundary_out_of_range"),
+    MERGE_VALUES_DIFFER("profile.edit.merge_values_differ"),
+    STALE_SEGMENT("profile.edit.stale_segment"),
+    INVALID_TIME("profile.edit.invalid_time"),
+    SEGMENT_LIMIT_REACHED("profile.edit.segment_limit_reached"),
+    SCHEDULE_LOCKED("profile.edit.schedule_locked"),
 }

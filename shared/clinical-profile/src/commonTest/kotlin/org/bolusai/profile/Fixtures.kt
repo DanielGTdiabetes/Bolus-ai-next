@@ -58,3 +58,14 @@ internal fun ClinicalProfiles.saved(editor: ProfileEditor): ProfileVersion =
 internal fun ClinicalProfiles.loaded(): ProfileHistory.Loaded = read() as ProfileHistory.Loaded
 
 internal fun ProfileEditor.with(next: ProfileContent) = copy(content = next)
+
+/** Sets the value of a schedule that is still a single full-day segment. */
+internal fun ProfileContent.withDayValue(parameter: ProfileParameter, value: ProfileValue): ProfileEdit =
+    edited(SegmentOperation.SetValue(parameter, SegmentRef(0, ProfileCatalog.MINUTES_PER_DAY), value))
+
+internal fun segment(start: Int, end: Int, value: ProfileValue = ProfileValue.NotConfigured) = TimeSegment(start, end, value)
+
+internal fun ProfileContent.withSchedule(parameter: ProfileParameter, vararg segments: TimeSegment) =
+    copy(schedules = schedules.map { if (it.parameter == parameter) ParameterSchedule(parameter, segments.toList()) else it })
+
+internal fun ProfileEdit.content(): ProfileContent = (this as ProfileEdit.Changed).content

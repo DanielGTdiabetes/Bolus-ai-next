@@ -19,8 +19,7 @@ append-only con triggers, huella SHA-256 canónica revalidada al leer, origen
 `manual`/`restored` (`system_proposal_accepted` reservado y rechazado), fecha y
 escritor. Unidad de glucosa (mg/dL o mmol/L) y zona IANA declaradas por versión.
 `carb_ratio` (g/U), `insulin_sensitivity` y `glucose_target` por franjas
-completas en el modelo. La UI edita solo un valor de día completo por parámetro.
-Las versiones con varias franjas se muestran en solo lectura. Decimal canónico no
+completas en el modelo. Decimal canónico no
 negativo, 6 enteros y 3 decimales como límite de representación, no clínico.
 «Sin configurar» distinto de `0`. Cambiar de unidad vacía ISF y objetivo y exige
 guardar esa versión sin valores dependientes. Nada se convierte. Restaurar crea
@@ -28,8 +27,20 @@ una versión nueva sin tocar las anteriores. Conflicto e idempotencia como en
 comidas. Auto Backup sigue desactivado y verify.ps1 lo comprueba junto con que el
 motor y `ReadOverview` no dependen del perfil.
 
-Consulta docs/adr/0012-local-clinical-profile.md y
-docs/validation/local-clinical-profile-2026-09-27.md.
+El editor de franjas (ADR 0013, aceptado con T1 a T5) divide, une solo franjas
+con valor exactamente igual, mueve límites compartidos y edita el valor de cada
+franja. Cobertura 00:00–24:00 por construcción, 24 h, 1 minuto sin redondeo,
+`24:00` solo como fin. Las operaciones puras viven en `ProfileSegments.kt` e
+identifican franjas por intervalo (`stale_segment` si ya no existe). Franjas
+adyacentes iguales se conservan y solo se unen por acción explícita. Cambiar de
+unidad conserva las fronteras de ISF y objetivo, vacía sus valores y bloquea su
+estructura hasta guardar. Máximo de 48 franjas solo para dividir. «Modificada»
+es estado derivado del editor, fuera de la huella. Paneles en línea que
+sobreviven a la recreación. Sin cambios de esquema.
+
+Consulta docs/adr/0012-local-clinical-profile.md,
+docs/adr/0013-clinical-profile-segment-editor.md y
+docs/validation/profile-segment-editor-2026-09-28.md.
 Comprueba el CI del SHA exacto integrado antes de empezar.
 Esta entrega no consultó ni modificó Legacy. Su última auditoría documentada
 continúa fijada en f5417721d8019a9831126f4d843edfc4de87653d; no afirmes que ese
@@ -54,17 +65,16 @@ En Windows, los XML de recursos están en CRLF en la copia de trabajo: al editar
 con scripts conserva los finales de línea o `git diff --check` fallará.
 
 REVISIÓN PENDIENTE
-El propietario revisa los resultados de la PR del perfil clínico antes de
-empezar otro bloque funcional. No avances sin esa revisión.
+El propietario revisa la PR del editor de franjas (ADR 0013) antes de integrarla
+y antes de empezar otro bloque funcional. No avances sin esa revisión.
 
 SIGUIENTE INCREMENTO PROPUESTO (tras la revisión)
-Editor de franjas horarias del perfil: crear, dividir, unir y editar franjas
-de un parámetro sobre el modelo ya existente, con validación estructural
-(cobertura completa, sin solapes ni cruce de medianoche), vista previa canónica y
-las mismas garantías de versión, unidad, conflicto e idempotencia. Sin esquema
-nuevo ni valores por defecto. Antes, un ADR breve que fije la interacción y cómo
-se muestran franjas adyacentes iguales. El significado de «confirmado», los
-límites aprobados, DIA e IOB siguen siendo decisiones del propietario.
+ADR breve, sin código, sobre qué significa un perfil «confirmado» y qué puertas
+tendría que superar antes de que el motor pudiera leerlo: completitud de valores
+por franja, zona y unidad declaradas, y qué queda bloqueado mientras falten
+límites aprobados. Solo decisiones pendientes del propietario, sin límites ni
+valores inventados. Límites clínicos, DIA, IOB y resolución de franjas en
+cambios de hora siguen siendo decisiones del propietario.
 
 TRABAJO
 1. Lee AGENTS.md, README, arquitectura, plan y ADRs relacionados. Actualiza origin,

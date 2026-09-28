@@ -519,6 +519,18 @@ DIA, conversión, propuestas, exportación ni uso clínico: cálculo y confirmac
 siguen bloqueados. Véanse el [ADR 0012](adr/0012-local-clinical-profile.md) y la
 [validación](validation/local-clinical-profile-2026-09-27.md).
 
+### Entrega del editor de franjas del perfil — 2026-09-28
+
+Continuación de la fase 6: el editor del perfil clínico permite dividir, unir
+(solo valores exactamente iguales), mover límites compartidos y editar el valor
+de cada franja, con cobertura 00:00–24:00 garantizada por construcción, 24 h y
+resolución de 1 minuto. Franjas adyacentes iguales se conservan. Cambiar de
+unidad conserva las fronteras de ISF y objetivo y pasa sus valores a «Sin
+configurar». Máximo de 48 franjas solo para dividir. Indicador «Modificada» solo
+de editor. Sin esquema nuevo, sin límites clínicos ni uso por el motor. Véanse el
+[ADR 0013](adr/0013-clinical-profile-segment-editor.md) y la
+[validación](validation/profile-segment-editor-2026-09-28.md).
+
 ### Secuencia de capacidades
 
 No intentar construir toda una fase en un solo cambio. Secuencia inicial:

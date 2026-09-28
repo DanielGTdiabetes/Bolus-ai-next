@@ -84,9 +84,41 @@ data class ProfileEditor(
     val glucoseDependentValuesLocked: Boolean
         get() = start.glucoseUnit is Setting.Declared && content.glucoseUnit != start.glucoseUnit
 
+    /** While a unit change is pending, glucose-dependent schedules are locked in values and structure (ADR 0013, §6). */
+    fun scheduleLocked(parameter: ProfileParameter): Boolean = parameter.glucoseDependent && glucoseDependentValuesLocked
+
+    /**
+     * Applies one editing operation. A locked schedule accepts no structural change and no entered value; clearing a
+     * value is harmless and allowed. Nothing is written.
+     */
+    fun edited(operation: SegmentOperation): ProfileEditorEdit {
+        if (scheduleLocked(operation.parameter)) {
+            if (operation.structural) return ProfileEditorEdit.Rejected(ProfileFailure.SCHEDULE_LOCKED)
+            if ((operation as SegmentOperation.SetValue).value is ProfileValue.Entered) {
+                return ProfileEditorEdit.Rejected(ProfileFailure.UNIT_CHANGE_WITH_VALUES)
+            }
+        }
+        return when (val edit = content.edited(operation)) {
+            is ProfileEdit.Rejected -> ProfileEditorEdit.Rejected(edit.reason)
+            is ProfileEdit.Changed -> ProfileEditorEdit.Changed(copy(content = edit.content))
+        }
+    }
+
+    /**
+     * Editor-only indicator (ADR 0013, §8): the segment's interval does not exist in [start] for the same parameter, or
+     * exists with another value. Derived from [start] and [content]; never stored, fingerprinted or used for origin.
+     */
+    fun isModified(parameter: ProfileParameter, segment: TimeSegment): Boolean =
+        start.schedule(parameter).segments.none { it == segment }
+
     val nextVersion: Long get() = baseVersion + 1
     val changed: Boolean get() = content != start
     fun toWrite() = ProfileWrite(baseVersion, content, origin, restoredFrom)
+}
+
+sealed interface ProfileEditorEdit {
+    data class Changed(val editor: ProfileEditor) : ProfileEditorEdit
+    data class Rejected(val reason: ProfileFailure) : ProfileEditorEdit
 }
 
 sealed interface ProfileRestore {

@@ -60,15 +60,6 @@ class ProfileContentTest {
         assertEquals(ProfileFailure.INVALID_PARAMETERS, ProfileContent.problem(2, mgdl, all))
     }
 
-    @Test fun multiSegmentScheduleIsNotEditableInThisPhase() {
-        val split = ProfileContent(1, mgdl, madrid, listOf(
-            schedule(ProfileParameter.CARB_RATIO, TimeSegment(0, 720, entered("8")), TimeSegment(720, 1440, entered("9"))),
-            ParameterSchedule.allDay(ProfileParameter.INSULIN_SENSITIVITY),
-            ParameterSchedule.allDay(ProfileParameter.GLUCOSE_TARGET)))
-        assertEquals(ProfileEdit.Rejected(ProfileFailure.SEGMENTS_UI_UNAVAILABLE),
-            split.withAllDayValue(ProfileParameter.CARB_RATIO, entered("10")))
-    }
-
     @Test fun timeZoneGrammarIsCheckedAndExistenceByPlatform() {
         listOf("Europe/Madrid", "UTC", "America/Argentina/Buenos_Aires", "Etc/GMT+1").forEach {
             assertTrue(ProfileTimeZone.isWellFormed(it), it)

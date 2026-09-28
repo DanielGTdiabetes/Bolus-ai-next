@@ -24,7 +24,7 @@ import java.util.UUID
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 
-/** Clinical profile capture UI (ADR 0012). Synthetic isolated databases; the app's own files are never opened. */
+/** Clinical profile capture and segment editing UI (ADR 0012 and 0013). Synthetic isolated databases; the app's own files are never opened. */
 @RunWith(AndroidJUnit4::class)
 class ClinicalProfileDeviceTest {
     private val instrumentation = InstrumentationRegistry.getInstrumentation()
@@ -117,34 +117,34 @@ class ClinicalProfileDeviceTest {
             awaitView(scenario, "profile:save")
             scenario.onActivity {
                 // Nothing is configured and nothing can be saved yet.
-                assertEquals("", text(it, "profile:value:carb_ratio"))
+                assertEquals("", text(it, "profile:value:carb_ratio@0-1440"))
                 assertFalse(view(it, "profile:save").isEnabled)
                 assertTrue((view(it, "profile:unit:none") as RadioButton).isChecked)
-                assertFalse(view(it, "profile:value:glucose_target").isEnabled)
-                type(it, "profile:value:carb_ratio", "0")
-                assertEquals(s(R.string.profile_preview_value, "0 g/U"), text(it, "profile:preview:carb_ratio"))
+                assertFalse(view(it, "profile:value:glucose_target@0-1440").isEnabled)
+                type(it, "profile:value:carb_ratio@0-1440", "0")
+                assertEquals(s(R.string.profile_preview_value, "0 g/U"), text(it, "profile:preview:carb_ratio@0-1440"))
                 view(it, "profile:unit:mg_dl").performClick()
             }
-            awaitView(scenario, "profile:value:glucose_target")
+            awaitView(scenario, "profile:value:glucose_target@0-1440")
             scenario.onActivity {
-                assertTrue(view(it, "profile:value:glucose_target").isEnabled)
-                assertEquals("0", text(it, "profile:value:carb_ratio"))
-                type(it, "profile:value:glucose_target", "1.000")
+                assertTrue(view(it, "profile:value:glucose_target@0-1440").isEnabled)
+                assertEquals("0", text(it, "profile:value:carb_ratio@0-1440"))
+                type(it, "profile:value:glucose_target@0-1440", "1.000")
                 assertEquals(s(R.string.profile_preview_error, ProfileFailure.AMBIGUOUS_DECIMAL.code),
-                    text(it, "profile:preview:glucose_target"))
+                    text(it, "profile:preview:glucose_target@0-1440"))
                 assertFalse(view(it, "profile:save").isEnabled)
-                type(it, "profile:value:glucose_target", "110,50")
-                assertEquals(s(R.string.profile_preview_value, "110.5 mg/dL"), text(it, "profile:preview:glucose_target"))
-                assertEquals(s(R.string.profile_preview_missing), text(it, "profile:preview:insulin_sensitivity"))
+                type(it, "profile:value:glucose_target@0-1440", "110,50")
+                assertEquals(s(R.string.profile_preview_value, "110.5 mg/dL"), text(it, "profile:preview:glucose_target@0-1440"))
+                assertEquals(s(R.string.profile_preview_missing), text(it, "profile:preview:insulin_sensitivity@0-1440"))
                 type(it, "profile:time_zone", "Europe/Madrid")
                 assertTrue(view(it, "profile:save").isEnabled)
             }
             // Unsaved editor survives recreation with the same text and previews.
             scenario.recreate()
-            awaitView(scenario, "profile:value:glucose_target")
+            awaitView(scenario, "profile:value:glucose_target@0-1440")
             scenario.onActivity {
-                assertEquals("110,50", text(it, "profile:value:glucose_target"))
-                assertEquals("0", text(it, "profile:value:carb_ratio"))
+                assertEquals("110,50", text(it, "profile:value:glucose_target@0-1440"))
+                assertEquals("0", text(it, "profile:value:carb_ratio@0-1440"))
                 assertTrue((view(it, "profile:unit:mg_dl") as RadioButton).isChecked)
             }
             assertEquals(emptyList<ProfileVersion>(), stored())
@@ -174,20 +174,20 @@ class ClinicalProfileDeviceTest {
             click(scenario, "profile:edit")
             awaitView(scenario, "profile:unit:mmol_l")
             click(scenario, "profile:unit:mmol_l")
-            awaitView(scenario, "profile:unit_lock", s(R.string.profile_unit_lock))
+            awaitView(scenario, "profile:unit_lock", s(R.string.profile_unit_lock, 1, 1))
             scenario.onActivity {
                 // Values typed under mg/dL are gone and cannot be typed again in this version.
-                assertEquals("", text(it, "profile:value:glucose_target"))
-                assertEquals("", text(it, "profile:value:insulin_sensitivity"))
-                assertFalse(view(it, "profile:value:glucose_target").isEnabled)
-                assertEquals("10", text(it, "profile:value:carb_ratio"))
+                assertEquals("", text(it, "profile:value:glucose_target@0-1440"))
+                assertEquals("", text(it, "profile:value:insulin_sensitivity@0-1440"))
+                assertFalse(view(it, "profile:value:glucose_target@0-1440").isEnabled)
+                assertEquals("10", text(it, "profile:value:carb_ratio@0-1440"))
             }
             // Switching back does not restore the numbers.
             click(scenario, "profile:unit:mg_dl")
-            awaitView(scenario, "profile:value:glucose_target")
+            awaitView(scenario, "profile:value:glucose_target@0-1440")
             scenario.onActivity {
                 assertNull(viewOrNull(it, "profile:unit_lock"))
-                assertEquals("", text(it, "profile:value:glucose_target"))
+                assertEquals("", text(it, "profile:value:glucose_target@0-1440"))
                 view(it, "profile:unit:mmol_l").performClick()
             }
             awaitView(scenario, "profile:unit_lock")
@@ -198,12 +198,12 @@ class ClinicalProfileDeviceTest {
             awaitView(scenario, "profile:saved", s(R.string.profile_saved, 2))
             awaitView(scenario, "profile:current:unit", s(R.string.profile_unit_value, "mmol/L"))
             click(scenario, "profile:edit")
-            awaitView(scenario, "profile:value:glucose_target")
+            awaitView(scenario, "profile:value:glucose_target@0-1440")
             scenario.onActivity {
                 assertNull(viewOrNull(it, "profile:unit_lock"))
-                assertTrue(view(it, "profile:value:glucose_target").isEnabled)
-                type(it, "profile:value:glucose_target", "6,1")
-                assertEquals(s(R.string.profile_preview_value, "6.1 mmol/L"), text(it, "profile:preview:glucose_target"))
+                assertTrue(view(it, "profile:value:glucose_target@0-1440").isEnabled)
+                type(it, "profile:value:glucose_target@0-1440", "6,1")
+                assertEquals(s(R.string.profile_preview_value, "6.1 mmol/L"), text(it, "profile:preview:glucose_target@0-1440"))
             }
             click(scenario, "profile:save")
             awaitView(scenario, "profile:saved", s(R.string.profile_saved, 3))
@@ -230,12 +230,12 @@ class ClinicalProfileDeviceTest {
             openProfile(scenario)
             awaitView(scenario, "profile:edit")
             click(scenario, "profile:edit")
-            awaitView(scenario, "profile:value:carb_ratio")
-            scenario.onActivity { type(it, "profile:value:carb_ratio", "12") }
+            awaitView(scenario, "profile:value:carb_ratio@0-1440")
+            scenario.onActivity { type(it, "profile:value:carb_ratio@0-1440", "12") }
             external = seed(ProfileWrite(1, content(ratio = entered("15")), ProfileOrigin.MANUAL, null)).single()
             click(scenario, "profile:save")
             awaitView(scenario, "profile:editor:status", s(R.string.profile_status_conflict, ProfileFailure.CONFLICT.code))
-            scenario.onActivity { assertEquals("12", text(it, "profile:value:carb_ratio")) }
+            scenario.onActivity { assertEquals("12", text(it, "profile:value:carb_ratio@0-1440")) }
         }
         assertEquals(listOf(1L, 2L), stored().map { it.version })
         assertEquals(external, stored().last())
@@ -266,13 +266,13 @@ class ClinicalProfileDeviceTest {
             awaitView(scenario, "profile:editor:origin", s(R.string.profile_editor_origin_restored, 1))
             scenario.onActivity {
                 assertTrue((view(it, "profile:unit:mg_dl") as RadioButton).isChecked)
-                assertEquals("110", text(it, "profile:value:glucose_target"))
-                assertEquals("0", text(it, "profile:value:carb_ratio"))
+                assertEquals("110", text(it, "profile:value:glucose_target@0-1440"))
+                assertEquals("0", text(it, "profile:value:carb_ratio@0-1440"))
                 assertNull(viewOrNull(it, "profile:unit_lock"))
                 // Editing turns the exact restoration into a manual edit; undoing brings it back.
-                type(it, "profile:value:carb_ratio", "1")
+                type(it, "profile:value:carb_ratio@0-1440", "1")
                 assertEquals(s(R.string.profile_editor_origin_manual_from, 1), text(it, "profile:editor:origin"))
-                type(it, "profile:value:carb_ratio", "0")
+                type(it, "profile:value:carb_ratio@0-1440", "0")
                 assertEquals(s(R.string.profile_editor_origin_restored, 1), text(it, "profile:editor:origin"))
             }
             assertEquals(2, stored().size)
@@ -293,9 +293,9 @@ class ClinicalProfileDeviceTest {
             openProfile(scenario)
             awaitView(scenario, "profile:edit")
             click(scenario, "profile:edit")
-            awaitView(scenario, "profile:value:carb_ratio")
+            awaitView(scenario, "profile:value:carb_ratio@0-1440")
             scenario.onActivity {
-                type(it, "profile:value:carb_ratio", "14")
+                type(it, "profile:value:carb_ratio@0-1440", "14")
                 view(it, "profile:history").performClick()
             }
             awaitView(scenario, "profile:history:1:restore")
@@ -305,13 +305,13 @@ class ClinicalProfileDeviceTest {
             scenario.onActivity { assertEquals(s(R.string.profile_restore_confirm_discard, 1), text(it, "profile:restore:confirm")) }
             click(scenario, "profile:restore:cancel")
             click(scenario, "profile:history:close")
-            awaitView(scenario, "profile:value:carb_ratio", "14")
+            awaitView(scenario, "profile:value:carb_ratio@0-1440", "14")
             scenario.onActivity { view(it, "profile:history").performClick() }
             awaitView(scenario, "profile:history:1:restore")
             click(scenario, "profile:history:1:restore")
             awaitView(scenario, "profile:restore:confirm")
             click(scenario, "profile:restore:confirm")
-            awaitView(scenario, "profile:value:carb_ratio", "10")
+            awaitView(scenario, "profile:value:carb_ratio@0-1440", "10")
         }
         assertEquals(2, stored().size)
     }
@@ -327,7 +327,7 @@ class ClinicalProfileDeviceTest {
         }
         awaitHistory(model)
         instrumentation.runOnMainSync {
-            model.startEdit(); model.setInput(ProfileParameter.CARB_RATIO.code, "13")
+            model.startEdit(); model.setInput(ClinicalProfileModel.valueKey(ProfileParameter.CARB_RATIO, SegmentRef(0, 1440)), "13")
             assertTrue(model.canSave)
             snapshot = model.snapshot()
             model.dispose()
@@ -375,29 +375,304 @@ class ClinicalProfileDeviceTest {
             android.database.DatabaseUtils.longForQuery(it, "SELECT count(*) FROM profile_versions", null)
         }
 
-    @Test fun multiSegmentVersionIsShownCompletelyAndNotEditable() {
-        val split = ProfileContent(1, mgdl, madrid, listOf(
-            ParameterSchedule(ProfileParameter.CARB_RATIO, listOf(TimeSegment(0, 360, entered("8")),
-                TimeSegment(360, 1440, ProfileValue.NotConfigured))),
-            ParameterSchedule.allDay(ProfileParameter.INSULIN_SENSITIVITY, entered("40")),
-            ParameterSchedule.allDay(ProfileParameter.GLUCOSE_TARGET)))
-        seed(ProfileWrite(0, split, ProfileOrigin.MANUAL, null))
+    // ADR 0013: segment editor.
+
+    private fun seg(start: Int, end: Int, value: ProfileValue = ProfileValue.NotConfigured) = TimeSegment(start, end, value)
+    private fun key(parameter: ProfileParameter, start: Int, end: Int) = "${parameter.code}@$start-$end"
+    private fun ProfileContent.with(parameter: ProfileParameter, vararg segments: TimeSegment) =
+        copy(schedules = schedules.map { if (it.parameter == parameter) ParameterSchedule(parameter, segments.toList()) else it })
+    private val ratio = ProfileParameter.CARB_RATIO
+    private val isf = ProfileParameter.INSULIN_SENSITIVITY
+    private val target = ProfileParameter.GLUCOSE_TARGET
+
+    private fun isShown(activity: MainActivity, tag: String) = viewOrNull(activity, tag)?.visibility == View.VISIBLE
+
+    private fun editLatest(scenario: ActivityScenario<MainActivity>) {
+        openProfile(scenario)
+        awaitView(scenario, "profile:edit")
+        click(scenario, "profile:edit")
+        awaitView(scenario, "profile:save")
+    }
+
+    private fun panelAction(scenario: ActivityScenario<MainActivity>, opener: String, time: String?) {
+        click(scenario, opener)
+        awaitView(scenario, "profile:panel:apply")
+        if (time != null) scenario.onActivity { type(it, "profile:panel:time", time) }
+        scenario.onActivity { assertTrue(opener, view(it, "profile:panel:apply").isEnabled) }
+        click(scenario, "profile:panel:apply")
+        scenario.onActivity { assertNull(viewOrNull(it, "profile:panel:apply")) }
+    }
+
+    @Test fun splitMoveMergeAndValuesAreExplicitEditsSavedExactly() {
+        seed(ProfileWrite(0, content(), ProfileOrigin.MANUAL, null))
         launch().use { scenario ->
-            openProfile(scenario)
-            val segments = s(R.string.profile_segment, "00:00", "06:00", "8 g/U") + "\n" +
-                s(R.string.profile_segment, "06:00", "24:00", s(R.string.profile_not_configured))
-            awaitView(scenario, "profile:current:carb_ratio",
-                s(R.string.profile_param_value, s(R.string.profile_param_carb_ratio), segments))
-            click(scenario, "profile:edit")
-            awaitView(scenario, "profile:segments:carb_ratio")
+            editLatest(scenario)
             scenario.onActivity {
-                assertNull(viewOrNull(it, "profile:value:carb_ratio"))
-                type(it, "profile:value:insulin_sensitivity", "41")
-                view(it, "profile:save").performClick()
+                assertFalse(isShown(it, "profile:modified:${key(ratio, 0, 1440)}"))
+                assertNull(viewOrNull(it, "profile:move_start:${key(ratio, 0, 1440)}"))
+                assertNull(viewOrNull(it, "profile:move_end:${key(ratio, 0, 1440)}"))
             }
+            // Split: 24:00 and 00:00 are not valid interior times; nothing is applied until "Aplicar".
+            click(scenario, "profile:split:${key(ratio, 0, 1440)}")
+            awaitView(scenario, "profile:panel:time")
+            scenario.onActivity {
+                type(it, "profile:panel:time", "24:00")
+                assertEquals(s(R.string.profile_preview_error, ProfileFailure.INVALID_TIME.code), text(it, "profile:panel:result"))
+                assertFalse(view(it, "profile:panel:apply").isEnabled)
+                type(it, "profile:panel:time", "00:00")
+                assertEquals(s(R.string.profile_preview_error, ProfileFailure.SPLIT_OUT_OF_RANGE.code), text(it, "profile:panel:result"))
+                assertFalse(view(it, "profile:save").isEnabled)
+                type(it, "profile:panel:time", "6:00")
+                assertTrue(text(it, "profile:panel:result").contains(s(R.string.profile_segment, "00:00", "06:00", "10 g/U")))
+                // Double tap on apply: the second click finds no open panel and changes nothing.
+                val apply = view(it, "profile:panel:apply")
+                apply.performClick(); apply.performClick()
+            }
+            awaitView(scenario, "profile:segment:${key(ratio, 360, 1440)}", "06:00–24:00")
+            scenario.onActivity {
+                assertNull(viewOrNull(it, "profile:segment:${key(ratio, 360, 1080)}"))
+                assertEquals("10", text(it, "profile:value:${key(ratio, 0, 360)}"))
+                assertEquals("10", text(it, "profile:value:${key(ratio, 360, 1440)}"))
+                assertTrue(isShown(it, "profile:modified:${key(ratio, 0, 360)}"))
+                assertTrue(isShown(it, "profile:modified:${key(ratio, 360, 1440)}"))
+                // Equal neighbours are offered a merge, never merged automatically.
+                assertTrue(isShown(it, "profile:merge:${key(ratio, 0, 360)}"))
+            }
+            // Moving the shared boundary moves both sides; values stay.
+            panelAction(scenario, "profile:move_end:${key(ratio, 0, 360)}", "07:00")
+            awaitView(scenario, "profile:segment:${key(ratio, 420, 1440)}", "07:00–24:00")
+            scenario.onActivity {
+                type(it, "profile:value:${key(ratio, 420, 1440)}", "12")
+                assertFalse(isShown(it, "profile:merge:${key(ratio, 0, 420)}"))
+                type(it, "profile:value:${key(ratio, 420, 1440)}", "10")
+                assertTrue(isShown(it, "profile:merge:${key(ratio, 0, 420)}"))
+            }
+            panelAction(scenario, "profile:merge:${key(ratio, 0, 420)}", null)
+            awaitView(scenario, "profile:segment:${key(ratio, 0, 1440)}", "00:00–24:00")
+            scenario.onActivity {
+                // Back to the starting interval and value: not modified, nothing to save.
+                assertFalse(isShown(it, "profile:modified:${key(ratio, 0, 1440)}"))
+                assertFalse(view(it, "profile:save").isEnabled)
+            }
+            panelAction(scenario, "profile:split:${key(ratio, 0, 1440)}", "12:07")
+            awaitView(scenario, "profile:value:${key(ratio, 727, 1440)}")
+            scenario.onActivity {
+                type(it, "profile:value:${key(ratio, 0, 727)}", "")
+                type(it, "profile:value:${key(ratio, 727, 1440)}", "0")
+                assertEquals(s(R.string.profile_preview_value, "0 g/U"), text(it, "profile:preview:${key(ratio, 727, 1440)}"))
+                assertEquals(s(R.string.profile_preview_missing), text(it, "profile:preview:${key(ratio, 0, 727)}"))
+                // Not configured and zero cannot be merged.
+                assertFalse(isShown(it, "profile:merge:${key(ratio, 0, 727)}"))
+            }
+            click(scenario, "profile:save")
+            awaitView(scenario, "profile:saved", s(R.string.profile_saved, 2))
+            awaitView(scenario, "profile:current:carb_ratio", s(R.string.profile_param_value, s(R.string.profile_param_carb_ratio),
+                s(R.string.profile_segment, "00:00", "12:07", s(R.string.profile_not_configured)) + "\n" +
+                    s(R.string.profile_segment, "12:07", "24:00", "0 g/U")))
+        }
+        assertEquals(listOf(seg(0, 727), seg(727, 1440, entered("0"))), stored().last().content.schedule(ratio).segments)
+        assertEquals(content().schedule(isf), stored().last().content.schedule(isf))
+    }
+
+    @Test fun adjacentEqualSegmentsAreKeptAndAStructureOnlyChangeIsANewVersion() {
+        seed(ProfileWrite(0, content(), ProfileOrigin.MANUAL, null))
+        launch().use { scenario ->
+            editLatest(scenario)
+            panelAction(scenario, "profile:split:${key(ratio, 0, 1440)}", "06:00")
+            awaitView(scenario, "profile:save")
+            scenario.onActivity { assertTrue(view(it, "profile:save").isEnabled) }
+            click(scenario, "profile:save")
+            awaitView(scenario, "profile:saved", s(R.string.profile_saved, 2))
+            scenario.recreate()
+            awaitView(scenario, "profile:current:carb_ratio", s(R.string.profile_param_value, s(R.string.profile_param_carb_ratio),
+                s(R.string.profile_segment, "00:00", "06:00", "10 g/U") + "\n" + s(R.string.profile_segment, "06:00", "24:00", "10 g/U")))
+        }
+        val versions = stored()
+        assertEquals(listOf(seg(0, 360, entered("10")), seg(360, 1440, entered("10"))), versions[1].content.schedule(ratio).segments)
+        assertNotEquals(versions[0].contentSha256, versions[1].contentSha256)
+    }
+
+    @Test fun unitChangeKeepsEveryBoundaryClearsValuesAndMergesNothing() {
+        val first = content()
+            .with(isf, seg(0, 360, entered("40")), seg(360, 720, entered("45")), seg(720, 1440, entered("50")))
+        val (v1) = seed(ProfileWrite(0, first, ProfileOrigin.MANUAL, null))
+        launch().use { scenario ->
+            editLatest(scenario)
+            click(scenario, "profile:unit:mmol_l")
+            awaitView(scenario, "profile:unit_lock", s(R.string.profile_unit_lock, 3, 1))
+            scenario.onActivity { activity ->
+                listOf(0 to 360, 360 to 720, 720 to 1440).forEach { (start, end) ->
+                    assertEquals("", text(activity, "profile:value:${key(isf, start, end)}"))
+                    assertFalse(view(activity, "profile:value:${key(isf, start, end)}").isEnabled)
+                    assertNull(viewOrNull(activity, "profile:split:${key(isf, start, end)}"))
+                    assertNull(viewOrNull(activity, "profile:merge:${key(isf, start, end)}"))
+                    assertTrue(isShown(activity, "profile:modified:${key(isf, start, end)}"))
+                }
+                // The carb ratio keeps its structure actions.
+                assertNotNull(viewOrNull(activity, "profile:split:${key(ratio, 0, 1440)}"))
+            }
+            scenario.recreate()
+            awaitView(scenario, "profile:unit_lock", s(R.string.profile_unit_lock, 3, 1))
+            click(scenario, "profile:save")
+            awaitView(scenario, "profile:saved", s(R.string.profile_saved, 2))
+            click(scenario, "profile:edit")
+            awaitView(scenario, "profile:save")
+            scenario.onActivity {
+                assertNull(viewOrNull(it, "profile:unit_lock"))
+                // Same boundaries, all "Sin configurar": a merge is offered but was not applied.
+                assertTrue(isShown(it, "profile:merge:${key(isf, 0, 360)}"))
+                assertTrue(isShown(it, "profile:merge:${key(isf, 360, 720)}"))
+                assertNotNull(viewOrNull(it, "profile:segment:${key(isf, 720, 1440)}"))
+            }
+        }
+        val versions = stored()
+        assertEquals(v1, versions[0])
+        assertEquals(mmol, versions[1].content.glucoseUnit)
+        assertEquals(listOf(seg(0, 360), seg(360, 720), seg(720, 1440)), versions[1].content.schedule(isf).segments)
+        assertEquals(listOf(seg(0, 1440)), versions[1].content.schedule(target).segments)
+        assertEquals(first.schedule(ratio), versions[1].content.schedule(ratio))
+    }
+
+    @Test fun recreationKeepsSegmentsPendingTextAndOpenPanel() {
+        seed(ProfileWrite(0, content(), ProfileOrigin.MANUAL, null))
+        launch().use { scenario ->
+            editLatest(scenario)
+            panelAction(scenario, "profile:split:${key(ratio, 0, 1440)}", "06:00")
+            awaitView(scenario, "profile:value:${key(ratio, 0, 360)}")
+            scenario.onActivity { type(it, "profile:value:${key(ratio, 0, 360)}", "0") }
+            click(scenario, "profile:split:${key(ratio, 360, 1440)}")
+            awaitView(scenario, "profile:panel:time")
+            scenario.onActivity { type(it, "profile:panel:time", "9:3") }
+            scenario.recreate()
+            awaitView(scenario, "profile:panel:time", "9:3")
+            scenario.onActivity {
+                assertEquals(s(R.string.profile_preview_error, ProfileFailure.INVALID_TIME.code), text(it, "profile:panel:result"))
+                assertEquals("0", text(it, "profile:value:${key(ratio, 0, 360)}"))
+                assertEquals("10", text(it, "profile:value:${key(ratio, 360, 1440)}"))
+                assertTrue(isShown(it, "profile:modified:${key(ratio, 0, 360)}"))
+                assertFalse(view(it, "profile:save").isEnabled)
+                type(it, "profile:panel:time", "9:30")
+            }
+            click(scenario, "profile:panel:apply")
+            awaitView(scenario, "profile:segment:${key(ratio, 570, 1440)}", "09:30–24:00")
+            click(scenario, "profile:save")
             awaitView(scenario, "profile:saved", s(R.string.profile_saved, 2))
         }
-        assertEquals(split.schedule(ProfileParameter.CARB_RATIO), stored().last().content.schedule(ProfileParameter.CARB_RATIO))
+        assertEquals(listOf(seg(0, 360, entered("0")), seg(360, 570, entered("10")), seg(570, 1440, entered("10"))),
+            stored().last().content.schedule(ratio).segments)
+    }
+
+    @Test fun savedStateIsRevalidatedAndNeverRepairedSilently() {
+        seed(ProfileWrite(0, content(), ProfileOrigin.MANUAL, null))
+        val repository = SqliteClinicalProfileRepository(context, name)
+        fun model(state: android.os.Bundle?) = ClinicalProfileModel(
+            ClinicalProfiles(repository, ProfileClock { 0 }, "test/state", AndroidTimeZoneRules), repository, state)
+        lateinit var first: ClinicalProfileModel
+        lateinit var snapshot: android.os.Bundle
+        instrumentation.runOnMainSync { first = model(null); first.ensureLoaded() }
+        awaitHistory(first)
+        try {
+            instrumentation.runOnMainSync {
+                first.startEdit()
+                first.openPanel(ClinicalProfileModel.PanelKind.SPLIT, ratio, SegmentRef(0, 1440))
+                first.setPanelText("06:00"); first.applyPanel()
+                first.setInput(ClinicalProfileModel.valueKey(ratio, SegmentRef(360, 1440)), "10")
+                first.openPanel(ClinicalProfileModel.PanelKind.MERGE, ratio, SegmentRef(0, 360))
+                snapshot = first.snapshot()
+                val sha = ProfileCodec.sha256(first.editor!!.content)
+                // Exact content, adjacent equal segments included, survives a round trip.
+                val again = model(snapshot)
+                assertEquals(sha, ProfileCodec.sha256(again.editor!!.content))
+                assertEquals(first.panel, again.panel)
+                assertTrue(again.editor!!.isModified(ratio, TimeSegment(0, 360, entered("10"))))
+                again.dispose()
+                // A panel naming an interval that no longer exists is closed visibly.
+                val stale = android.os.Bundle(snapshot).apply { putString("panelSegment", "0-300") }
+                val closed = model(stale)
+                assertNull(closed.panel)
+                assertEquals(ProfileFailure.STALE_SEGMENT, closed.editFailure)
+                assertNotNull(closed.editor)
+                closed.dispose()
+                // Undecodable content discards the editor with a visible reason.
+                val broken = android.os.Bundle(snapshot).apply { putString("content", "not a profile") }
+                val discarded = model(broken)
+                assertNull(discarded.editor)
+                assertEquals(ProfileFailure.INVALID_RECORD, discarded.recoveryFailure)
+                discarded.dispose()
+            }
+        } finally { instrumentation.runOnMainSync { first.dispose() } }
+    }
+
+    @Test fun conflictKeepsEverySegmentInTheEditor() {
+        seed(ProfileWrite(0, content(), ProfileOrigin.MANUAL, null))
+        launch().use { scenario ->
+            editLatest(scenario)
+            panelAction(scenario, "profile:split:${key(ratio, 0, 1440)}", "06:00")
+            seed(ProfileWrite(1, content(ratio = entered("15")), ProfileOrigin.MANUAL, null))
+            click(scenario, "profile:save")
+            awaitView(scenario, "profile:editor:status", s(R.string.profile_status_conflict, ProfileFailure.CONFLICT.code))
+            scenario.onActivity {
+                assertEquals("10", text(it, "profile:value:${key(ratio, 0, 360)}"))
+                assertEquals("10", text(it, "profile:value:${key(ratio, 360, 1440)}"))
+            }
+        }
+        assertEquals(listOf(1L, 2L), stored().map { it.version })
+        assertEquals(listOf(seg(0, 1440, entered("15"))), stored().last().content.schedule(ratio).segments)
+    }
+
+    @Test fun restoredMultiSegmentVersionIsEditableAndSplitThenMergeStaysExact() {
+        val multi = content().with(ratio, seg(0, 360, entered("8")), seg(360, 720, entered("8")), seg(720, 1440))
+            .with(target, seg(0, 600, entered("0")), seg(600, 1440, entered("110")))
+        val (v1) = seed(ProfileWrite(0, multi, ProfileOrigin.MANUAL, null), ProfileWrite(1, content(), ProfileOrigin.MANUAL, null))
+        launch().use { scenario ->
+            openProfile(scenario)
+            awaitView(scenario, "profile:history")
+            click(scenario, "profile:history")
+            awaitView(scenario, "profile:history:1:restore")
+            click(scenario, "profile:history:1:restore")
+            awaitView(scenario, "profile:restore:confirm")
+            click(scenario, "profile:restore:confirm")
+            awaitView(scenario, "profile:editor:origin", s(R.string.profile_editor_origin_restored, 1))
+            scenario.onActivity {
+                assertEquals("8", text(it, "profile:value:${key(ratio, 360, 720)}"))
+                assertEquals("", text(it, "profile:value:${key(ratio, 720, 1440)}"))
+                assertEquals("0", text(it, "profile:value:${key(target, 0, 600)}"))
+                assertTrue(isShown(it, "profile:merge:${key(ratio, 0, 360)}"))
+            }
+            panelAction(scenario, "profile:split:${key(ratio, 720, 1440)}", "20:00")
+            awaitView(scenario, "profile:editor:origin", s(R.string.profile_editor_origin_manual_from, 1))
+            panelAction(scenario, "profile:merge:${key(ratio, 720, 1200)}", null)
+            awaitView(scenario, "profile:editor:origin", s(R.string.profile_editor_origin_restored, 1))
+            click(scenario, "profile:save")
+            awaitView(scenario, "profile:current:origin", s(R.string.profile_origin_restored, 1))
+        }
+        val v3 = stored().last()
+        assertEquals(ProfileOrigin.RESTORED, v3.origin)
+        assertEquals(v1.contentSha256, v3.contentSha256)
+        assertEquals(multi, v3.content)
+    }
+
+    @Test fun splitLimitOnlyBlocksSplittingAndNeverForcesAReduction() {
+        val many = (0 until 60).map { seg(it * 24, (it + 1) * 24, entered("${it + 1}")) }
+        seed(ProfileWrite(0, content().with(ratio, *many.toTypedArray()), ProfileOrigin.MANUAL, null))
+        launch().use { scenario ->
+            editLatest(scenario)
+            scenario.onActivity {
+                assertNotNull(viewOrNull(it, "profile:segment_limit:carb_ratio"))
+                assertNull(viewOrNull(it, "profile:split:${key(ratio, 0, 24)}"))
+                // Every value is different: no merge is offered and none is required.
+                many.forEach { segment -> assertFalse(isShown(it, "profile:merge:${key(ratio, segment.startMinute, segment.endMinute)}")) }
+                assertNotNull(viewOrNull(it, "profile:split:${key(isf, 0, 1440)}"))
+                type(it, "profile:value:${key(ratio, 24, 48)}", "99")
+            }
+            panelAction(scenario, "profile:move_end:${key(ratio, 24, 48)}", "00:50")
+            awaitView(scenario, "profile:segment:${key(ratio, 24, 50)}")
+            click(scenario, "profile:save")
+            awaitView(scenario, "profile:saved", s(R.string.profile_saved, 2))
+        }
+        val saved = stored().last().content.schedule(ratio).segments
+        assertEquals(60, saved.size)
+        assertEquals(seg(24, 50, entered("99")), saved[1])
     }
 
     @Test fun bolusStaysBlockedAndDoesNotUseTheSavedProfile() {
@@ -491,6 +766,38 @@ class ClinicalProfileDeviceTest {
                 scenario.onActivity {
                     model.proposeRestore(1)
                     assertFits(it, model, "profile:restore:question")
+                }
+            }
+        } finally { instrumentation.runOnMainSync { model.dispose() } }
+    }
+
+    @Test fun segmentEditorFitsExpandedLayoutsWithEightSegmentsAtLargeFont() {
+        fun eight(value: (Int) -> ProfileValue) =
+            (0 until 8).map { seg(it * 180, (it + 1) * 180, value(it)) }.toTypedArray()
+        val multi = content().with(ratio, *eight { entered("${10 + it}") })
+            .with(isf, *eight { entered("40") }).with(target, *eight { if (it % 2 == 0) entered("0") else ProfileValue.NotConfigured })
+        seed(ProfileWrite(0, multi, ProfileOrigin.MANUAL, null))
+        val repository = SqliteClinicalProfileRepository(context, name)
+        lateinit var model: ClinicalProfileModel
+        instrumentation.runOnMainSync {
+            model = ClinicalProfileModel(ClinicalProfiles(repository, ProfileClock { 0 }, "test/layout", AndroidTimeZoneRules),
+                repository, null)
+            model.ensureLoaded()
+        }
+        try {
+            awaitHistory(model)
+            launch().use { scenario ->
+                scenario.onActivity {
+                    model.startEdit()
+                    model.openPanel(ClinicalProfileModel.PanelKind.MOVE_END, ratio, SegmentRef(180, 360))
+                    model.setPanelText("04:30")
+                    assertFits(it, model, "profile:panel:result")
+                    model.cancelPanel()
+                    model.openPanel(ClinicalProfileModel.PanelKind.MERGE, isf, SegmentRef(0, 180))
+                    assertFits(it, model, "profile:panel:apply")
+                    model.cancelPanel()
+                    model.setUnit(mmol)
+                    assertFits(it, model, "profile:unit_lock")
                 }
             }
         } finally { instrumentation.runOnMainSync { model.dispose() } }

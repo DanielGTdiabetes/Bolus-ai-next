@@ -15,9 +15,9 @@ class ProfileUnitTest {
             content().schedules))
         val noUnit = ProfileContent.empty()
         assertEquals(ProfileEdit.Rejected(ProfileFailure.UNIT_REQUIRED),
-            noUnit.withAllDayValue(ProfileParameter.GLUCOSE_TARGET, entered("110")))
+            noUnit.withDayValue(ProfileParameter.GLUCOSE_TARGET, entered("110")))
         // The carb ratio does not depend on the glucose unit.
-        assertIs<ProfileEdit.Changed>(noUnit.withAllDayValue(ProfileParameter.CARB_RATIO, entered("10")))
+        assertIs<ProfileEdit.Changed>(noUnit.withDayValue(ProfileParameter.CARB_RATIO, entered("10")))
     }
 
     @Test fun changingUnitClearsDependentValuesAndNeverConverts() {
@@ -40,7 +40,7 @@ class ProfileUnitTest {
         val editor = profiles.edit(profiles.loaded()).let { it.with(it.content.withGlucoseUnit(mmol)) }
         assertTrue(editor.glucoseDependentValuesLocked)
         // While locked, dependent values cannot be entered in the same version.
-        val typed = (editor.content.withAllDayValue(ProfileParameter.GLUCOSE_TARGET, entered("6.1")) as ProfileEdit.Changed).content
+        val typed = (editor.content.withDayValue(ProfileParameter.GLUCOSE_TARGET, entered("6.1")) as ProfileEdit.Changed).content
         assertEquals(ProfileSave.Failed(ProfileFailure.UNIT_CHANGE_WITH_VALUES), profiles.save(editor.with(typed)))
         assertEquals(listOf(v1), repository.versions)
         val v2 = profiles.saved(editor)
@@ -49,7 +49,7 @@ class ProfileUnitTest {
         // The next version starts from mmol/L and accepts values in that unit.
         val next = profiles.edit(profiles.loaded())
         assertFalse(next.glucoseDependentValuesLocked)
-        val v3 = profiles.saved(next.with((next.content.withAllDayValue(ProfileParameter.GLUCOSE_TARGET,
+        val v3 = profiles.saved(next.with((next.content.withDayValue(ProfileParameter.GLUCOSE_TARGET,
             entered("6.1")) as ProfileEdit.Changed).content))
         assertEquals(mmol, v3.content.glucoseUnit)
         val history = profiles.loaded()
@@ -72,12 +72,12 @@ class ProfileUnitTest {
 
     @Test fun declaringAUnitForTheFirstTimeReinterpretsNothing() {
         val v1 = profiles.saved(profiles.newProfile().let {
-            it.with((it.content.withAllDayValue(ProfileParameter.CARB_RATIO, entered("10")) as ProfileEdit.Changed).content)
+            it.with((it.content.withDayValue(ProfileParameter.CARB_RATIO, entered("10")) as ProfileEdit.Changed).content)
         })
         assertEquals(Setting.NotConfigured, v1.content.glucoseUnit)
         val editor = profiles.edit(profiles.loaded()).let { it.with(it.content.withGlucoseUnit(mmol)) }
         assertFalse(editor.glucoseDependentValuesLocked)
-        val v2 = profiles.saved(editor.with((editor.content.withAllDayValue(ProfileParameter.GLUCOSE_TARGET,
+        val v2 = profiles.saved(editor.with((editor.content.withDayValue(ProfileParameter.GLUCOSE_TARGET,
             entered("6.1")) as ProfileEdit.Changed).content))
         assertEquals(2, v2.version)
     }

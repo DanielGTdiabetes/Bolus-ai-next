@@ -382,7 +382,32 @@ concurrencia, idempotencia de guardado, SQLite, backup ni bloqueo de cálculo.
 - `scripts/verify.ps1 -DeviceTests` en el Pixel.
 - evidencia en `docs/validation/profile-segment-editor-<fecha>.md`.
 
-## 16. Condiciones para revisar este ADR
+## 16. Notas de implementación
+
+Precisiones de la entrega, sin cambiar decisiones:
+
+- Las operaciones viven en `shared/clinical-profile` (`ProfileSegments.kt`):
+  `SegmentOperation` (`Split`, `MergeWithNext`, `MoveBoundary`, `SetValue`),
+  `ProfileContent.edited`, `ProfileEditor.edited`, `ProfileEditor.isModified` y
+  `ProfileTimes`. `withAllDayValue` desaparece.
+- Código adicional `profile.edit.schedule_locked` para una operación estructural
+  sobre ISF u objetivo mientras hay un cambio de unidad sin guardar. Un valor
+  introducido en ese estado sigue devolviendo `profile.edit.unit_change_with_values`.
+- Sin unidad declarada, ISF y objetivo no aceptan valores pero sí dividir, mover
+  y unir franjas `Sin configurar`. La estructura no depende de la unidad.
+- Los paneles de dividir, mover límite y unir son en línea, bajo la franja, no
+  diálogos del sistema. Su estado vive en el modelo y se guarda con la actividad.
+  Unir también pide confirmación con vista previa.
+- Con un panel abierto «Guardar» queda deshabilitado, porque su texto aún no se
+  ha aplicado.
+- Un estado guardado que no decodifica se descarta con
+  `profile.storage.invalid_record` visible. Un texto pendiente cuya clave no
+  corresponde a una franja actual, o un panel sobre un intervalo que ya no
+  existe, se descarta con `profile.edit.stale_segment` visible. Una clave ausente
+  muestra el valor guardado, nunca «Sin configurar».
+- Evidencia: [validación 2026-09-28](../validation/profile-segment-editor-2026-09-28.md).
+
+## 17. Condiciones para revisar este ADR
 
 Resolución de franjas en cambios de hora, uso del perfil por el motor, límites
 clínicos, plantillas o copia entre parámetros, un segundo esquema de contenido,
