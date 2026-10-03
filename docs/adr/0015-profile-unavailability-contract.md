@@ -1,7 +1,12 @@
 # ADR 0015: evolución del contrato de indisponibilidad para el perfil
 
-- Estado: **propuesto**. No implementado. Pendiente de revisión y decisión del
-  propietario (sección 9).
+- Estado: **aceptado** para el diseño del contrato. **No implementado.**
+- Aprobación: el propietario aceptó el ADR el 2026-10-03, tras incorporar las
+  tres correcciones de su revisión (sección 12), con las decisiones D1 a D10
+  aprobadas según la recomendación de cada una (sección 9). La aceptación fija
+  el diseño del contrato v2. No autoriza implementarlo, conectar el perfil con
+  ningún consumidor ni ninguna aprobación clínica: cada una exige una petición
+  explícita del propietario. Cálculo y tratamiento siguen bloqueados.
 - Fecha: 2026-10-03.
 - Fase y criterio de aceptación: fase 6 (perfil) y contratos de la fase 2.
   Decide cómo comunicar con `input.profile.*` los estados E1 a E11 del
@@ -301,7 +306,7 @@ Precisiones:
 | E7 completa sin confirmar | solo política | `unconfirmed` + política | `unconfirmed` [`profile.confirmation.missing`] + política |
 | E8 anterior confirmada, última sin confirmar | como E6 o E7 | como E6 o E7 | la fila de E6 o E7 que corresponda, con `unconfirmed` [`profile.confirmation.missing`, `profile.confirmation.superseded`] |
 | E9 confirmación vigente | solo política | igual | solo política |
-| E10 confirmación retirada, completa | solo política | `revoked` (o `unconfirmed`) + política | `unconfirmed` [`profile.confirmation.revoked`] + política |
+| E10 confirmación retirada, completa | solo política | `revoked` (o `unconfirmed`) + política | `unconfirmed` [`profile.confirmation.revoked`] + política. Con confirmaciones superadas de versiones anteriores, `unconfirmed` [`profile.confirmation.revoked`, `profile.confirmation.superseded`] (6.1) |
 | E10 confirmación retirada, con faltas | política más las causas de completitud | `revoked` y las de completitud + política | las causas de completitud que se demuestren (`incomplete` [`profile.gate.incomplete`], `invalid` [`profile.gate.time_zone_unrecognized`] o ambas) + `unconfirmed` [`profile.confirmation.revoked`] + política. Con superadas, también [`profile.confirmation.superseded`] |
 | E11 confirmada, zona no reconocida | `invalid` + política | igual | `invalid` [`profile.gate.time_zone_unrecognized`] + política. Sin `unconfirmed`: la confirmación sigue vigente |
 
@@ -376,6 +381,9 @@ Android y arquitectura:
 
 ## 9. Decisiones del propietario
 
+Estado: D1 a D10 **aprobadas** el 2026-10-03 con la recomendación de cada una.
+La columna «Si no se decide» se conserva como justificación histórica.
+
 | Id | Pregunta | Recomendación | Si no se decide |
 |---|---|---|---|
 | D1 | ¿B o C? | C (sección 5) | sigue la opción A provisional. Ninguna aprobación clínica puede retirar `policy_not_approved` |
@@ -424,3 +432,9 @@ confirmación están demostradas.
 | 1 | La matriz perdía causas de completitud: zona no reconocida sin confirmación vigente, y faltas y zona a la vez. Ahora las causas se componen por dimensión, `incomplete` e `invalid` se conservan juntas con sus detalles, junto a `unconfirmed` y la política, y E10 precisa la acumulación | 6.1, 6.2, 8 | D5 |
 | 2 | Faltaba la tabla de admisibilidad. Ahora enumera las 53 combinaciones: los 13 motivos v1 para las cuatro entradas, sin restricción nueva, y `unconfirmed` solo para `profile`. La elevación v1 → v2 es total sobre las 52 combinaciones de v1 | C.1, 5, 8 | D4 |
 | 3 | Garantías de construcción: gramática y límites del detalle, identificadores estables de rechazo, copias defensivas en causa e informe y `@Throws` hacia Swift (o un resultado explícito), con sus pruebas previstas e iOS sin verificar | C.2, 5, 8 | D9, D10 |
+
+Aceptación: tras esta revisión (commit `220e138`, CI en verde) el propietario
+aceptó el ADR el 2026-10-03 con D1 a D10 según su recomendación. Antes de
+cerrar pidió explicitar en la fila «E10 confirmación retirada, completa» el
+detalle `profile.confirmation.superseded` cuando corresponda, como ya fijaba
+6.1. La aceptación no autoriza la implementación ni ninguna aprobación clínica.

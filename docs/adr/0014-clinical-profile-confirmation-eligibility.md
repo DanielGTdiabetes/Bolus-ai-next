@@ -18,9 +18,11 @@
   en verde), tras la revisión del propietario y una corrección. Véase la
   [validación](../validation/profile-confirmation-ui-2026-10-03.md). El ADR
   queda implementado para confirmación de datos. Cálculo y tratamiento siguen
-  bloqueados en todos los estados, y las decisiones clínicas pendientes (opción
-  B o C de la sección 6.3, P4 y P6 del ADR 0012, límites, vigencia, DIA e IOB)
-  siguen abiertas.
+  bloqueados en todos los estados, y las decisiones clínicas pendientes (P4 y
+  P6 del ADR 0012, límites, vigencia, DIA e IOB) siguen abiertas. La elección
+  entre las opciones B y C de la sección 6.3 quedó resuelta en el diseño por el
+  [ADR 0015](0015-profile-unavailability-contract.md) (opción C, aceptado el
+  2026-10-03, sin implementar).
 - Fase y criterio de aceptación: fase 6, trabajo 1 y 2 («confirmación de perfil»
   y «validar completitud, solapamientos, huecos, zona horaria, vigencia y límites
   aprobados»). Este ADR define qué significa confirmar los datos de una versión

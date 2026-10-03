@@ -133,27 +133,28 @@ docs/validation/profile-confirmation-ui-2026-10-03.md:
 Ni Bolo, `ReadOverview` ni el motor leen el perfil. `input.profile.*` no se
 implementa ni se conecta. Sin cambios de esquema, serialización ni huellas.
 
-ADR 0015 — CONTRATO DE INDISPONIBILIDAD DEL PERFIL (propuesto, en revisión)
+ADR 0015 — CONTRATO DE INDISPONIBILIDAD DEL PERFIL (aceptado, sin implementar)
 docs/adr/0015-profile-unavailability-contract.md compara las opciones B y C
 del ADR 0014 §6.3 con la evidencia de contratos, consumidores y pruebas
 actuales, define las correspondencias E1 a E11 y recomienda C (contrato v2
 aditivo con detalle de dominio, `unconfirmed` solo para `profile`, v1
 congelado, garantías de construcción y `@Throws` hacia Swift). Incorpora la
-primera revisión del propietario (sección 12). Decisiones D1 a D10 pendientes
-del propietario. Publicado como PR en
-borrador, sin implementar ni integrar.
+revisión del propietario (sección 12). Aceptado el 2026-10-03 para el diseño
+del contrato, con D1 a D10 aprobadas según su recomendación, e integrado como
+documentación mediante la PR #35. **Sin implementar**: no hay tipos v2,
+adaptador, módulo nuevo ni cambio de `ReadOverview` (D7) en el código. La
+aceptación no autoriza implementarlo ni ninguna aprobación clínica.
 
 SIGUIENTE PASO
-El ADR 0014 está implementado e integrado. El ADR 0015 espera revisión. No hay
-ningún incremento autorizado: no implementes el ADR 0015 ni empieces otro
-incremento sin una petición explícita del propietario que fije su alcance.
-Siguen abiertas como decisiones del propietario, y cualquier avance clínico
-necesita antes su ADR: límites clínicos, vigencia (sin política aprobada),
-resolución de franjas en cambios de hora (P4 del ADR 0012),
-exportación/importación de copias (P6 del ADR 0012), DIA, IOB y la evolución de
-`input.profile.*` (ADR 0015, opción B o C de la sección 6.3 del ADR 0014), que
-debe resolverse antes de cualquier aprobación clínica. Cálculo y tratamiento
-siguen bloqueados.
+El ADR 0014 está implementado e integrado. El ADR 0015 está aceptado y sin
+implementar. No hay ningún incremento autorizado: no implementes el ADR 0015 ni
+empieces otro incremento sin una petición explícita del propietario que fije su
+alcance. Conectar el perfil con Bolo, `ReadOverview` o el motor exige además su
+propio ADR. Siguen abiertas como decisiones del propietario, y cualquier avance
+clínico necesita antes su ADR: límites clínicos, vigencia (sin política
+aprobada), resolución de franjas en cambios de hora (P4 del ADR 0012),
+exportación/importación de copias (P6 del ADR 0012), DIA e IOB. Cálculo y
+tratamiento siguen bloqueados.
 
 TRABAJO
 1. Lee AGENTS.md, README, arquitectura, plan y ADRs relacionados. Actualiza origin,
