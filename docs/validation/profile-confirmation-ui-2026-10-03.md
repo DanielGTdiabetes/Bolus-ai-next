@@ -7,7 +7,8 @@ evento `push`). Implementa la **segunda parte** del
 [ADR 0014](../adr/0014-clinical-profile-confirmation-eligibility.md): estados,
 revisión de solo lectura, confirmación, retirada, historial de confirmaciones,
 recreación con operación pendiente y el texto de Bolo. Rama
-`claude/profile-confirmation-ui`. Legacy no se consulta ni se modifica.
+`claude/profile-confirmation-ui`, integrada en `main` mediante la PR #33 (véase
+«Integración»). Legacy no se consulta ni se modifica.
 
 ## Qué existe tras esta entrega
 
@@ -168,6 +169,30 @@ Pixel 10 Pro Fold (API 37, `KEYCODE_WAKEUP` cada 10 s, sin cambios de ajustes ni
 red) con `OK (115 tests)` en 102,7 s (98 anteriores y 17 de
 `ClinicalProfileConfirmationUiDeviceTest`), paquetes de prueba desinstalados y
 `git diff --check` limpio.
+
+## Integración
+
+PR #33, integrada en `main` mediante merge commit por el flujo normal, sin
+saltar protecciones ni cambiar configuraciones de GitHub. Antes de integrar se
+comprobó que la cabeza seguía siendo
+`db079a048ba6938d17bc50a99b8020aa48818958` (la corrección de revisión) y que sus
+checks estaban en verde: Windows verification
+([Verify 37130882595](https://github.com/DanielGTdiabetes/Bolus-ai-next/actions/runs/37130882595))
+y GitGuardian. La primera cabeza revisada, `2d88506`, también pasó Verify
+([37129161638](https://github.com/DanielGTdiabetes/Bolus-ai-next/actions/runs/37129161638)).
+`main` no tiene protección de rama ni reglas, así que no hay checks marcados
+como requeridos.
+
+- Merge commit: `89404989e451a3cc1899df309caedc759bdfdc44`, con padres
+  `7b2b1d2` y `db079a0`.
+- CI del SHA exacto de `main` tras integrar:
+  [Verify 37131464837](https://github.com/DanielGTdiabetes/Bolus-ai-next/actions/runs/37131464837),
+  evento `push`, conclusión `success`.
+- `git merge-base --is-ancestor db079a0… origin/main`: correcto (código 0).
+
+Integrar no cambia el alcance: confirmar datos sigue sin aprobar uso clínico,
+cálculo y tratamiento siguen bloqueados y las decisiones clínicas pendientes
+siguen abiertas.
 
 ## Riesgos y pendientes
 

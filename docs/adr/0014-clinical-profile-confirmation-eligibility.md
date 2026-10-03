@@ -12,9 +12,15 @@
   pruebas) integrada en `main` mediante la PR #32 tras revisión y CI en verde.
   Véase la [validación](../validation/profile-confirmation-domain-2026-10-03.md).
   Parte 2 (UI de revisión, confirmación y revocación, historial y texto de
-  Bolo) implementada en la rama `claude/profile-confirmation-ui` desde
-  `7b2b1d2` y publicada como PR para revisión del propietario, sin integrar.
-  Véase la [validación](../validation/profile-confirmation-ui-2026-10-03.md).
+  Bolo) integrada en `main` mediante la PR #33 (merge commit
+  `89404989e451a3cc1899df309caedc759bdfdc44`, Verify
+  [37131464837](https://github.com/DanielGTdiabetes/Bolus-ai-next/actions/runs/37131464837)
+  en verde), tras la revisión del propietario y una corrección. Véase la
+  [validación](../validation/profile-confirmation-ui-2026-10-03.md). El ADR
+  queda implementado para confirmación de datos. Cálculo y tratamiento siguen
+  bloqueados en todos los estados, y las decisiones clínicas pendientes (opción
+  B o C de la sección 6.3, P4 y P6 del ADR 0012, límites, vigencia, DIA e IOB)
+  siguen abiertas.
 - Fase y criterio de aceptación: fase 6, trabajo 1 y 2 («confirmación de perfil»
   y «validar completitud, solapamientos, huecos, zona horaria, vigencia y límites
   aprobados»). Este ADR define qué significa confirmar los datos de una versión

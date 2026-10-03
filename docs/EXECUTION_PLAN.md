@@ -552,7 +552,8 @@ confirmar y retirar como acciones separadas con `operation_id` conservado en
 reintentos y recreación, resolución de operaciones pendientes por identidad,
 historial de confirmaciones, retiradas y superadas, y Bolo con «Perfil · no se
 usa para calcular» sin leer el perfil. Cálculo y tratamiento siguen bloqueados.
-Véase la [validación](validation/profile-confirmation-ui-2026-10-03.md).
+Integrada mediante la PR #33 (merge commit `8940498`, Verify 37131464837 en
+verde). Véase la [validación](validation/profile-confirmation-ui-2026-10-03.md).
 
 ### Secuencia de capacidades
 
