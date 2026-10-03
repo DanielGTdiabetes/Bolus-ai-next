@@ -14,7 +14,11 @@ import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 
-/** ADR 0012. Synthetic, isolated database files only; the app's clinical-profile.db is never opened. */
+/**
+ * ADR 0012, kept valid on schema v2 (ADR 0014). Synthetic, isolated database files only; the app's clinical-profile.db
+ * is never opened. Tampering drops a trigger and recreates it with its exact frozen definition, so the file keeps the
+ * approved schema and the row-level validation is what fails; an altered definition is covered separately.
+ */
 @RunWith(AndroidJUnit4::class)
 class SqliteClinicalProfileRepositoryDeviceTest {
     private val context = InstrumentationRegistry.getInstrumentation().targetContext
@@ -46,6 +50,15 @@ class SqliteClinicalProfileRepositoryDeviceTest {
 
     private fun raw(name: String, run: (SQLiteDatabase) -> Unit) =
         SQLiteDatabase.openDatabase(context.getDatabasePath(name).path, null, SQLiteDatabase.OPEN_READWRITE).use(run)
+
+    /** Drops [triggers], applies [change] and recreates them with the exact frozen v2 text. */
+    private fun SQLiteDatabase.withoutTriggers(vararg triggers: String, change: (SQLiteDatabase) -> Unit) {
+        triggers.forEach { execSQL("DROP TRIGGER $it") }
+        change(this)
+        triggers.forEach { trigger ->
+            execSQL(ClinicalProfileSchema.SCHEMA_V2.single { it.startsWith("CREATE TRIGGER $trigger ") })
+        }
+    }
 
     private fun dump(name: String): List<String> {
         val rows = mutableListOf<String>()
@@ -162,8 +175,9 @@ class SqliteClinicalProfileRepositoryDeviceTest {
         }
         // A row written by a connection without foreign keys (dangling source, no segments) fails closed on read.
         raw(name) { db ->
-            db.execSQL("DROP TRIGGER profile_segments_latest_only")
-            db.execSQL("INSERT INTO profile_versions VALUES (9, 1, 'mg/dL', 'Europe/Madrid', '$sha', 'manual', 7, 1, 'w')")
+            db.withoutTriggers("profile_segments_latest_only") {
+                it.execSQL("INSERT INTO profile_versions VALUES (9, 1, 'mg/dL', 'Europe/Madrid', '$sha', 'manual', 7, 1, 'w')")
+            }
         }
         SqliteClinicalProfileRepository(context, name).use {
             assertEquals(ProfileRead.Failed(ProfileFailure.INVALID_RECORD), it.readVersions())
@@ -255,10 +269,9 @@ class SqliteClinicalProfileRepositoryDeviceTest {
         fun forged(setup: (SQLiteDatabase) -> Unit, expected: ProfileFailure) = withDatabase { name ->
             SqliteClinicalProfileRepository(context, name).use { it.saved(write(0, content())) }
             raw(name) { db ->
-                listOf("profile_versions_immutable_update", "profile_versions_immutable_delete",
-                    "profile_segments_immutable_update", "profile_segments_immutable_delete", "profile_segments_latest_only")
-                    .forEach { db.execSQL("DROP TRIGGER $it") }
-                setup(db)
+                db.withoutTriggers("profile_versions_immutable_update", "profile_versions_immutable_delete",
+                    "profile_segments_immutable_update", "profile_segments_immutable_delete", "profile_segments_latest_only",
+                    change = setup)
             }
             SqliteClinicalProfileRepository(context, name).use {
                 assertEquals(ProfileRead.Failed(expected), it.readVersions())
@@ -307,10 +320,8 @@ class SqliteClinicalProfileRepositoryDeviceTest {
                 it.saved(write(0, content())); it.saved(write(1, content(ratio = entered("11"))))
             }
             raw(name) { db ->
-                listOf("profile_versions_immutable_update", "profile_versions_immutable_delete",
-                    "profile_segments_immutable_update", "profile_segments_immutable_delete")
-                    .forEach { db.execSQL("DROP TRIGGER $it") }
-                setup(db)
+                db.withoutTriggers("profile_versions_immutable_update", "profile_versions_immutable_delete",
+                    "profile_segments_immutable_update", "profile_segments_immutable_delete", change = setup)
             }
             val before = dump(name)
             SqliteClinicalProfileRepository(context, name).use {
@@ -333,10 +344,10 @@ class SqliteClinicalProfileRepositoryDeviceTest {
             it.saved(write(0, content())); it.saved(write(1, content(ratio = entered("11"))))
         }
         raw(name) { db ->
-            db.execSQL("DROP TRIGGER profile_versions_immutable_delete")
-            db.execSQL("DROP TRIGGER profile_segments_immutable_delete")
-            db.execSQL("DELETE FROM profile_segments WHERE version = 1")
-            db.execSQL("DELETE FROM profile_versions WHERE version = 1")
+            db.withoutTriggers("profile_versions_immutable_delete", "profile_segments_immutable_delete") {
+                it.execSQL("DELETE FROM profile_segments WHERE version = 1")
+                it.execSQL("DELETE FROM profile_versions WHERE version = 1")
+            }
         }
         SqliteClinicalProfileRepository(context, name).use {
             val history = ClinicalProfiles(it, ProfileClock { 0 }, "w", AndroidTimeZoneRules).read()
@@ -364,11 +375,11 @@ class SqliteClinicalProfileRepositoryDeviceTest {
         }
         withDatabase { name ->
             SqliteClinicalProfileRepository(context, name).use { it.saved(write(0, content())) }
-            raw(name) { it.version = 2 }
+            raw(name) { it.version = 3 }
             SqliteClinicalProfileRepository(context, name).use {
                 assertEquals(ProfileRead.Failed(ProfileFailure.UNSUPPORTED_SCHEMA), it.readVersions())
             }
-            raw(name) { assertEquals(2, it.version) }
+            raw(name) { assertEquals(3, it.version) }
         }
     }
 
@@ -397,8 +408,9 @@ class SqliteClinicalProfileRepositoryDeviceTest {
             }
             // A tampered backup copy fails closed instead of being repaired.
             raw(backup) { db ->
-                db.execSQL("DROP TRIGGER profile_segments_immutable_update")
-                db.execSQL("UPDATE profile_segments SET value = '9' WHERE version = 2 AND parameter = 'carb_ratio'")
+                db.withoutTriggers("profile_segments_immutable_update") {
+                    it.execSQL("UPDATE profile_segments SET value = '9' WHERE version = 2 AND parameter = 'carb_ratio'")
+                }
             }
             SqliteClinicalProfileRepository(context, backup).use {
                 assertEquals(ProfileRead.Failed(ProfileFailure.INVALID_RECORD), it.readVersions())

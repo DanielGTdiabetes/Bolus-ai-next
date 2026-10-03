@@ -28,4 +28,11 @@ enum class ProfileFailure(val code: String) {
     INVALID_TIME("profile.edit.invalid_time"),
     SEGMENT_LIMIT_REACHED("profile.edit.segment_limit_reached"),
     SCHEDULE_LOCKED("profile.edit.schedule_locked"),
+    /** Operation errors of data confirmation (ADR 0014, section 7.1). Returned to the caller; never an input state. */
+    CONFIRMATION_OPERATION_MISMATCH("profile.confirmation.operation_mismatch"),
+    CONFIRMATION_STATE_CHANGED("profile.confirmation.state_changed"),
+    CONFIRMATION_STALE_VERSION("profile.confirmation.stale_version"),
+    CONFIRMATION_INCOMPLETE("profile.confirmation.incomplete"),
+    CONFIRMATION_ALREADY_ACTIVE("profile.confirmation.already_active"),
+    CONFIRMATION_NOT_ACTIVE("profile.confirmation.not_active"),
 }

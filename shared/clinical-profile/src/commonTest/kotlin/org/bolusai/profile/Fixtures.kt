@@ -19,18 +19,35 @@ internal fun content(
     ParameterSchedule.allDay(ProfileParameter.GLUCOSE_TARGET, target),
 ))
 
-/** Mirrors the SQLite adapter: the shared policy decides, this fake only appends. */
+/** Mirrors the SQLite adapter: the shared policies decide after validating everything, this fake only appends. */
 internal class MemoryProfileRepository : ClinicalProfileRepository {
     val versions = mutableListOf<ProfileVersion>()
+    val events = mutableListOf<ConfirmationEvent>()
     var reads = 0
     var writes = 0
     var failNextSave = false
+    /** The next confirmation insert fails before commit: nothing is kept. */
+    var failNextCommit = false
+    /** The next confirmation insert commits but the caller never receives the answer. */
+    var loseNextResponse = false
 
-    override fun readVersions(): ProfileRead { reads++; return ProfileRead.Loaded(versions.toList()) }
+    private fun record(): ProfileRecordRead = ProfileRecord.validate(versions.toList(), events.toList())
+
+    override fun readVersions(): ProfileRead {
+        reads++
+        val record = record()
+        // Like the adapter: events that cannot be proven fail the read; version chains are judged by the use case.
+        return if (events.isNotEmpty() && record is ProfileRecordRead.Failed) ProfileRead.Failed(record.reason)
+        else ProfileRead.Loaded(versions.toList())
+    }
+
+    override fun readRecord(): ProfileRecordRead { reads++; return record() }
 
     override fun save(write: ProfileWrite, createdAtEpochMs: Long, writer: String): ProfileSave {
         writes++
         if (failNextSave) { failNextSave = false; return ProfileSave.Failed(ProfileFailure.SAVE_FAILED) }
+        // Never append to a history whose versions or events cannot be proven (ADR 0014, section 7.5).
+        (record() as? ProfileRecordRead.Failed)?.let { return ProfileSave.Failed(it.reason) }
         val latest = versions.maxByOrNull { it.version }
         val decision = ProfileWritePolicy.evaluate(write, createdAtEpochMs, writer, latest,
             versions.firstOrNull { it.version == write.baseVersion + 1 },
@@ -41,6 +58,39 @@ internal class MemoryProfileRepository : ClinicalProfileRepository {
             is ProfileWriteDecision.Reject -> ProfileSave.Failed(decision.reason)
         }
     }
+
+    override fun appendConfirmation(request: ConfirmationRequest, recordedAtEpochMs: Long, writer: String,
+                                    zones: TimeZoneRules): ConfirmationWrite {
+        writes++
+        val record = when (val read = record()) {
+            is ProfileRecordRead.Failed -> return ConfirmationWrite.Failed(read.reason)
+            is ProfileRecordRead.Loaded -> read.record
+        }
+        return when (val decision = ConfirmationPolicy.evaluate(request, recordedAtEpochMs, writer, record, zones)) {
+            is ConfirmationDecision.Reject -> ConfirmationWrite.Failed(decision.reason)
+            is ConfirmationDecision.Replay -> ConfirmationWrite.Recorded(decision.event, true, record)
+            is ConfirmationDecision.Insert -> {
+                if (failNextCommit) { failNextCommit = false; return ConfirmationWrite.Failed(ProfileFailure.SAVE_FAILED) }
+                events.add(decision.event)
+                val committed = (record() as ProfileRecordRead.Loaded).record
+                if (loseNextResponse) { loseNextResponse = false; return ConfirmationWrite.Failed(ProfileFailure.SAVE_FAILED) }
+                ConfirmationWrite.Recorded(decision.event, false, committed)
+            }
+        }
+    }
+}
+
+/** Synthetic operation identities; real ones come from the platform's random UUIDs. */
+internal fun operationId(n: Int) = OperationId("00000000-0000-4000-8000-" + n.toString().padStart(12, '0'))
+
+internal class SequentialOperationIds(private var next: Int = 1) : OperationIds {
+    override fun next(): OperationId = operationId(next++)
+}
+
+/** Platform zone rules that can retire an identifier, as a tz database update might (ADR 0014, E11). */
+internal class MutableZones(vararg ids: String) : TimeZoneRules {
+    val known = ids.toMutableSet()
+    override fun exists(id: String): Boolean = id in known
 }
 
 internal class FixedClock(var now: Long = 1_790_000_000_000) : ProfileClock {

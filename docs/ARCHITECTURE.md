@@ -93,6 +93,15 @@ versiones append-only protegidas por triggers. Cada versión lleva su unidad de
 glucosa junto a sus valores. Ni el motor ni `ReadOverview` dependen del módulo, y
 `verify.ps1` lo comprueba. Véase el [ADR 0012](adr/0012-local-clinical-profile.md).
 
+La confirmación de datos (ADR 0014) vive en el mismo módulo: completitud
+estructural, eventos `confirm`/`revoke` append-only fuera de la huella,
+validación conjunta de versiones y eventos (`ProfileRecord`), política común y
+estado en cuatro dimensiones con elegibilidad clínica siempre bloqueada. El
+adaptador Android usa `clinical-profile.db` v2, verifica el esquema por
+definición al abrir y al migrar desde v1, y evalúa la política en una
+transacción exclusiva. Véase el
+[ADR 0014](adr/0014-clinical-profile-confirmation-eligibility.md).
+
 ## Conectividad
 
 Sin Internet deben seguir disponibles las funciones que solo requieren datos locales válidos.
