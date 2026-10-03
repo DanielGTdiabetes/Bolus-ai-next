@@ -18,7 +18,7 @@ import java.util.UUID
  * definition when the file is opened and migrated; every read re-derives fingerprints and fails closed.
  */
 internal class SqliteClinicalProfileRepository(context: Context, name: String? = DATABASE_NAME) :
-    ClinicalProfileRepository, Closeable {
+    ClosableProfileRepository {
     private class CorruptStorage : RuntimeException()
 
     private val helper = object : SQLiteOpenHelper(context.applicationContext, name, null, SCHEMA_VERSION,
@@ -158,6 +158,9 @@ internal class SqliteClinicalProfileRepository(context: Context, name: String? =
         const val SCHEMA_VERSION = ClinicalProfileSchema.V2
     }
 }
+
+/** The profile port plus the lifecycle the screen owns; lets tests wrap the SQLite adapter without another store. */
+internal interface ClosableProfileRepository : ClinicalProfileRepository, Closeable
 
 /** Time zone existence from the device tz database; region identifiers only, no fixed offsets. */
 internal object AndroidTimeZoneRules : TimeZoneRules {

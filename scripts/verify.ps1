@@ -77,6 +77,11 @@ try {
     if (Select-String -LiteralPath $overviewSource -Pattern 'org\.bolusai\.profile|ClinicalProfile' -Quiet) {
         throw "The Bolo overview must keep reporting the profile as unavailable (ADR 0012)"
     }
+    # ADR 0014: Bolo renders a fixed profile line and never reads the profile or its confirmations.
+    $rendererSource = Join-Path $repositoryRoot "android\app\src\main\java\org\bolusai\next\ui\ScreenRenderer.kt"
+    if (Select-String -LiteralPath $rendererSource -Pattern 'org\.bolusai\.profile|ClinicalProfile|ProfileGate|Confirmation' -Quiet) {
+        throw "Bolo must not read the clinical profile or its confirmations (ADR 0014)"
+    }
 
     $workflowDirectory = Join-Path $repositoryRoot ".github\workflows"
     $canonicalWorkflow = Join-Path $workflowDirectory "verify.yml"
@@ -180,7 +185,7 @@ jobs:
             }
             # Direct instrumentation avoids collecting unrelated device logcat or clinical data.
             $instrumentation = @(adb shell am instrument -w -r `
-                -e class org.bolusai.next.glucose.dexcom.AndroidDexcomSenderEvidenceTest,org.bolusai.next.NavigationDeviceTest,org.bolusai.next.MealDraftDeviceTest,org.bolusai.next.MealHistoryDeviceTest,org.bolusai.next.MealRestoreDeviceTest,org.bolusai.next.meals.SqliteMealRepositoryDeviceTest,org.bolusai.next.DarkThemeDeviceTest,org.bolusai.next.profile.SqliteClinicalProfileRepositoryDeviceTest,org.bolusai.next.profile.ClinicalProfileConfirmationDeviceTest,org.bolusai.next.ClinicalProfileDeviceTest `
+                -e class org.bolusai.next.glucose.dexcom.AndroidDexcomSenderEvidenceTest,org.bolusai.next.NavigationDeviceTest,org.bolusai.next.MealDraftDeviceTest,org.bolusai.next.MealHistoryDeviceTest,org.bolusai.next.MealRestoreDeviceTest,org.bolusai.next.meals.SqliteMealRepositoryDeviceTest,org.bolusai.next.DarkThemeDeviceTest,org.bolusai.next.profile.SqliteClinicalProfileRepositoryDeviceTest,org.bolusai.next.profile.ClinicalProfileConfirmationDeviceTest,org.bolusai.next.ClinicalProfileDeviceTest,org.bolusai.next.ClinicalProfileConfirmationUiDeviceTest `
                 org.bolusai.next.test/androidx.test.runner.AndroidJUnitRunner)
             $instrumentationExit = $LASTEXITCODE
             $instrumentation | Write-Output

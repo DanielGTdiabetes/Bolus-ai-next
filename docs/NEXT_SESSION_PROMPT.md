@@ -41,18 +41,19 @@ sobreviven a la recreación. Sin cambios de esquema.
 Consulta docs/adr/0012-local-clinical-profile.md,
 docs/adr/0013-clinical-profile-segment-editor.md,
 docs/adr/0014-clinical-profile-confirmation-eligibility.md,
-docs/validation/profile-segment-editor-2026-09-28.md y
-docs/validation/profile-confirmation-domain-2026-10-03.md.
+docs/validation/profile-segment-editor-2026-09-28.md,
+docs/validation/profile-confirmation-domain-2026-10-03.md y
+docs/validation/profile-confirmation-ui-2026-10-03.md.
 Comprueba el CI del SHA exacto integrado antes de empezar.
 Esta entrega no consultó ni modificó Legacy. Su última auditoría documentada
 continúa fijada en f5417721d8019a9831126f4d843edfc4de87653d; no afirmes que ese
 SHA sigue siendo el main remoto sin comprobarlo si necesitas nueva evidencia.
 
 LÍMITES
-El perfil es captura. La confirmación de datos existe en dominio y base local
-(parte 1 del ADR 0014), pero no en pantalla, y no aprueba uso clínico: no
-alimenta motor, Bolo, IOB ni recomendación, y Bolo sigue mostrando
-«Perfil · sin versión confirmada» hasta la parte 2. No hay
+El perfil es captura. La confirmación de datos existe en dominio, base local
+(parte 1 del ADR 0014) y, en la rama de la parte 2, en pantalla. No aprueba uso
+clínico: no alimenta motor, Bolo, IOB ni recomendación. Bolo muestra
+«Perfil · no se usa para calcular» sin leer el perfil (parte 2). No hay
 límites clínicos, DIA, curva, redondeo, conversión de unidades, propuestas del
 sistema, aprendizaje, exportación/importación, sync ni perfiles alternativos. La
 resolución de franjas en cambios de hora queda para el ADR del motor. Los macros
@@ -64,11 +65,16 @@ durante toda la ejecución. Enviar `adb shell input keyevent KEYCODE_WAKEUP` cad
 10 s mientras corre verify.ps1 lo evita sin cambiar ajustes. Toda clase nueva de
 instrumentación debe añadirse a la lista `-e class` de scripts/verify.ps1.
 Toda prueba que abra Ajustes → Cálculo debe inyectar
-`MainActivity.profileRepositoryFactory` en memoria o sobre un fichero sintético.
+`MainActivity.profileRepositoryFactory` en memoria o sobre un fichero sintético
+(la fábrica devuelve `ClosableProfileRepository`; `ControlledProfileRepository`
+de androidTest falla lecturas o escrituras y retiene escrituras).
+`profileTimeZoneRules` y `profileOperationIds` permiten zonas retiradas y
+operaciones contadas en pruebas. Una base con un trigger sintético añadido no
+supera la verificación de esquema al abrirse de nuevo: cuenta filas en crudo.
 En Windows, los XML de recursos están en CRLF en la copia de trabajo: al editarlos
 con scripts conserva los finales de línea o `git diff --check` fallará.
 
-ADR 0014 — CONFIRMACIÓN DE DATOS DEL PERFIL (parte 1 integrada, parte 2 sin empezar)
+ADR 0014 — CONFIRMACIÓN DE DATOS DEL PERFIL (parte 1 integrada, parte 2 en revisión)
 ADR 0014 (docs/adr/0014-clinical-profile-confirmation-eligibility.md), aceptado
 el 2026-10-03 con C1 a C9 según su recomendación (C7 como solución
 provisional). Confirmar datos es revisar una versión guardada identificada por
@@ -97,25 +103,32 @@ docs/validation/profile-confirmation-domain-2026-10-03.md:
   `ClinicalProfileConfirmationDeviceTest` en `verify.ps1`. Las pruebas que
   manipulan filas recrean el trigger con su texto exacto. Si no, la apertura
   falla con `unsupported_schema`.
-La UI no cambia: no hay botones de confirmar ni retirar, Bolo sigue con
-«Perfil · sin versión confirmada» y ni Bolo, `ReadOverview` ni el motor leen el
-perfil. `input.profile.*` no se implementa ni se conecta.
+Parte 2 implementada en la rama `claude/profile-confirmation-ui` desde
+`7b2b1d2` y publicada como PR para revisión, **sin integrar**. Véase
+docs/validation/profile-confirmation-ui-2026-10-03.md:
+- `ClinicalProfileModel` lee con `readState()` y presenta `ProfileGateState`
+  (E1 a E11). Revisión de solo lectura desde una lectura nueva, ligada a
+  versión, huella y último evento, con todas las franjas y los `0` destacados.
+  Bloqueada con cambios, textos pendientes, panel abierto o cambio de unidad.
+  Confirmar y retirar separados, `operation_id` una vez por intención con
+  `OperationIds`, petición completa en el estado guardado, recreación con
+  `resolvePending`, `replayed` nunca como reconfirmación, historial con
+  confirmadas, retiradas y superadas. Bolo: «Perfil · no se usa para calcular».
+- Pruebas: `ClinicalProfileConfirmationUiDeviceTest` (15) en `verify.ps1`.
+  `verify.ps1` comprueba también que `ScreenRenderer` no referencia el perfil.
+Ni Bolo, `ReadOverview` ni el motor leen el perfil. `input.profile.*` no se
+implementa ni se conecta. Sin cambios de esquema, serialización ni huellas.
 
-SIGUIENTE INCREMENTO PROPUESTO (solo con petición explícita del propietario)
-Solo con autorización explícita del propietario, la parte 2 del ADR 0014:
-vista de solo lectura de la última versión con «Revisar y confirmar los datos
-de la versión N…» construida desde una lectura nueva, nunca dentro del
-editor ni con cambios, textos pendientes, panel abierto o cambio de unidad
-pendiente. Confirmar y retirar con `AndroidOperationIds`, con `operation_id` y
-carga útil conservados en el estado guardado y resueltos por identidad al
-recrear (`ClinicalProfiles.resolvePending`). Textos de la sección 9, siempre con
-«Cálculo todavía bloqueado», historial con confirmaciones, retiradas y
-superadas, y Bolo con «Perfil · no se usa para calcular» sin leer el perfil.
-Pruebas de UI de la sección 10: doble toque, rotación, commit antes de recrear,
-E5 a E11, layouts 840×900, 900×840 y 411×914 dp, texto 1,0× y 1,8×, claro y
-oscuro. Límites clínicos, DIA, IOB, resolución de franjas en cambios de hora,
-`input.profile.*` y la opción B o C de la sección 6.3 siguen siendo decisiones
-del propietario.
+SIGUIENTE PASO
+1. Revisión del propietario de la PR de la parte 2. Si pide cambios, aplicarlos
+   en la misma rama y revalidar (`verify.ps1`, `-DeviceTests`, CI del SHA).
+2. Solo con autorización, integrar por el flujo normal, comprobar el CI del SHA
+   integrado, la ancestralidad en origin/main y registrar la integración en el
+   ADR, la validación y este prompt.
+No empieces otro incremento sin autorización explícita. Siguen siendo
+decisiones del propietario: límites clínicos, vigencia (P4), DIA, IOB,
+resolución de franjas en cambios de hora, `input.profile.*` y la opción B o C
+de la sección 6.3, que debe elegirse antes de cualquier aprobación clínica.
 
 TRABAJO
 1. Lee AGENTS.md, README, arquitectura, plan y ADRs relacionados. Actualiza origin,

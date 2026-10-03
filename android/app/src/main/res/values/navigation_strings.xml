@@ -52,7 +52,7 @@
     <string name="view_all">Ver todo</string>
     <string name="calculation_detail">Faltan entradas validadas y reglas aprobadas. No hay una dosis disponible para revisar o confirmar.</string>
     <string name="inputs_title">Entradas del cálculo</string>
-    <string name="profile_absent">Perfil · sin versión confirmada</string>
+    <string name="profile_absent">Perfil · no se usa para calcular</string>
     <string name="profile_detail">Parámetros clínicos, unidades y horarios pendientes. Configúralos en Ajustes cuando esté disponible la edición local.</string>
     <string name="iob_absent">IOB · desconocido</string>
     <string name="iob_detail">No hay historial local de insulina validado ni algoritmo aprobado.</string>

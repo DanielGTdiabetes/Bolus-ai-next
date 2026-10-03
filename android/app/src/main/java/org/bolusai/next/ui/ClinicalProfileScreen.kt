@@ -21,9 +21,10 @@ import java.text.DateFormat
 import java.util.Date
 
 /**
- * Settings → Cálculo: local clinical profile capture (ADR 0012) with time segment editing (ADR 0013). Appends to
- * [content]; never clears the settings shell. It shows values exactly with the unit of their own version, changes
- * segments only through explicit actions and exposes no calculation path.
+ * Settings → Cálculo: local clinical profile capture (ADR 0012) with time segment editing (ADR 0013) and the review,
+ * confirmation and revocation of saved data (ADR 0014). Appends to [content]; never clears the settings shell. It shows
+ * values exactly with the unit of their own version, changes segments only through explicit actions and exposes no
+ * calculation path: "Datos confirmados" always comes with "Cálculo todavía bloqueado".
  */
 internal class ClinicalProfileScreen(
     private val context: Context,
@@ -81,9 +82,14 @@ internal class ClinicalProfileScreen(
         model.recoveryFailure?.takeIf { model.editor == null }?.let {
             notice(context.getString(R.string.profile_recovery_failed, it.code), "profile:recovery_failure")
         }
+        model.confirmationRecoveryFailure?.let {
+            notice(context.getString(R.string.profile_confirmation_recovery_failed, it.code), "profile:confirmation:recovery_failure")
+        }
         model.ensureLoaded()
         val editor = model.editor
+        val decision = model.decision
         when {
+            decision is ClinicalProfileModel.Decision.Review -> review(decision)
             model.historyOpen -> history()
             editor != null -> editor(editor)
             else -> current()
@@ -93,20 +99,221 @@ internal class ClinicalProfileScreen(
 
     private fun current() {
         model.lastSaved?.let { label(context.getString(R.string.profile_saved, it), "profile:saved") }
-        when (val state = model.history) {
-            null -> label(R.string.profile_loading, "profile:status")
-            ProfileHistory.Missing -> {
+        confirmationNotice()
+        when (val state = model.gate) {
+            null, ProfileGateState.ReadPending -> {
+                label(R.string.profile_loading, "profile:status")
+                undetermined()
+            }
+            is ProfileGateState.Missing -> {
                 label(R.string.profile_missing, "profile:status")
                 action(R.string.profile_create, "profile:new") { model.startNew() }
             }
-            is ProfileHistory.Failed -> {
+            is ProfileGateState.Unreadable -> {
                 label(context.getString(R.string.profile_read_failed, state.reason.code), "profile:status")
-                action(R.string.profile_retry, "profile:retry", true) { model.retry() }
+                undetermined()
+                action(R.string.profile_retry, "profile:retry", model.recording == null) { model.retry() }
             }
-            is ProfileHistory.Loaded -> {
+            is ProfileGateState.Evaluated -> {
+                gateStatus(state, "profile:gate")
+                confirmationActions(state)
                 version(state.latest, "profile:current", latest = true)
-                action(context.getString(R.string.profile_edit, state.latest.version + 1), "profile:edit") { model.startEdit() }
-                action(R.string.profile_history_open, "profile:history") { model.openHistory() }
+                action(context.getString(R.string.profile_edit, state.latest.version + 1), "profile:edit",
+                    !model.busy && model.pending == null) { model.startEdit() }
+                action(R.string.profile_history_open, "profile:history", !model.busy && model.pending == null) {
+                    model.openHistory()
+                }
+            }
+        }
+    }
+
+    // ADR 0014, section 9: states, actions and outcomes of the data confirmation. Never clinical approval.
+
+    private fun gateText(state: ProfileGateState.Evaluated): String {
+        val version = state.latest.version
+        val complete = state.completeness == ProfileCompleteness.Complete
+        return when (state.confirmation) {
+            is VersionConfirmation.Active -> state.gaps.filterIsInstance<CompletenessGap.TimeZoneUnrecognized>().firstOrNull()
+                ?.let { context.getString(R.string.profile_gate_confirmed_zone, version, it.id) }
+                ?: context.getString(R.string.profile_gate_confirmed, version)
+            is VersionConfirmation.Revoked -> context.getString(R.string.profile_gate_revoked, version)
+            VersionConfirmation.Unconfirmed -> {
+                val earlier = state.superseded.mapNotNull { it.profileVersion }.distinct().sorted()
+                when {
+                    earlier.isEmpty() ->
+                        context.getString(if (complete) R.string.profile_gate_unconfirmed else R.string.profile_gate_incomplete, version)
+                    earlier.size == 1 -> context.getString(if (complete) R.string.profile_gate_superseded
+                        else R.string.profile_gate_superseded_incomplete, version, earlier.single())
+                    else -> context.getString(if (complete) R.string.profile_gate_superseded_many
+                        else R.string.profile_gate_superseded_many_incomplete, version, earlier.joinToString(", "))
+                }
+            }
+        }
+    }
+
+    /** Current state of the latest version and, unless a confirmation is active, every missing item. */
+    private fun gateStatus(state: ProfileGateState.Evaluated, tag: String) {
+        notice(gateText(state), tag)
+        if (state.confirmation !is VersionConfirmation.Active) gaps(state, "$tag:gaps")
+    }
+
+    private fun gaps(state: ProfileGateState.Evaluated, tag: String) {
+        if (state.gaps.isEmpty()) return
+        label(R.string.profile_gaps_title, tag)
+        state.gaps.forEachIndexed { index, gap ->
+            label(when (gap) {
+                CompletenessGap.UnitNotDeclared -> context.getString(R.string.profile_gap_unit)
+                CompletenessGap.TimeZoneNotDeclared -> context.getString(R.string.profile_gap_zone)
+                is CompletenessGap.TimeZoneUnrecognized -> context.getString(R.string.profile_gap_zone_unrecognized, gap.id)
+                is CompletenessGap.ValueNotConfigured -> context.getString(R.string.profile_gap_value,
+                    parameterName(gap.parameter), context.getString(R.string.profile_segment_range, minutes(gap.startMinute), minutes(gap.endMinute)))
+            }, "$tag:$index", 14f)
+        }
+    }
+
+    /** Explicit, separate actions on the saved version; never inside the editor and never "save and confirm". */
+    private fun confirmationActions(state: ProfileGateState.Evaluated) {
+        val version = state.latest.version
+        if (state.canConfirm) {
+            action(context.getString(R.string.profile_review_open, version), "profile:review:open", model.canOpenReview) {
+                model.openReview()
+            }
+            if (model.reviewBlocked) notice(context.getString(R.string.profile_review_blocked), "profile:review:blocked")
+        }
+        val question = model.decision as? ClinicalProfileModel.Decision.Revoke
+        if (question == null) {
+            if (state.canRevoke) {
+                action(context.getString(R.string.profile_revoke_open, version), "profile:revoke:open",
+                    !model.busy && model.pending == null) { model.proposeRevoke() }
+            }
+            return
+        }
+        notice(context.getString(R.string.profile_revoke_question, question.version), "profile:revoke:question")
+        if (model.recording != null) label(R.string.profile_revoke_recording, "profile:revoke:recording")
+        action(R.string.profile_revoke_confirm, "profile:revoke:confirm",
+            !model.busy && model.undetermined == null) { model.revoke() }
+        action(R.string.profile_revoke_cancel, "profile:revoke:cancel", model.recording == null) { model.cancelDecision() }
+    }
+
+    /** A pending operation whose outcome cannot be proven yet: neither success nor failure is shown. */
+    private fun undetermined() {
+        val reason = model.undetermined ?: return
+        val kind = model.pending?.kind ?: return
+        notice(context.getString(if (kind == ConfirmationEventKind.CONFIRM) R.string.profile_review_undetermined
+            else R.string.profile_revoke_undetermined, reason.code), "profile:undetermined")
+    }
+
+    private fun confirmationNotice() {
+        val outcome = model.notice ?: return
+        val state = model.evaluated
+        val text = when (outcome) {
+            is ClinicalProfileModel.ConfirmationNotice.Recorded -> when (outcome.kind) {
+                ConfirmationEventKind.CONFIRM -> when {
+                    !outcome.replayed -> context.getString(R.string.profile_notice_confirmed, outcome.version)
+                    // A historical retry is never presented as a new confirmation.
+                    state?.record?.revocationOf(outcome.seq) != null -> context.getString(R.string.profile_notice_confirm_replayed_revoked)
+                    else -> context.getString(R.string.profile_notice_confirm_replayed, outcome.version)
+                }
+                ConfirmationEventKind.REVOKE -> context.getString(if (outcome.replayed) R.string.profile_notice_revoke_replayed
+                    else R.string.profile_notice_revoked, outcome.version)
+            }
+            is ClinicalProfileModel.ConfirmationNotice.Failed -> failureText(outcome, state)
+        }
+        notice(text, "profile:confirmation:notice")
+        if (outcome is ClinicalProfileModel.ConfirmationNotice.Failed) {
+            label(context.getString(R.string.profile_notice_code, outcome.reason.code), "profile:confirmation:code", 13f)
+            if (outcome.reason == ProfileFailure.CONFIRMATION_INCOMPLETE && state != null) gaps(state, "profile:confirmation:gaps")
+        }
+    }
+
+    private fun failureText(notice: ClinicalProfileModel.ConfirmationNotice.Failed, state: ProfileGateState.Evaluated?): String {
+        val confirm = notice.kind == ConfirmationEventKind.CONFIRM
+        val newer = state?.latest?.version?.takeIf { it > notice.version }
+        return when (notice.reason) {
+            ProfileFailure.CONFIRMATION_STALE_VERSION -> when {
+                newer == null -> context.getString(R.string.profile_notice_stale_unknown)
+                confirm -> context.getString(R.string.profile_notice_stale, newer)
+                else -> context.getString(R.string.profile_notice_revoke_stale, newer)
+            }
+            ProfileFailure.CONFIRMATION_STATE_CHANGED -> context.getString(if (confirm) R.string.profile_notice_state_changed
+                else R.string.profile_notice_revoke_state_changed)
+            ProfileFailure.CONFIRMATION_ALREADY_ACTIVE -> context.getString(R.string.profile_notice_already_active, notice.version)
+            ProfileFailure.CONFIRMATION_INCOMPLETE -> context.getString(R.string.profile_notice_incomplete, notice.version)
+            ProfileFailure.CONFIRMATION_NOT_ACTIVE -> context.getString(R.string.profile_notice_not_active)
+            ProfileFailure.CONFIRMATION_OPERATION_MISMATCH -> context.getString(R.string.profile_notice_mismatch)
+            else -> context.getString(if (confirm) R.string.profile_notice_write_failed else R.string.profile_notice_revoke_failed,
+                notice.reason.code)
+        }
+    }
+
+    /**
+     * Read-only review built from a fresh read: version, short fingerprint, unit, zone and every segment of every
+     * parameter, with explicit zeros highlighted. Confirming sends exactly this version and fingerprint.
+     */
+    private fun review(review: ClinicalProfileModel.Decision.Review) {
+        confirmationNotice()
+        val state = model.gate
+        val target = review.target
+        when {
+            state == null || state == ProfileGateState.ReadPending -> {
+                label(R.string.profile_loading, "profile:review:status")
+                undetermined()
+            }
+            state is ProfileGateState.Unreadable -> {
+                label(context.getString(R.string.profile_read_failed, state.reason.code), "profile:review:status")
+                undetermined()
+                action(R.string.profile_retry, "profile:review:retry", model.recording == null) { model.retry() }
+            }
+            state is ProfileGateState.Missing -> label(R.string.profile_missing, "profile:review:status")
+            state is ProfileGateState.Evaluated && target != null && state.latest.version == target.version -> {
+                reviewBody(state)
+                val retrying = model.pending != null
+                if (model.recording != null) label(R.string.profile_review_recording, "profile:review:recording")
+                action(context.getString(R.string.profile_review_confirm, target.version), "profile:review:confirm",
+                    !model.busy && !model.reviewBlocked && model.undetermined == null && (state.canConfirm || retrying)) {
+                    model.confirm()
+                }
+            }
+            else -> label(R.string.profile_loading, "profile:review:status")
+        }
+        action(R.string.profile_review_back, "profile:review:back", model.recording == null) { model.cancelDecision() }
+    }
+
+    private fun reviewBody(state: ProfileGateState.Evaluated) {
+        val version = state.latest
+        val body = version.content
+        heading(context.getString(R.string.profile_review_title, version.version), "profile:review:title")
+        notice(context.getString(R.string.profile_review_explanation), "profile:review:explanation")
+        gateStatus(state, "profile:review:gate")
+        val sha = version.contentSha256
+        label(context.getString(R.string.profile_review_identity, version.version, DateFormat.getDateTimeInstance(
+            DateFormat.MEDIUM, DateFormat.SHORT).format(Date(version.createdAtEpochMs)), "${sha.take(4)}…${sha.takeLast(4)}"),
+            "profile:review:identity")
+        label(context.getString(R.string.profile_unit_value, unitText(body.glucoseUnit)), "profile:review:unit")
+        label(context.getString(R.string.profile_zone_value, when (val zone = body.timeZone) {
+            Setting.NotConfigured -> context.getString(R.string.profile_not_configured)
+            is Setting.Declared -> zone.value.id
+        }), "profile:review:zone")
+        body.schedules.forEach { schedule ->
+            val parameter = schedule.parameter
+            heading(parameter.unitLabel(body.glucoseUnit)?.let {
+                context.getString(R.string.profile_param_with_unit, parameterName(parameter), it)
+            } ?: parameterName(parameter), "profile:review:param:${parameter.code}")
+            // Every segment, never a summary; an explicit 0 is highlighted for review without being judged.
+            schedule.segments.forEach { segment ->
+                val start = minutes(segment.startMinute)
+                val end = minutes(segment.endMinute)
+                val key = ClinicalProfileModel.valueKey(parameter, SegmentRef.of(segment))
+                val value = segment.value
+                if (value is ProfileValue.Entered && value.decimal.text == "0") {
+                    label(context.getString(R.string.profile_review_zero, start, end), "profile:review:segment:$key").apply {
+                        setTypeface(typeface, Typeface.BOLD)
+                        setTextColor(context.getColor(R.color.accent))
+                    }
+                } else {
+                    label(context.getString(R.string.profile_segment, start, end, valueText(value, null)),
+                        "profile:review:segment:$key")
+                }
             }
         }
     }
@@ -451,7 +658,7 @@ internal class ClinicalProfileScreen(
     }
 
     private fun statusText(): String = when {
-        model.busy -> context.getString(R.string.profile_status_saving)
+        model.saving -> context.getString(R.string.profile_status_saving)
         model.failure == ProfileFailure.CONFLICT ->
             context.getString(R.string.profile_status_conflict, ProfileFailure.CONFLICT.code)
         model.failure != null -> context.getString(R.string.profile_status_failed, model.failure!!.code)
@@ -459,19 +666,28 @@ internal class ClinicalProfileScreen(
     }
 
     private fun history() {
-        when (val state = model.history) {
-            null -> label(R.string.profile_loading, "profile:history:status")
-            ProfileHistory.Missing -> label(R.string.profile_missing, "profile:history:status")
-            is ProfileHistory.Failed -> {
+        when (val state = model.gate) {
+            null, ProfileGateState.ReadPending -> label(R.string.profile_loading, "profile:history:status")
+            is ProfileGateState.Missing -> label(R.string.profile_missing, "profile:history:status")
+            is ProfileGateState.Unreadable -> {
                 label(context.getString(R.string.profile_read_failed, state.reason.code), "profile:history:status")
                 action(R.string.profile_retry, "profile:retry", true) { model.retry() }
             }
-            is ProfileHistory.Loaded -> {
-                heading(context.getString(R.string.profile_history_title, state.versions.size), "profile:history:status")
+            is ProfileGateState.Evaluated -> {
+                val loaded = state.record.history as ProfileHistory.Loaded
+                heading(context.getString(R.string.profile_history_title, loaded.versions.size), "profile:history:status")
+                gateStatus(state, "profile:history:gate")
+                // Reachable from an open editor: the review action stays visible but blocked while it has changes.
+                if (state.canConfirm) {
+                    action(context.getString(R.string.profile_review_open, state.latest.version), "profile:review:open",
+                        model.canOpenReview) { model.openReview() }
+                    if (model.reviewBlocked) notice(context.getString(R.string.profile_review_blocked), "profile:review:blocked")
+                }
                 model.restoreFailure?.let { label(context.getString(R.string.profile_restore_failed, it.code), "profile:restore:failure") }
-                state.versions.forEach { version ->
-                    version(version, "profile:history:${version.version}", version == state.latest)
-                    if (version != state.latest) restoreAction(version, state.latest)
+                loaded.versions.forEach { version ->
+                    version(version, "profile:history:${version.version}", version == loaded.latest)
+                    confirmationHistory(state.record, version, loaded.latest)
+                    if (version != loaded.latest) restoreAction(version, loaded.latest, state.record)
                 }
             }
         }
@@ -479,7 +695,24 @@ internal class ClinicalProfileScreen(
             "profile:history:close", true) { model.closeHistory() }
     }
 
-    private fun restoreAction(version: ProfileVersion, latest: ProfileVersion) {
+    /** Confirmations and revocations of [version] in seq order; dates are device time and only informative. */
+    private fun confirmationHistory(record: ProfileRecord, version: ProfileVersion, latest: ProfileVersion) {
+        val prefix = "profile:history:${version.version}:event"
+        fun date(event: ConfirmationEvent) =
+            DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT).format(Date(event.recordedAtEpochMs))
+        record.events.filter { it.kind == ConfirmationEventKind.CONFIRM && it.profileVersion == version.version }.forEach { event ->
+            label(context.getString(R.string.profile_history_confirmed, date(event)), "$prefix:${event.seq}", 14f)
+            val revocation = record.revocationOf(event.seq)
+            when {
+                revocation != null -> label(context.getString(R.string.profile_history_revoked, date(revocation)),
+                    "$prefix:${revocation.seq}", 14f)
+                version != latest -> label(context.getString(R.string.profile_history_superseded, latest.version),
+                    "$prefix:${event.seq}:superseded", 14f)
+            }
+        }
+    }
+
+    private fun restoreAction(version: ProfileVersion, latest: ProfileVersion, record: ProfileRecord) {
         if (model.restoreCandidate != version.version) {
             action(context.getString(R.string.profile_history_restore, version.version),
                 "profile:history:${version.version}:restore") { model.proposeRestore(version.version) }
@@ -489,6 +722,10 @@ internal class ClinicalProfileScreen(
         if (version.content.glucoseUnit != latest.content.glucoseUnit) {
             lines.add(context.getString(R.string.profile_restore_unit_warning, version.version,
                 unitText(version.content.glucoseUnit), unitText(latest.content.glucoseUnit)))
+        }
+        // A restored version is new and never inherits the confirmation of its source (ADR 0014, C5).
+        if (record.confirmationOf(version.version) is VersionConfirmation.Active) {
+            lines.add(context.getString(R.string.profile_restore_no_inherit, version.version))
         }
         val pending = model.dirty
         if (pending) lines.add(context.getString(R.string.profile_restore_discard_warning))

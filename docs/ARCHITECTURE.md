@@ -99,7 +99,10 @@ validación conjunta de versiones y eventos (`ProfileRecord`), política común 
 estado en cuatro dimensiones con elegibilidad clínica siempre bloqueada. El
 adaptador Android usa `clinical-profile.db` v2, verifica el esquema por
 definición al abrir y al migrar desde v1, y evalúa la política en una
-transacción exclusiva. Véase el
+transacción exclusiva. La pantalla de Ajustes → Cálculo presenta esos estados y
+llama a los casos de uso (`readState`, `confirmRequest`, `revokeRequest`,
+`record`, `resolvePending`); no decide reglas ni abre SQLite. Bolo muestra un
+texto fijo y no lee el perfil. Véase el
 [ADR 0014](adr/0014-clinical-profile-confirmation-eligibility.md).
 
 ## Conectividad

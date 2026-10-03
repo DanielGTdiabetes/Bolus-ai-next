@@ -1,13 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
-<resources>
+<resources xmlns:tools="http://schemas.android.com/tools">
     <string name="profile_section_title">Perfil clínico local</string>
     <string name="profile_safety">Captura local versionada. Guardar crea una versión nueva e inmutable. Ningún valor se usa para calcular, recomendar ni tratar.</string>
-    <string name="profile_loading">Leyendo perfil…</string>
-    <string name="profile_read_failed">No se pudo leer el perfil · %1$s</string>
+    <string name="profile_loading">Leyendo perfil y confirmaciones…</string>
+    <string name="profile_read_failed">No se pudo leer el perfil ni su estado de confirmación · %1$s. No se muestra como sin confirmar.</string>
     <string name="profile_retry">Reintentar lectura</string>
     <string name="profile_missing">Sin perfil guardado. Todo está sin configurar.</string>
     <string name="profile_create">Crear perfil · se guardará como versión 1</string>
-    <string name="profile_saved">Guardado · versión %1$d</string>
+    <string name="profile_saved">Guardado · versión %1$d · datos sin confirmar.</string>
     <string name="profile_created_at">Guardada: %1$s (hora del dispositivo)</string>
     <string name="profile_origin_manual">Origen: introducido manualmente</string>
     <string name="profile_origin_restored">Origen: restaurada sin cambios desde la versión %1$d</string>
@@ -80,4 +80,58 @@
     <string name="profile_restore_failed">No se puede restaurar · %1$s</string>
     <string name="profile_history_close">Volver al perfil</string>
     <string name="profile_history_back_editor">Volver al editor</string>
+    <!-- ADR 0014: review, confirmation and revocation of the saved data. Never clinical approval.
+         PluralsCandidate is ignored where a version number identifies one version; it is not a quantity. -->
+    <string name="profile_gate_incomplete">Versión %1$d · datos incompletos · no se puede confirmar todavía. Cálculo todavía bloqueado.</string>
+    <string name="profile_gate_unconfirmed">Versión %1$d · datos sin confirmar. Cálculo todavía bloqueado.</string>
+    <string name="profile_gate_superseded" tools:ignore="PluralsCandidate">Versión %1$d · datos sin confirmar. La confirmación de la versión %2$d queda en el historial y no se aplica a la versión %1$d. Cálculo todavía bloqueado.</string>
+    <string name="profile_gate_superseded_incomplete" tools:ignore="PluralsCandidate">Versión %1$d · datos incompletos · no se puede confirmar todavía. La confirmación de la versión %2$d queda en el historial y no se aplica a la versión %1$d. Cálculo todavía bloqueado.</string>
+    <string name="profile_gate_superseded_many">Versión %1$d · datos sin confirmar. Las confirmaciones de las versiones %2$s quedan en el historial y no se aplican a la versión %1$d. Cálculo todavía bloqueado.</string>
+    <string name="profile_gate_superseded_many_incomplete">Versión %1$d · datos incompletos · no se puede confirmar todavía. Las confirmaciones de las versiones %2$s quedan en el historial y no se aplican a la versión %1$d. Cálculo todavía bloqueado.</string>
+    <string name="profile_gate_confirmed">Datos confirmados · versión %1$d. Cálculo todavía bloqueado: faltan límites y reglas clínicas aprobados.</string>
+    <string name="profile_gate_revoked">Confirmación retirada · versión %1$d. Revisa los datos y vuelve a confirmarlos si son correctos. Cálculo todavía bloqueado.</string>
+    <string name="profile_gate_confirmed_zone">Datos confirmados · versión %1$d, pero la zona horaria %2$s ya no se reconoce en este dispositivo. Revisa la zona o retira la confirmación. Cálculo todavía bloqueado.</string>
+    <string name="profile_gaps_title">No se puede confirmar: faltan datos.</string>
+    <string name="profile_gap_unit">Unidad de glucosa sin declarar</string>
+    <string name="profile_gap_zone">Zona horaria sin declarar</string>
+    <string name="profile_gap_zone_unrecognized">Zona horaria no reconocida en este dispositivo: %1$s</string>
+    <string name="profile_gap_value">%1$s %2$s · Sin configurar</string>
+    <string name="profile_review_open">Revisar y confirmar los datos de la versión %1$d…</string>
+    <string name="profile_review_blocked">Tienes cambios sin guardar en el editor. Guárdalos o descártalos antes de confirmar. Solo se confirman versiones guardadas.</string>
+    <string name="profile_review_title">Revisar datos de la versión %1$d</string>
+    <string name="profile_review_explanation">Vas a declarar que has revisado estos datos guardados y que son los que quieres registrar. Esto no aprueba límites, no comprueba que los valores sirvan para calcular y no autoriza ninguna dosis. El cálculo sigue bloqueado.</string>
+    <string name="profile_review_identity">Versión %1$d · guardada el %2$s (hora del dispositivo) · huella %3$s</string>
+    <string name="profile_review_zero">%1$s–%2$s · 0 · introducido explícitamente</string>
+    <string name="profile_review_confirm">Confirmar datos de la versión %1$d</string>
+    <string name="profile_review_back">Volver sin confirmar</string>
+    <string name="profile_review_recording">Registrando confirmación…</string>
+    <string name="profile_review_undetermined">No se sabe todavía si la confirmación se registró · %1$s. Reintenta la lectura antes de volver a confirmar.</string>
+    <string name="profile_revoke_open">Retirar la confirmación de la versión %1$d…</string>
+    <string name="profile_revoke_question" tools:ignore="PluralsCandidate">Los datos de la versión %1$d dejarán de constar como confirmados. La versión y sus valores no cambian. Para volver a confirmarlos tendrás que revisarlos otra vez.</string>
+    <string name="profile_revoke_confirm">Retirar confirmación</string>
+    <string name="profile_revoke_cancel">Cancelar</string>
+    <string name="profile_revoke_recording">Registrando retirada…</string>
+    <string name="profile_revoke_undetermined">No se sabe todavía si la retirada se registró · %1$s. Reintenta la lectura antes de volver a retirarla.</string>
+    <string name="profile_notice_confirmed">Datos confirmados · versión %1$d. Cálculo todavía bloqueado.</string>
+    <string name="profile_notice_confirm_replayed">La confirmación de la versión %1$d ya se había registrado.</string>
+    <string name="profile_notice_confirm_replayed_revoked">Esta confirmación ya se había registrado y después se retiró. No se ha vuelto a confirmar.</string>
+    <string name="profile_notice_revoked">Confirmación retirada · versión %1$d.</string>
+    <string name="profile_notice_revoke_replayed">La retirada de la confirmación de la versión %1$d ya se había registrado.</string>
+    <string name="profile_notice_stale" tools:ignore="PluralsCandidate">No se confirmó: existe una versión más reciente (%1$d). Revisa la versión %1$d antes de confirmar.</string>
+    <string name="profile_notice_stale_unknown">No se confirmó: la versión revisada ya no es la última guardada.</string>
+    <string name="profile_notice_state_changed">No se confirmó: el estado de confirmación cambió mientras revisabas. Vuelve a revisarlo.</string>
+    <string name="profile_notice_already_active">La versión %1$d ya tiene una confirmación vigente.</string>
+    <string name="profile_notice_incomplete" tools:ignore="PluralsCandidate">No se confirmó: la versión %1$d está incompleta en este dispositivo.</string>
+    <string name="profile_notice_mismatch">No se registró: la operación pendiente no coincide con la almacenada. No se ha reintentado.</string>
+    <string name="profile_notice_write_failed">No se pudo registrar la confirmación · %1$s. No se ha confirmado nada.</string>
+    <string name="profile_notice_not_active">No se retiró: esa confirmación ya no está vigente.</string>
+    <string name="profile_notice_revoke_state_changed">No se retiró: el estado de confirmación cambió mientras revisabas. Vuelve a revisarlo.</string>
+    <string name="profile_notice_revoke_stale">No se retiró: existe una versión más reciente (%1$d).</string>
+    <string name="profile_notice_revoke_failed">No se pudo registrar la retirada · %1$s. No se ha retirado nada.</string>
+    <string name="profile_notice_code">Código: %1$s</string>
+    <string name="profile_confirmation_recovery_failed">No se pudo recuperar la operación pendiente · %1$s. Lee de nuevo el estado antes de confirmar.</string>
+    <string name="profile_history_confirmed">Confirmada el %1$s</string>
+    <string name="profile_history_revoked">Confirmación retirada el %1$s</string>
+    <string name="profile_history_superseded">Superada por la versión %1$d</string>
+    <string name="profile_restore_no_inherit">La versión que se guarde será nueva y necesitará su propia confirmación. La confirmación de la versión %1$d no se hereda.</string>
 </resources>

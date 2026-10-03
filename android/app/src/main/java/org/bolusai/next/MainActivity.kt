@@ -32,10 +32,14 @@ import org.bolusai.next.meals.SqliteMealRepository
 import org.bolusai.next.ui.title
 import org.bolusai.next.ui.ClinicalProfileModel
 import org.bolusai.next.ui.ClinicalProfileScreen
+import org.bolusai.next.profile.AndroidOperationIds
 import org.bolusai.next.profile.AndroidTimeZoneRules
+import org.bolusai.next.profile.ClosableProfileRepository
 import org.bolusai.next.profile.SqliteClinicalProfileRepository
 import org.bolusai.profile.ClinicalProfiles
+import org.bolusai.profile.OperationIds
 import org.bolusai.profile.ProfileClock
+import org.bolusai.profile.TimeZoneRules
 import java.util.UUID
 
 class MainActivity : ComponentActivity() {
@@ -79,8 +83,9 @@ class MainActivity : ComponentActivity() {
                 val repository = profileRepositoryFactory?.invoke(applicationContext)
                     ?: SqliteClinicalProfileRepository(applicationContext)
                 val clock = profileClock ?: ProfileClock { System.currentTimeMillis() }
-                return ClinicalProfileModel(ClinicalProfiles(repository, clock, writer(), AndroidTimeZoneRules),
-                    repository, restoredProfile) as T
+                val zones = profileTimeZoneRules ?: AndroidTimeZoneRules
+                return ClinicalProfileModel(ClinicalProfiles(repository, clock, writer(), zones),
+                    repository, restoredProfile, profileOperationIds ?: AndroidOperationIds) as T
             }
         })[ClinicalProfileModel::class.java]
         renderer = ScreenRenderer(this, findViewById(R.id.screen_content), ::open,
@@ -231,7 +236,9 @@ class MainActivity : ComponentActivity() {
         /** Process-local test seam. No Intent or external caller can select volatile storage. */
         var mealRepositoryFactory: ((Context) -> SqliteMealRepository)? = null
         /** Process-local test seams for the clinical profile; production always uses the app database and clock. */
-        var profileRepositoryFactory: ((Context) -> SqliteClinicalProfileRepository)? = null
+        var profileRepositoryFactory: ((Context) -> ClosableProfileRepository)? = null
         var profileClock: ProfileClock? = null
+        var profileTimeZoneRules: TimeZoneRules? = null
+        var profileOperationIds: OperationIds? = null
     }
 }
