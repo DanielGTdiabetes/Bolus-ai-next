@@ -114,6 +114,14 @@ reinterpreta valores: la versión que cambia la unidad se guarda sin sensibilida
 ni objetivo. El perfil no se usa para calcular, recomendar ni tratar. Véanse el
 [ADR 0012](docs/adr/0012-local-clinical-profile.md) y la
 [validación](docs/validation/local-clinical-profile-2026-09-27.md).
+El dominio común y la base local ya registran la confirmación de datos de una
+versión guardada como hechos separados del contenido (confirmar, retirar y
+volver a confirmar, sin herencia entre versiones) y `clinical-profile.db` pasa a
+v2 con migración verificada. Confirmar datos no aprueba su uso clínico: cálculo y
+tratamiento siguen bloqueados. La pantalla para revisar y confirmar llega en una
+entrega posterior. Véanse el
+[ADR 0014](docs/adr/0014-clinical-profile-confirmation-eligibility.md) y la
+[validación](docs/validation/profile-confirmation-domain-2026-10-03.md).
 Se ha verificado el flujo en la pantalla interior del Pixel 10 Pro Fold, además
 de layouts anchos vertical/horizontal con texto ampliado. Pausar y reanudar los
 editores conserva sus campos, foco y posición de desplazamiento.

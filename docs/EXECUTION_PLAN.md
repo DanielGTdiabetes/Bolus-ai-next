@@ -531,6 +531,18 @@ de editor. Sin esquema nuevo, sin límites clínicos ni uso por el motor. Véans
 [ADR 0013](adr/0013-clinical-profile-segment-editor.md) y la
 [validación](validation/profile-segment-editor-2026-09-28.md).
 
+### Entrega de confirmación de datos del perfil, parte 1 — 2026-10-03
+
+Continuación de la fase 6 (trabajo 1 y 2): completitud estructural del perfil
+sin límites clínicos, eventos append-only de confirmación y revocación con
+identidad de operación, orden por `seq` y estado observado, validación conjunta
+del historial, política común idempotente y `clinical-profile.db` v2 con
+migración desde v1 verificada por definición y prueba de copia previa. Sin UI
+nueva: la revisión, confirmación y revocación en pantalla y el texto de Bolo son
+la parte 2. Cálculo y tratamiento siguen bloqueados en todos los estados. Véanse
+el [ADR 0014](adr/0014-clinical-profile-confirmation-eligibility.md) y la
+[validación](validation/profile-confirmation-domain-2026-10-03.md).
+
 ### Secuencia de capacidades
 
 No intentar construir toda una fase en un solo cambio. Secuencia inicial:

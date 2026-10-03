@@ -14,7 +14,10 @@ class ProfileVersioningTest {
         assertEquals(ProfileHistory.Missing, profiles.read())
         val failing = object : ClinicalProfileRepository {
             override fun readVersions() = ProfileRead.Failed(ProfileFailure.CORRUPT_STORAGE)
+            override fun readRecord() = ProfileRecordRead.Failed(ProfileFailure.CORRUPT_STORAGE)
             override fun save(write: ProfileWrite, createdAtEpochMs: Long, writer: String) = error("unused")
+            override fun appendConfirmation(request: ConfirmationRequest, recordedAtEpochMs: Long, writer: String,
+                                            zones: TimeZoneRules) = error("unused")
         }
         val history = ClinicalProfiles(failing, clock, "w", knownZones).read()
         assertEquals(ProfileHistory.Failed(ProfileFailure.CORRUPT_STORAGE), history)

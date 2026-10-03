@@ -332,11 +332,15 @@ class ClinicalProfileDeviceTest {
             snapshot = model.snapshot()
             model.dispose()
         }
-        // Damage an older version, then recreate the editor from saved state as after process death.
+        // Damage an older version, then recreate the editor from saved state as after process death. The trigger is
+        // recreated with its exact frozen text so the schema stays valid and the row validation is what fails.
         android.database.sqlite.SQLiteDatabase.openDatabase(context.getDatabasePath(name).path, null,
             android.database.sqlite.SQLiteDatabase.OPEN_READWRITE).use { db ->
             db.execSQL("DROP TRIGGER profile_segments_immutable_update")
             db.execSQL("UPDATE profile_segments SET value = '9' WHERE version = 1 AND parameter = 'carb_ratio'")
+            db.execSQL(org.bolusai.next.profile.ClinicalProfileSchema.SCHEMA_V2.single {
+                it.startsWith("CREATE TRIGGER profile_segments_immutable_update ")
+            })
         }
         val second = SqliteClinicalProfileRepository(context, name)
         lateinit var restored: ClinicalProfileModel

@@ -11,12 +11,23 @@ sealed interface ProfileSave {
     data class Failed(val reason: ProfileFailure) : ProfileSave
 }
 
-/** Local persistence port. Implementations append only and evaluate [ProfileWritePolicy] inside one transaction. */
+/**
+ * Local persistence port. Implementations append only and evaluate [ProfileWritePolicy] and [ConfirmationPolicy]
+ * inside one exclusive transaction, after validating every version and every confirmation event (ADR 0014, 7.1, 7.5).
+ */
 interface ClinicalProfileRepository {
-    /** One consistent read of every version. */
+    /** One consistent read of every version; fails when the versions or the confirmation events cannot be proven. */
     fun readVersions(): ProfileRead
+    /** One consistent read of versions and confirmation events, validated by [ProfileRecord.validate]. */
+    fun readRecord(): ProfileRecordRead
     /** Returns only after commit; identical retries are idempotent; never updates or deletes a version. */
     fun save(write: ProfileWrite, createdAtEpochMs: Long, writer: String): ProfileSave
+    /**
+     * Appends one confirmation or revocation event, or replays the one already stored under the same operation
+     * identity. [ConfirmationWrite.Recorded] is returned only after commit; nothing is written on any rejection.
+     */
+    fun appendConfirmation(request: ConfirmationRequest, recordedAtEpochMs: Long, writer: String,
+                           zones: TimeZoneRules): ConfirmationWrite
 }
 
 fun interface ProfileClock { fun nowEpochMs(): Long }
@@ -166,6 +177,28 @@ class ClinicalProfiles(
         if (!ProfileTimeZone.isWellFormed(text) || !zones.exists(text)) return TimeZoneInput.Invalid(ProfileFailure.INVALID_TIME_ZONE)
         return TimeZoneInput.Valid(Setting.Declared(ProfileTimeZone(text)))
     }
+
+    /** Gate state of the latest version (ADR 0014). Calculation and treatment stay blocked in every state. */
+    fun readState(): ProfileGateState = ProfileGateState.of(repository.readRecord(), zones)
+
+    /** Request for the version shown by [state]; [id] comes from [OperationIds] when the user acts. */
+    fun confirmRequest(state: ProfileGateState.Evaluated, id: OperationId): ConfirmationRequest.Confirm =
+        ConfirmationRequest.Confirm(id, state.latest.version, state.latest.contentSha256, state.record.lastEventSeq)
+
+    /** Request to revoke the active confirmation shown by [state]; null when there is none to revoke. */
+    fun revokeRequest(state: ProfileGateState.Evaluated, id: OperationId): ConfirmationRequest.Revoke? =
+        state.activeConfirmation?.let { ConfirmationRequest.Revoke(id, it.seq, state.record.lastEventSeq) }
+
+    /** Confirms or revokes. Reusing the same request is idempotent and never reactivates a revoked confirmation. */
+    fun record(request: ConfirmationRequest): ConfirmationOutcome =
+        when (val result = repository.appendConfirmation(request, clock.nowEpochMs(), writer, zones)) {
+            is ConfirmationWrite.Failed -> ConfirmationOutcome.Rejected(result.reason)
+            is ConfirmationWrite.Recorded ->
+                ConfirmationOutcome.Recorded(result.event, result.replayed, ProfileGateState.of(result.record, zones))
+        }
+
+    /** Resolves an operation kept across recreation by its identity before anything else (ADR 0014, 9.3). */
+    fun resolvePending(pending: ConfirmationRequest): PendingResolution = PendingConfirmations.resolve(pending, readState())
 
     fun save(editor: ProfileEditor): ProfileSave {
         val zone = editor.content.timeZone

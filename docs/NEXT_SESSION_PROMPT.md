@@ -14,9 +14,9 @@ sigue en v3 (ADR 0008 a 0011).
 
 Ajustes → Cálculo captura el perfil clínico local (ADR 0012, aceptado con las
 ocho recomendaciones de su sección 12 y la regla de unidades 4.4). Módulo
-`shared/clinical-profile` y base propia `clinical-profile.db` v1: versiones
-append-only con triggers, huella SHA-256 canónica revalidada al leer, origen
-`manual`/`restored` (`system_proposal_accepted` reservado y rechazado), fecha y
+`shared/clinical-profile` y base propia `clinical-profile.db` v2 (parte 1 del
+ADR 0014, migrada desde v1): versiones append-only con triggers, huella
+SHA-256 canónica revalidada al leer, origen `manual`/`restored` (`system_proposal_accepted` reservado y rechazado), fecha y
 escritor. Unidad de glucosa (mg/dL o mmol/L) y zona IANA declaradas por versión.
 `carb_ratio` (g/U), `insulin_sensitivity` y `glucose_target` por franjas
 completas en el modelo. Decimal canónico no
@@ -39,16 +39,20 @@ es estado derivado del editor, fuera de la huella. Paneles en línea que
 sobreviven a la recreación. Sin cambios de esquema.
 
 Consulta docs/adr/0012-local-clinical-profile.md,
-docs/adr/0013-clinical-profile-segment-editor.md y
-docs/validation/profile-segment-editor-2026-09-28.md.
+docs/adr/0013-clinical-profile-segment-editor.md,
+docs/adr/0014-clinical-profile-confirmation-eligibility.md,
+docs/validation/profile-segment-editor-2026-09-28.md y
+docs/validation/profile-confirmation-domain-2026-10-03.md.
 Comprueba el CI del SHA exacto integrado antes de empezar.
 Esta entrega no consultó ni modificó Legacy. Su última auditoría documentada
 continúa fijada en f5417721d8019a9831126f4d843edfc4de87653d; no afirmes que ese
 SHA sigue siendo el main remoto sin comprobarlo si necesitas nueva evidencia.
 
 LÍMITES
-El perfil es captura: no está «confirmado», no alimenta motor, Bolo, IOB ni
-recomendación, y Bolo sigue mostrando «Perfil · sin versión confirmada». No hay
+El perfil es captura. La confirmación de datos existe en dominio y base local
+(parte 1 del ADR 0014), pero no en pantalla, y no aprueba uso clínico: no
+alimenta motor, Bolo, IOB ni recomendación, y Bolo sigue mostrando
+«Perfil · sin versión confirmada» hasta la parte 2. No hay
 límites clínicos, DIA, curva, redondeo, conversión de unidades, propuestas del
 sistema, aprendizaje, exportación/importación, sync ni perfiles alternativos. La
 resolución de franjas en cambios de hora queda para el ADR del motor. Los macros
@@ -64,29 +68,54 @@ Toda prueba que abra Ajustes → Cálculo debe inyectar
 En Windows, los XML de recursos están en CRLF en la copia de trabajo: al editarlos
 con scripts conserva los finales de línea o `git diff --check` fallará.
 
-DECISIÓN DOCUMENTAL ACEPTADA (sin implementar)
+ADR 0014 — CONFIRMACIÓN DE DATOS DEL PERFIL (parte 1 integrada, parte 2 sin empezar)
 ADR 0014 (docs/adr/0014-clinical-profile-confirmation-eligibility.md), aceptado
 el 2026-10-03 con C1 a C9 según su recomendación (C7 como solución
 provisional). Confirmar datos es revisar una versión guardada identificada por
 número y huella. No aprueba límites, vigencia ni aptitud para calcular o tratar.
-Dimensiones separadas: integridad, completitud, confirmación y elegibilidad
-clínica, esta última siempre bloqueada. Eventos append-only de confirmación y
-revocación con `operation_id` y `seq`, sin herencia entre versiones, solo la
-última versión, revocación sin exigir completitud, `clinical-profile.db` v2 con
-migración verificada por definición. Nada de esto existe aún en código: el
-perfil sigue sin confirmaciones y Bolo sigue con «Perfil · sin versión
-confirmada».
+
+Parte 1 integrada en `main` mediante la PR #32 (rama
+`claude/profile-confirmation-domain`). Véase
+docs/validation/profile-confirmation-domain-2026-10-03.md:
+- `shared/clinical-profile`: `ProfileCompleteness.kt` (faltas deterministas,
+  `0` configurado, zona comprobada con `TimeZoneRules`, sin límite de 48),
+  `ProfileConfirmation.kt` (`OperationId`, puerto `OperationIds`, eventos
+  `confirm`/`revoke`, contrato 1, `ProfileRecord.validate`,
+  `ConfirmationPolicy`) y `ProfileGate.kt` (`ProfileGateState` E1 a E11,
+  `ProfileGateCodes`, `ConfirmationOutcome` con `replayed` y estado vigente,
+  `PendingConfirmations.resolve`). `ClinicalProfiles` añade `readState`,
+  `confirmRequest`, `revokeRequest`, `record` y `resolvePending`. El puerto añade
+  `readRecord` y `appendConfirmation`. Códigos `profile.confirmation.*` en
+  `ProfileFailure`.
+- Android: `clinical-profile.db` v2. `ClinicalProfileSchema.kt` congela
+  `SCHEMA_V1` (huella fijada en `ClinicalProfileSchemaTextTest`) y
+  `V2_ADDITIONS`, y verifica por definición al abrir y al migrar.
+  `ClinicalProfileRows.kt` es el códec estricto de filas. `save`, lecturas y
+  `appendConfirmation` validan versiones y eventos en una transacción
+  exclusiva. `AndroidOperationIds` existe, pero ninguna pantalla lo usa aún.
+- Pruebas: 87 comunes y `OK (98 tests)` en dispositivo, con
+  `ClinicalProfileConfirmationDeviceTest` en `verify.ps1`. Las pruebas que
+  manipulan filas recrean el trigger con su texto exacto. Si no, la apertura
+  falla con `unsupported_schema`.
+La UI no cambia: no hay botones de confirmar ni retirar, Bolo sigue con
+«Perfil · sin versión confirmada» y ni Bolo, `ReadOverview` ni el motor leen el
+perfil. `input.profile.*` no se implementa ni se conecta.
 
 SIGUIENTE INCREMENTO PROPUESTO (solo con petición explícita del propietario)
-Implementar el ADR 0014 tal como está: completitud estructural, eventos y
-política compartida, migración v1 → v2 con prueba de copia previa, UI de
-revisión, confirmación y revocación, resolución de operación pendiente por
-identidad y cambio del texto de Bolo a «Perfil · no se usa para calcular», sin
-que Bolo, `ReadOverview` ni el motor lean el perfil. Cálculo y tratamiento
-siguen bloqueados en todos los estados. La correspondencia con `input.profile.*`
-se documenta y prueba, pero no se conecta. Límites clínicos, DIA, IOB,
-resolución de franjas en cambios de hora y la opción B o C de la sección 6.3
-siguen siendo decisiones del propietario.
+Solo con autorización explícita del propietario, la parte 2 del ADR 0014:
+vista de solo lectura de la última versión con «Revisar y confirmar los datos
+de la versión N…» construida desde una lectura nueva, nunca dentro del
+editor ni con cambios, textos pendientes, panel abierto o cambio de unidad
+pendiente. Confirmar y retirar con `AndroidOperationIds`, con `operation_id` y
+carga útil conservados en el estado guardado y resueltos por identidad al
+recrear (`ClinicalProfiles.resolvePending`). Textos de la sección 9, siempre con
+«Cálculo todavía bloqueado», historial con confirmaciones, retiradas y
+superadas, y Bolo con «Perfil · no se usa para calcular» sin leer el perfil.
+Pruebas de UI de la sección 10: doble toque, rotación, commit antes de recrear,
+E5 a E11, layouts 840×900, 900×840 y 411×914 dp, texto 1,0× y 1,8×, claro y
+oscuro. Límites clínicos, DIA, IOB, resolución de franjas en cambios de hora,
+`input.profile.*` y la opción B o C de la sección 6.3 siguen siendo decisiones
+del propietario.
 
 TRABAJO
 1. Lee AGENTS.md, README, arquitectura, plan y ADRs relacionados. Actualiza origin,
