@@ -26,6 +26,9 @@
   [contrato `unavailable-input-v1`](../contracts/unavailable-input-v1.md) y
   [contrato `unavailable-input-report-v1`](../contracts/unavailable-input-report-v1.md).
   Este ADR complementa al ADR 0012 sin editarlo. La sección 1.3 lista qué precisa.
+- Revisión del propietario (2026-10-03, PR #31 en borrador): cuatro correcciones
+  incorporadas antes de decidir (sección 16). Las recomendaciones generales C1 a
+  C9 se mantienen y siguen pendientes.
 
 ## 0. Cómo leer este ADR
 
@@ -179,18 +182,21 @@ conectada a nada.
 | E7 | Completa sin confirmar | íntegro | completa | sin confirmar | bloqueada | revisar y confirmar, editar, guardar, restaurar | uso clínico | `policy_not_approved` | `profile.confirmation.missing` |
 | E8 | Completa, una versión anterior confirmada | íntegro | completa o incompleta | sin confirmar (la anterior queda como historia) | bloqueada | como E6 o E7 | como E6 o E7. Nunca se usa la anterior | como E6 o E7 | `profile.confirmation.missing` más `profile.confirmation.superseded` |
 | E9 | Confirmación vigente (confirmada y bloqueada para uso clínico) | íntegro | completa | vigente | **bloqueada** | ver confirmación, revocar, editar, guardar, restaurar | uso clínico | `policy_not_approved` | `profile.not_approved_for_calculation` |
-| E10 | Confirmación revocada | íntegro | completa | revocada | bloqueada | revisar y confirmar de nuevo (acto nuevo), editar, guardar, restaurar | uso clínico | `policy_not_approved` | `profile.confirmation.revoked` |
-| E11 | Confirmada, zona ya no reconocida por la plataforma | íntegro | incompleta (zona no reconocida) | vigente, como hecho histórico | bloqueada | editar, guardar | confirmar de nuevo, uso clínico | `invalid`, `policy_not_approved` | `profile.gate.time_zone_unrecognized` |
+| E10 | Confirmación revocada | íntegro | completa o incompleta (por ejemplo, tras revocar en E11) | revocada | bloqueada | revisar y confirmar de nuevo (acto nuevo, solo si está completa), editar, guardar, restaurar | uso clínico. Confirmar mientras esté incompleta | `policy_not_approved`, más `incomplete` o `invalid` si está incompleta | `profile.confirmation.revoked` y, si procede, las faltas |
+| E11 | Confirmada, zona ya no reconocida por la plataforma | íntegro | incompleta (zona no reconocida) | vigente, como hecho histórico | bloqueada | ver confirmación, revocar, editar, guardar, restaurar | confirmar de nuevo, uso clínico | `invalid`, `policy_not_approved` | `profile.gate.time_zone_unrecognized` |
 
 Notas:
 
-- E9 es la única fila con confirmación vigente y es también la fila «confirmada
-  pero bloqueada para uso clínico». Una futura fila «confirmada y elegible» solo
-  podría existir con un ADR de aprobación clínica.
+- E9 y E11 son las filas con confirmación vigente, y ambas están bloqueadas
+  para uso clínico. E9 es la fila «confirmada pero bloqueada para uso clínico»
+  con la versión completa. E11 tiene además la completitud fallida. Una futura
+  fila «confirmada y elegible» solo podría existir con un ADR de aprobación
+  clínica.
 - E11 cubre una actualización de la base de zonas del sistema que retire un
   identificador. La confirmación no se borra ni se revoca automáticamente: sigue
   siendo verdad que el usuario revisó esos datos. La puerta de completitud vuelve
-  a fallar y lo explica.
+  a fallar y lo explica. El usuario puede retirar la confirmación, porque revocar
+  no exige completitud ni zona reconocida (sección 2.3).
 - Mientras un guardado, una confirmación o una revocación están en vuelo, la UI
   bloquea las otras dos operaciones y muestra el estado anterior marcado como «en
   revisión», no el resultado esperado.
@@ -199,21 +205,25 @@ Notas:
 
 Confirmar la versión `N` exige, comprobado de nuevo dentro de la transacción:
 
-1. lectura demostrada e historial íntegro (versiones y eventos);
-2. `N` es la última versión guardada;
-3. la huella enviada coincide con la de `N` en la base;
+1. Lectura demostrada e historial íntegro (versiones y eventos).
+2. `N` es la última versión guardada.
+3. La huella enviada coincide con la de `N` en la base.
 4. `N` es estructuralmente completa (sección 3), incluida la comprobación de zona
-   con la plataforma en ese momento;
-5. `N` no tiene una confirmación vigente;
-6. el último evento observado por el usuario coincide con el último evento
-   almacenado (sección 7.2);
-7. no hay cambios sin guardar en el editor (comprobado por la UI, sección 5.4).
+   con la plataforma en ese momento.
+5. `N` no tiene una confirmación vigente.
+6. El último evento observado por el usuario coincide con el último evento
+   almacenado (sección 7.2).
+7. No hay cambios sin guardar en el editor (comprobado por la UI, sección 5.4).
 
 Revocar la confirmación `c` exige:
 
-1. lectura demostrada e historial íntegro;
-2. `c` es un evento de confirmación de la última versión y sigue vigente;
-3. el último evento observado coincide con el almacenado.
+1. Lectura demostrada e historial íntegro (versiones y eventos).
+2. `c` es un evento de confirmación de la última versión y sigue vigente.
+3. El último evento observado coincide con el almacenado.
+
+Revocar **no** exige completitud ni zona reconocida por la plataforma. Retirar
+una declaración nunca puede quedar bloqueado por la misma falta que la vuelve
+dudosa (E11).
 
 Transiciones:
 
@@ -226,6 +236,8 @@ E10 --confirmar (operación nueva)--> E9
 E7, E9, E10 --guardar o restaurar--> E6 o E8 (versión nueva sin confirmar)
 cualquier estado --lectura fallida--> E2, E3 o E4
 E9 --zona retirada por la plataforma--> E11
+E11 --revocar--> E10 (incompleta, no confirmable hasta corregir la zona)
+E11 --guardar versión con zona reconocida--> E7 (versión nueva sin confirmar)
 ```
 
 Ninguna transición lleva a un estado con elegibilidad clínica.
@@ -348,11 +360,11 @@ El estado se deriva, nunca se guarda como columna «confirmado»:
 1. Leer versiones y eventos en **una** transacción.
 2. Validar versiones como hoy (ADR 0012).
 3. Validar eventos, en orden de `seq`:
-   - `seq` contiguo 1..N, `operation_id` único y bien formado;
-   - `kind` y `contract_version` conocidos (desconocido: `unsupported_schema`);
-   - `confirm`: `profile_version` existe y `content_sha256` coincide con su huella;
-   - `revoke`: `revokes_seq` apunta a un `confirm` anterior aún no revocado;
-   - `observed_event_seq = seq - 1` (sección 7.2);
+   - `seq` contiguo 1..N, `operation_id` único y bien formado.
+   - `kind` y `contract_version` conocidos (desconocido: `unsupported_schema`).
+   - `confirm`: `profile_version` existe y `content_sha256` coincide con su huella.
+   - `revoke`: `revokes_seq` apunta a un `confirm` anterior aún no revocado.
+   - `observed_event_seq = seq - 1` (sección 7.2).
    - reproduciendo los eventos, ninguna versión tiene dos confirmaciones
      vigentes a la vez.
 4. Para la última versión `L`: sin eventos `confirm` para `L` es «sin
@@ -398,10 +410,25 @@ siendo la del almacenamiento privado de la app, sin Auto Backup.
   requiere confirmación nueva aunque la restaurada estuviera confirmada
   (recomendación).
 - Cambio de unidad (aprobado, ADR 0012 §4.4 y ADR 0013 §6): sin conversión,
-  fronteras conservadas, ISF y objetivo «Sin configurar» en la versión que
-  cambia la unidad. Esa versión es incompleta por construcción (E6) y no puede
-  confirmarse. Los valores en la unidad nueva van en la versión siguiente, que
-  necesita su propia confirmación.
+  fronteras conservadas y valores dependientes «Sin configurar» en la versión
+  que cambia la unidad. La regla aprobada se mide contra la **unidad de
+  partida** del editor (la última versión, o la versión restaurada si el editor
+  nació de una restauración) y solo aplica si esa unidad estaba declarada.
+- Por tanto, solo es incompleta por construcción (E6) y no confirmable la
+  versión que **cambia desde una unidad de partida ya declarada**: todas las
+  franjas de ISF y objetivo quedan «Sin configurar». Los valores en la unidad
+  nueva van en la versión siguiente, que necesita su propia confirmación.
+- Se conservan las dos excepciones aprobadas, que no vacían nada:
+  - **Primera declaración de unidad** (de «no configurada» a una unidad): la
+    versión puede llevar ISF y objetivo en esa unidad. Si queda completa, puede
+    optar a confirmación como cualquier otra (E7).
+  - **Restauración exacta de una versión con otra unidad** (origen `restored`):
+    copia unidad y valores juntos, sin convertir. Si el contenido restaurado está
+    completo, la versión nueva puede optar a una confirmación nueva. Nunca hereda
+    la de la versión restaurada.
+- Una edición manual a partir de una restauración compara con la unidad de la
+  versión restaurada, como fija el ADR 0012 §4.4. Conservar esa unidad no vacía
+  valores. Cambiarla sí.
 
 ### 5.4 Edición sin guardar frente a versión guardada (recomendación, C6)
 
@@ -512,13 +539,16 @@ El orden de las listas es el lexicográfico técnico del informe, no prioridad.
 `confirm(request, recordedAtEpochMs, writer)` y `revoke(...)` se ejecutan en una
 transacción exclusiva de SQLite, igual que `save`:
 
-1. Si `operation_id` ya existe: comparar la carga útil almacenada (tipo, versión,
+1. Releer y validar versiones y eventos completos. Si no se demuestra:
+   `profile.storage.invalid_record` y nada se escribe ni se devuelve como
+   histórico.
+2. Si `operation_id` ya existe: comparar la carga útil almacenada (tipo, versión,
    huella, `revokes_seq`, `observed_event_seq`, contrato). Igual: devolver
    `Recorded(evento histórico, replayed = true)` junto al **estado vigente
-   actual**, derivado aparte. Distinta: `profile.confirmation.operation_mismatch`.
-   No se inserta nada en ningún caso.
-2. Releer y validar versiones y eventos completos. Si no se demuestra:
-   `profile.storage.invalid_record` y nada se escribe.
+   actual**, derivado del mismo historial ya validado. Distinta:
+   `profile.confirmation.operation_mismatch`. No se inserta nada en ningún caso.
+   Esta rama solo se alcanza después del paso 1: un reintento nunca devuelve
+   éxito, ni histórico ni actual, sobre un historial que no se puede demostrar.
 3. Comprobar `observed_event_seq` contra el último `seq`. Distinto:
    `profile.confirmation.state_changed`.
 4. `confirm`: la versión pedida es la última (si no, `profile.confirmation.stale_version`),
@@ -555,7 +585,8 @@ decidió. La alternativa laxa (solo comprobar «sin confirmación vigente») es 
 | Se guarda una versión nueva mientras se revisa la anterior | `stale_version`. La pantalla ofrece revisar la versión nueva. No se confirma nada |
 | Confirmación concurrente con revocación | la que entra después ve `observed_event_seq` distinto y falla con `state_changed`. Ninguna se aplica sobre un estado no visto |
 | Respuesta perdida tras el commit | el reintento con el mismo `operation_id` devuelve el evento histórico (`replayed = true`) |
-| Reintento tras reinicio de la actividad | `operation_id` se conserva en el estado guardado y el reintento es idempotente |
+| Reintento tras reinicio de la actividad | `operation_id` se conserva en el estado guardado. Al recrear, la operación pendiente se resuelve primero por su identidad (sección 9.3). Si ya consta, se muestra como registrada. Si no, el reintento sigue siendo idempotente |
+| Commit terminado antes de recrear la pantalla | la lectura posterior encuentra `operation_id` con la misma carga útil. Se muestra «registrada», nunca `state_changed` ni fracaso, aunque `observed_event_seq` ya no sea el último evento |
 | Reinicio completo del proceso sin estado guardado | la intención se pierde. La nueva lectura muestra el estado real. Si el commit ocurrió, aparece «Datos confirmados». Si no, el usuario vuelve a confirmar con operación nueva. No hay cola persistente |
 | Misma clave con carga útil distinta | `operation_mismatch`. Nada se escribe |
 | Reintento de una confirmación antigua tras revocarla | devuelve el evento histórico con `replayed = true` y estado vigente «revocada». **No** reactiva la confirmación |
@@ -670,9 +701,30 @@ de migrar una v1 vacía: misma lista de objetos en `sqlite_master`.
 
 `onUpgrade(db, 1, 2)` dentro de la transacción del helper:
 
-1. Comprobar que `sqlite_master` contiene **exactamente** los objetos esperados
-   de v1 (dos tablas, cinco triggers, `android_metadata`) y las columnas
-   esperadas (`PRAGMA table_info`). Cualquier diferencia: `unsupported_schema`.
+1. Comprobar el esquema v1 por **definición**, no solo por inventario.
+   Cualquier diferencia: `unsupported_schema`.
+   - **Inventario exacto** de `sqlite_master`: tablas `profile_versions` y
+     `profile_segments`, los cinco triggers de v1, el índice automático
+     `sqlite_autoindex_profile_segments_1` de la clave primaria compuesta y la
+     tabla `android_metadata` que crea la plataforma. Ningún objeto más ni
+     menos.
+   - **Definiciones exactas**: el campo `sql` de cada tabla y trigger de perfil
+     se compara byte a byte con el texto de v1 congelado en el código
+     (`SCHEMA_V1`). SQLite conserva el texto `CREATE` original, así que la
+     comparación cubre columnas, `CHECK`, claves foráneas y cuerpos de trigger.
+     El texto de `SCHEMA` se introdujo en `e78563a` y no ha cambiado desde
+     entonces (`git log -L` sobre `SqliteClinicalProfileRepository.kt`). Un
+     fichero creado por un build no integrado con otro texto se rechaza.
+   - **Índice automático**: su `sql` es `NULL`, así que se comprueba con
+     `PRAGMA index_list(profile_segments)` (un único índice, `unique = 1`,
+     `origin = 'pk'`) y `PRAGMA index_info` (columnas `version`, `parameter`,
+     `start_minute`, en ese orden).
+   - `android_metadata` no aporta garantías de perfil. Solo se exige su
+     presencia y la columna `locale`.
+   - Comprobar solo nombres y columnas no basta: un trigger sustituido por otro
+     permisivo con el mismo nombre conserva ese inventario (comprobado por el
+     propietario en SQLite en memoria). La comparación de definiciones lo
+     rechaza.
 2. `PRAGMA foreign_key_check` vacío y `PRAGMA quick_check` igual a `ok`. Si no:
    `corrupt`.
 3. Leer y validar el historial completo con el dominio: decodificación,
@@ -684,6 +736,10 @@ de migrar una v1 vacía: misma lista de objetos en `sqlite_master`.
 6. Conservar versiones, franjas, huellas, origen, `restored_from`, fechas y
    escritores sin reescribir ninguna fila.
 
+Tras crear los objetos de 8.2, el esquema resultante se compara también por
+definición con el texto congelado de v2 (`SCHEMA_V2`), igual que una creación
+limpia.
+
 Cualquier excepción revierte la transacción: el fichero queda en v1 intacto y
 la pantalla muestra el motivo, nunca «sin perfil». No hay reparación
 destructiva, borrado de filas ni recreación de la base. El siguiente arranque
@@ -691,7 +747,11 @@ vuelve a intentar la migración desde el mismo estado.
 
 ### 8.5 Apertura, degradación y recuperación
 
-- Apertura de v2: validación completa de versiones y eventos en cada lectura.
+- Apertura de v2: comparación de definiciones con `SCHEMA_V2` (inventario,
+  `sql` de tablas, índices con nombre y triggers, e índices automáticos por
+  `PRAGMA`) al abrir, y validación completa de versiones y eventos en cada
+  lectura. Una definición distinta falla con `unsupported_schema` sin tocar el
+  fichero.
 - `user_version` mayor que 2: `unsupported_schema`.
 - Degradación: un build v1 que abre una base v2 ya falla hoy con
   `unsupported_schema` en `onDowngrade` y no la toca. Un build v2 hace lo mismo
@@ -707,13 +767,29 @@ vuelve a intentar la migración desde el mismo estado.
 
 ### 8.6 Prueba de copia previa
 
+Caso válido:
+
 1. Crear con el esquema v1 congelado (fixture de prueba) una base con historial
    sintético de varias versiones, franjas, `0`, «Sin configurar» y restauración.
 2. Cerrar la base y copiar el fichero.
 3. Migrar el original a v2 y validarlo.
 4. Abrir la copia con el adaptador v1 congelado: se lee y valida idéntica.
-5. Repetir con una fila manipulada: la migración falla, el original conserva
-   `user_version = 1` y el mismo contenido lógico, y sigue abriendo con v1.
+
+Caso corrupto:
+
+1. Crear la misma base v1 e introducir una fila manipulada (por ejemplo, una
+   huella que no corresponde a su contenido, o un decimal no canónico).
+2. Cerrar la base y copiar el fichero.
+3. Intentar migrar el original: falla con el motivo estable y revierte.
+4. El original conserva `user_version = 1` y el mismo contenido lógico,
+   **incluida la fila corrupta**. No se repara ni se borra nada.
+5. Original y copia, abiertos con el adaptador v1 congelado, se **siguen
+   rechazando** con el mismo motivo que antes de intentar la migración. Ninguno
+   se lee como válido.
+
+Caso de esquema alterado: una v1 con un trigger sustituido por otro permisivo
+del mismo nombre, o con un `CHECK` distinto, se rechaza con
+`unsupported_schema` antes de leer filas y queda intacta.
 
 ## 9. UI propuesta
 
@@ -738,7 +814,7 @@ Estado en la vista de la última versión:
 | E8 | «Versión 5 · datos sin confirmar. La confirmación de la versión 4 queda en el historial y no se aplica a la versión 5. Cálculo todavía bloqueado.» |
 | E9 | «Datos confirmados · versión 4. Cálculo todavía bloqueado: faltan límites y reglas clínicas aprobados.» |
 | E10 | «Confirmación retirada · versión 4. Revisa los datos y vuelve a confirmarlos si son correctos. Cálculo todavía bloqueado.» |
-| E11 | «Datos confirmados · versión 4, pero la zona horaria Europe/Madrid ya no se reconoce en este dispositivo. Revisa la zona. Cálculo todavía bloqueado.» |
+| E11 | «Datos confirmados · versión 4, pero la zona horaria Europe/Madrid ya no se reconoce en este dispositivo. Revisa la zona o retira la confirmación. Cálculo todavía bloqueado.» |
 | E1 | «Leyendo perfil y confirmaciones…» |
 | E2 a E4 | «No se pudo leer el perfil ni su estado de confirmación · `<código>`. No se muestra como sin confirmar.» |
 
@@ -811,11 +887,33 @@ orden por `seq`.
 
 Bolo (C7): «Perfil · no se usa para calcular», sin leer el perfil.
 
-### 9.3 Recreación
+### 9.3 Recreación y operación pendiente
 
-La pantalla de revisión guarda versión, huella, `observed_event_seq` y
-`operation_id` pendiente. Al recrear, relee la base: si algo cambió, cierra la
-revisión con `stale_version` o `state_changed` visible y no confirma.
+La pantalla de revisión guarda versión, huella, `observed_event_seq`,
+`operation_id` pendiente y su carga útil. Al recrear, relee versiones y eventos
+en una transacción y aplica este orden:
+
+1. **Lectura no demostrada** (pendiente, fallida o historial inválido): se
+   conserva la operación pendiente sin reintentarla y se muestra «No se sabe
+   todavía si la confirmación se registró · `<código>`. Reintenta la lectura
+   antes de volver a confirmar.» No se presenta como fracaso ni como éxito.
+2. **Resolver por identidad.** Si el historial validado contiene
+   `operation_id`:
+   - con la misma carga útil: la operación terminó antes de recrear. Se muestra
+     como registrada, con el estado vigente actual (que puede ser ya
+     «revocada» si otra acción posterior la retiró). Se descarta la operación
+     pendiente.
+   - con otra carga útil: `operation_mismatch` visible. No se reintenta.
+3. **La operación no consta.** Solo entonces se comparan versión, huella y
+   `observed_event_seq` con lo almacenado. Si algo cambió, se cierra la
+   revisión con `stale_version` o `state_changed` visible, se descarta la
+   operación pendiente y no se confirma. Si nada cambió, la revisión sigue
+   abierta y el usuario puede repetir la acción con el mismo `operation_id`.
+
+Así una confirmación ya registrada nunca se presenta como conflicto ni como
+fracaso. El mismo orden aplica a una revocación pendiente.
+
+Texto para el paso 2: «La confirmación de la versión 4 ya se había registrado.»
 
 ## 10. Pruebas previstas
 
@@ -823,72 +921,92 @@ Sin implementar en esta entrega. Todas con datos sintéticos.
 
 ### Comunes (`shared/clinical-profile`, JVM)
 
-- matriz E1 a E11 completa, cada fila con sus dimensiones y códigos;
+- matriz E1 a E11 completa, cada fila con sus dimensiones y códigos.
 - ausencia frente a `0`: `0` cuenta como configurado, «Sin configurar» como falta,
-  en cada parámetro y franja;
+  en cada parámetro y franja.
 - completitud por franja: una sola franja vacía entre varias configuradas, lista
-  de faltas completa y ordenada;
+  de faltas completa y ordenada.
 - unidad no declarada, zona no declarada, zona no reconocida por un
-  `TimeZoneRules` falso;
-- versión con más de 48 franjas completa: confirmable;
+  `TimeZoneRules` falso.
+- versión con más de 48 franjas completa: confirmable.
 - derivación: sin confirmar, vigente, revocada, reconfirmada, superada por versión
-  nueva, nunca fallback a una anterior;
-- versión nueva con huella igual a una histórica confirmada: sin confirmar;
-- restauración de una versión confirmada: versión nueva sin confirmar;
-- versión que cambia la unidad: incompleta y no confirmable;
+  nueva, nunca fallback a una anterior.
+- versión nueva con huella igual a una histórica confirmada: sin confirmar.
+- restauración de una versión confirmada: versión nueva sin confirmar.
+- versión que cambia desde una unidad de partida declarada: incompleta y no
+  confirmable. Primera declaración de unidad con valores completos:
+  confirmable. Restauración exacta completa de una versión con otra unidad:
+  confirmable con confirmación nueva, sin heredar la de origen.
+- revocación desde E11: aceptada sin completitud ni zona reconocida. Después,
+  E10 incompleta no confirmable.
 - validación de eventos: hueco o duplicado en `seq`, `operation_id` repetido o
   mal formado, `kind` o contrato desconocidos, huella distinta, versión
   inexistente, revocación de revocación, doble revocación, dos confirmaciones
   vigentes, `observed_event_seq` incoherente. Todo falla cerrado sin mostrar
-  «sin confirmar»;
+  «sin confirmar».
 - política de operación: idempotencia, `operation_mismatch`, `stale_version`,
-  `state_changed`, `already_active`, `not_active`, `incomplete`;
+  `state_changed`, `already_active`, `not_active`, `incomplete`.
 - reintento de una confirmación revocada: histórico con `replayed` y estado
-  vigente «revocada»;
+  vigente «revocada».
+- reintento con historial o eventos manipulados: `invalid_record`, nunca
+  `Recorded`, aunque `operation_id` exista.
+- resolución de operación pendiente al recrear (sección 9.3): lectura fallida
+  conserva la operación sin éxito ni fracaso. Operación encontrada con la misma
+  carga útil se muestra registrada aunque `observed_event_seq` haya quedado
+  atrás. Operación no encontrada con estado cambiado da `state_changed`.
 - correspondencia `input.profile.*` de la sección 6, conservando el código de
-  dominio y sin `expired`;
+  dominio y sin `expired`.
 - todos los estados: `allowsCalculation = false` y `allowsTreatment = false`.
 
 ### SQLite en dispositivo
 
-- creación limpia de v2 equivalente a migrar una v1 vacía (`sqlite_master`);
+- creación limpia de v2 equivalente a migrar una v1 vacía (`sqlite_master`).
 - migración de v1 vacía y de v1 con historial: filas, huellas y procedencia
-  idénticas, cero confirmaciones;
+  idénticas, cero confirmaciones.
 - rollback ante corrupción, esquema ajeno, columna extra o huella manipulada:
-  sigue en v1 con contenido lógico intacto;
-- copia previa de la sección 8.6;
-- `user_version` futura y degradación: `unsupported_schema`;
+  sigue en v1 con contenido lógico intacto.
+- inventario v1 con el índice automático `sqlite_autoindex_profile_segments_1`
+  aceptado. Índice ausente, objeto adicional, trigger sustituido por otro
+  permisivo con el mismo nombre o `CHECK` alterado: `unsupported_schema`.
+- definiciones de v2 tras crear y tras migrar idénticas a `SCHEMA_V2`. Una v2
+  con un trigger alterado se rechaza al abrir.
+- copia previa de la sección 8.6.
+- `user_version` futura y degradación: `unsupported_schema`.
 - triggers: `UPDATE` y `DELETE` abortan, inserción no contigua, versión no
   última, huella distinta, segunda confirmación vigente, revocación de
-  confirmación no vigente o de otra versión;
+  confirmación no vigente o de otra versión.
 - dos conexiones confirmando a la vez, confirmación contra revocación, versión
-  nueva entre lectura y confirmación;
-- commit fallido inyectado: nada insertado y reintento correcto después;
-- reinicio del repositorio: estado idéntico;
-- `save` rechaza añadir si los eventos no validan;
+  nueva entre lectura y confirmación.
+- commit fallido inyectado: nada insertado y reintento correcto después.
+- reinicio del repositorio: estado idéntico.
+- `save` rechaza añadir si los eventos no validan.
 - `meal-drafts.db` intacta en v3.
 
 ### UI en dispositivo
 
-- E5 a E11 visibles con sus textos, siempre con «Cálculo todavía bloqueado»;
+- E5 a E11 visibles con sus textos, siempre con «Cálculo todavía bloqueado».
 - confirmar no disponible dentro del editor ni con cambios pendientes, textos
-  pendientes, panel abierto o cambio de unidad pendiente;
+  pendientes, panel abierto o cambio de unidad pendiente.
 - la revisión muestra versión, huella corta, unidad, zona y todas las franjas, y
-  destaca `0`;
-- doble toque, rotación y recreación con revisión abierta y operación en vuelo;
+  destaca `0`.
+- doble toque, rotación y recreación con revisión abierta y operación en vuelo.
+- commit terminado antes de recrear: la confirmación aparece como registrada,
+  nunca como conflicto ni fracaso.
+- E11 ofrece «Retirar la confirmación» y, tras retirarla, no ofrece confirmar
+  hasta corregir la zona.
 - versión nueva guardada desde otra conexión durante la revisión: `stale_version`
-  visible;
-- errores de lectura y escritura visibles, nunca como «sin confirmar»;
-- revocar y reconfirmar como acciones separadas;
-- historial con confirmaciones, revocaciones y superadas;
+  visible.
+- errores de lectura y escritura visibles, nunca como «sin confirmar».
+- revocar y reconfirmar como acciones separadas.
+- historial con confirmaciones, revocaciones y superadas.
 - layouts 840×900, 900×840 y 411×914 dp, texto 1,0× y 1,8×, tema claro y oscuro.
 
 ### Arquitectura y verificación
 
 - motor, Bolo y `ReadOverview` siguen sin depender del perfil ni de las
-  confirmaciones (`verify.ps1`);
-- Bolo no muestra «Datos confirmados» ni lee el perfil;
-- clases nuevas en la lista `-e class` de `scripts/verify.ps1`;
+  confirmaciones (`verify.ps1`).
+- Bolo no muestra «Datos confirmados» ni lee el perfil.
+- clases nuevas en la lista `-e class` de `scripts/verify.ps1`.
 - `scripts/verify.ps1 -DeviceTests` con un único dispositivo autorizado y
   repositorios sintéticos aislados.
 
@@ -902,8 +1020,8 @@ anteriores (P4 y P6 del ADR 0012 siguen abiertas).
 
 - Pregunta: ¿qué declara exactamente el usuario al confirmar?
 - Alternativas: (a) revisión explícita de los datos de una versión guardada
-  identificada por número y huella, sin aprobación clínica; (b) confirmación más
-  aprobación clínica en un solo acto, esperando a los límites; (c) no confirmar
+  identificada por número y huella, sin aprobación clínica. (b) confirmación más
+  aprobación clínica en un solo acto, esperando a los límites. (c) no confirmar
   nada hasta tener límites.
 - Recomendación: (a), con el texto de la sección 1.1 y la separación de la 1.3.
 - Justificación: registra ya lo que el usuario puede afirmar sin presentar nada
@@ -917,8 +1035,8 @@ anteriores (P4 y P6 del ADR 0012 siguen abiertas).
 
 - Pregunta: ¿qué debe cumplir una versión para poder confirmarse?
 - Alternativas: (a) todas las reglas estructurales aprobadas más valor
-  configurado en todas las franjas, con `0` contado como configurado; (b) igual
-  que (a) pero bloqueando `0`; (c) permitir confirmar versiones incompletas
+  configurado en todas las franjas, con `0` contado como configurado. (b) igual
+  que (a) pero bloqueando `0`. (c) permitir confirmar versiones incompletas
   marcándolas.
 - Recomendación: (a), con zona comprobada contra la plataforma al confirmar y al
   evaluar, `0` destacado en la revisión y el límite de 48 fuera de la puerta.
@@ -931,8 +1049,8 @@ anteriores (P4 y P6 del ADR 0012 siguen abiertas).
 ### C3. Política de última versión y ausencia de fallback histórico
 
 - Pregunta: ¿qué versión puede ser candidata a un uso futuro?
-- Alternativas: (a) solo la última guardada con su propia confirmación vigente;
-  (b) la última confirmada aunque exista una posterior sin confirmar; (c) elegir
+- Alternativas: (a) solo la última guardada con su propia confirmación vigente.
+  (b) la última confirmada aunque exista una posterior sin confirmar. (c) elegir
   manualmente una versión «activa».
 - Recomendación: (a).
 - Justificación: (b) usaría datos que el usuario ya cambió. (c) introduce un
@@ -945,9 +1063,11 @@ anteriores (P4 y P6 del ADR 0012 siguen abiertas).
 
 - Pregunta: ¿cómo se retira una confirmación y cómo se vuelve a confirmar?
 - Alternativas: (a) evento `revoke` enlazado por `seq` a una confirmación vigente
-  de la última versión, reconfirmación como operación nueva; (b) sin revocación,
-  solo versión nueva; (c) permitir revocar confirmaciones superadas.
-- Recomendación: (a).
+  de la última versión, reconfirmación como operación nueva. (b) sin revocación,
+  solo versión nueva. (c) permitir revocar confirmaciones superadas.
+- Recomendación: (a). Revocar exige historial íntegro y confirmación vigente
+  de la última versión, pero **no** completitud ni zona reconocida, de modo que
+  también se puede retirar en E11.
 - Justificación: permite al usuario retractarse sin crear contenido nuevo y
   conserva toda la historia. (c) no cambia ningún estado vigente y añade ruido.
 - Si no se resuelve: el usuario no puede retirar una confirmación errónea sin
@@ -958,10 +1078,13 @@ anteriores (P4 y P6 del ADR 0012 siguen abiertas).
 
 - Pregunta: ¿qué ocurre con la confirmación al crear versiones?
 - Alternativas: (a) ninguna versión nueva hereda confirmación, ni con huella
-  idéntica, ni por restauración; (b) heredar si la huella coincide con una
-  versión confirmada; (c) heredar en restauraciones exactas.
-- Recomendación: (a). La versión que cambia unidad es incompleta y no
-  confirmable. Se mantienen sin cambios las reglas aprobadas de unidad.
+  idéntica, ni por restauración. (b) heredar si la huella coincide con una
+  versión confirmada. (c) heredar en restauraciones exactas.
+- Recomendación: (a). Solo la versión que cambia desde una unidad de partida
+  declarada es incompleta y no confirmable. La primera declaración de unidad y
+  la restauración exacta de una versión con otra unidad conservan sus valores y
+  pueden optar a una confirmación nueva si están completas (sección 5.3). Se
+  mantienen sin cambios las reglas aprobadas de unidad.
 - Justificación: la confirmación es un acto sobre lo que se revisó, en una
   versión concreta. Heredarla convertiría una coincidencia de huella en una
   revisión no hecha.
@@ -972,8 +1095,8 @@ anteriores (P4 y P6 del ADR 0012 siguen abiertas).
 
 - Pregunta: ¿se puede confirmar con un editor abierto?
 - Alternativas: (a) no: solo desde la vista de solo lectura, sin editor con
-  cambios, con revisión construida desde la base; (b) sí, confirmando la última
-  versión guardada con aviso; (c) «Guardar y confirmar» en un paso.
+  cambios, con revisión construida desde la base. (b) sí, confirmando la última
+  versión guardada con aviso. (c) «Guardar y confirmar» en un paso.
 - Recomendación: (a), con las cinco barreras de la sección 5.4.
 - Justificación: (b) y (c) facilitan confirmar algo distinto de lo que se ve.
 - Si no se resuelve: riesgo de confirmar por error contenido distinto del
@@ -985,8 +1108,8 @@ anteriores (P4 y P6 del ADR 0012 siguen abiertas).
 - Pregunta: ¿cómo se reportan los estados del perfil en el contrato general?
 - Alternativas: (a) tabla de la sección 6.2 con la opción A de 6.3: sin motivo
   general para «sin confirmar» o «revocada», código de dominio conservado y
-  `policy_not_approved` siempre presente; (b) añadir `unconfirmed` (y `revoked`)
-  al contrato v1 con revisión de consumidores; (c) contrato v2.
+  `policy_not_approved` siempre presente. (b) añadir `unconfirmed` (y `revoked`)
+  al contrato v1 con revisión de consumidores. (c) contrato v2.
 - Recomendación: (a) para este incremento, y decidir entre (b) y (c) antes de
   cualquier aprobación clínica. Incluye los motivos propuestos para pendiente
   (`unknown`), fallo de lectura (`persistence_failed`), historial inválido
@@ -1003,10 +1126,12 @@ anteriores (P4 y P6 del ADR 0012 siguen abiertas).
 
 - Pregunta: ¿cómo se identifican y serializan confirmar y revocar?
 - Alternativas: (a) `operation_id` UUID por intención, `seq` contiguo como orden,
-  transacción exclusiva y comprobación estricta de `observed_event_seq`;
-  (b) igual pero comprobación laxa (solo «sin confirmación vigente»); (c) sin
+  transacción exclusiva y comprobación estricta de `observed_event_seq`.
+  (b) igual pero comprobación laxa (solo «sin confirmación vigente»). (c) sin
   identificador, idempotencia por contenido como en `save`.
-- Recomendación: (a), con los escenarios de la sección 7.3.
+- Recomendación: (a), con los escenarios de la sección 7.3. Todo reintento
+  valida antes versiones y eventos, y una operación pendiente al recrear la
+  pantalla se resuelve primero por su identidad (sección 9.3).
 - Justificación: (b) permite confirmar sobre una revocación hecha por otra
   conexión que el usuario no ha visto. (c) no distingue un reintento de una
   reconfirmación tras revocar, que es justo el caso que no debe reactivarse.
@@ -1019,10 +1144,13 @@ anteriores (P4 y P6 del ADR 0012 siguen abiertas).
 - Pregunta: ¿cómo se almacena y se migra?
 - Alternativas: (a) tabla única de eventos con `CHECK` por tipo, índices y
   triggers de la sección 8.2, migración v1 → v2 transaccional con validación
-  completa y sin confirmaciones automáticas, `save` validando también eventos;
+  completa y sin confirmaciones automáticas, `save` validando también eventos.
   (b) dos tablas, confirmaciones y revocaciones, con un tercer objeto para el
-  orden; (c) base separada para confirmaciones.
-- Recomendación: (a), con las pruebas de 8.6 y 10.
+  orden. (c) base separada para confirmaciones.
+- Recomendación: (a), con verificación del esquema por definición (texto
+  congelado de v1 y v2, índice automático por `PRAGMA`) al migrar y al abrir, y
+  con las pruebas de 8.6 y 10, incluida la conservación y el rechazo de una copia
+  corrupta.
 - Justificación: una sola secuencia da orden inequívoco. (c) pierde la
   transacción común con las versiones, imprescindible para comprobar «última
   versión y su huella» de forma atómica.
@@ -1052,7 +1180,7 @@ anteriores (P4 y P6 del ADR 0012 siguen abiertas).
   v2, UI de revisión y revocación y el cambio de texto de Bolo, con cálculo y
   tratamiento bloqueados en todos los estados.
 - Local, sin red, sin permisos nuevos, sin tocar motor ni `ReadOverview`.
-- Coste: una tabla, cinco triggers, dos índices y validación de eventos en cada
+- Coste: una tabla, seis triggers, dos índices y validación de eventos en cada
   lectura. El volumen es pequeño.
 - Rollback de la implementación: revertir el commit deja una base v2 que un build
   v1 no abre (fallo cerrado, sin pérdida). Se recupera con un build compatible.
@@ -1075,3 +1203,20 @@ Aprobación de límites o de una política clínica, conexión de la puerta a Bo
 al motor, cambio del contrato `unavailable-input`, perfiles alternativos,
 sincronización entre dispositivos, propuestas del sistema, un segundo esquema de
 contenido o un cambio del significado de confirmar.
+
+## 16. Revisión del propietario sobre la PR #31 (2026-10-03)
+
+El propietario revisó el borrador (commit `c5f64b8`, CI en verde) y pidió cuatro
+correcciones antes de decidir. Se incorporan sin cambiar las recomendaciones
+generales C1 a C9, que siguen pendientes. C7 se mantiene como solución
+provisional mientras `policy_not_approved` bloquee todo.
+
+| Punto | Corrección | Secciones | Decisiones afectadas |
+|---|---|---|---|
+| 1 | Un reintento valida versiones y eventos antes de devolver `Recorded`. Al recrear la pantalla, la operación pendiente se resuelve primero por su identidad, para no presentar una confirmación ya registrada como conflicto o fracaso | 7.1, 7.3, 9.3, 10 | C8 |
+| 2 | La versión incompleta por construcción es solo la que cambia desde una unidad de partida declarada. Primera declaración y restauración exacta con otra unidad conservan valores y pueden optar a confirmación nueva | 5.3, 10, C5 | C5 |
+| 3 | E11 permite retirar la confirmación. Revocar no exige completitud ni zona reconocida. E9 y E11 tienen confirmación vigente | 2.2, 2.3, 9.2, 10, C4 | C4 |
+| 4 | La migración verifica definiciones exactas, incluye el índice automático de la clave compuesta y conserva y sigue rechazando una copia corrupta | 8.4, 8.5, 8.6, 10, C9 | C9 |
+
+Además se corrigen dos detalles del borrador publicado: el recuento de triggers
+nuevos (seis) y la puntuación de algunas listas.
