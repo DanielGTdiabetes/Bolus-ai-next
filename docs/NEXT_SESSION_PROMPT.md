@@ -138,7 +138,9 @@ docs/adr/0015-profile-unavailability-contract.md compara las opciones B y C
 del ADR 0014 §6.3 con la evidencia de contratos, consumidores y pruebas
 actuales, define las correspondencias E1 a E11 y recomienda C (contrato v2
 aditivo con detalle de dominio, `unconfirmed` solo para `profile`, v1
-congelado). Decisiones D1 a D8 pendientes del propietario. Publicado como PR en
+congelado, garantías de construcción y `@Throws` hacia Swift). Incorpora la
+primera revisión del propietario (sección 12). Decisiones D1 a D10 pendientes
+del propietario. Publicado como PR en
 borrador, sin implementar ni integrar.
 
 SIGUIENTE PASO

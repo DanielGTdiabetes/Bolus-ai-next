@@ -124,22 +124,94 @@ Tipo nuevo, versión 2, que conserva v1 intacto:
 
 ```kotlin
 // Ilustrativo. Vive en el módulo del contrato, sin depender del perfil.
-data class InputUnavailability(          // contractVersion = 2
-    val input: InputKind,
-    val reason: UnavailabilityReasonV2,   // motivos v1 con el mismo código y significado, más unconfirmed
-    val details: List<String>,            // códigos de dominio estables, ordenados y sin duplicados
+class InputUnavailability @Throws(IllegalArgumentException::class) constructor(  // contractVersion = 2
+    input: InputKind,
+    reason: UnavailabilityReasonV2,   // los 13 motivos v1 con el mismo código y significado, más unconfirmed
+    details: List<String>,            // códigos de dominio estables
 )
-class InputUnavailabilityReport(entries: List<InputUnavailability>) // contractVersion = 2
+class InputUnavailabilityReport @Throws(IllegalArgumentException::class) constructor(
+    entries: List<InputUnavailability>,
+) // contractVersion = 2
 ```
 
-- Admisibilidad por entrada: una tabla fija qué motivos puede declarar cada
-  entrada. `unconfirmed` solo para `profile`. Construir una combinación no
-  admitida falla con un identificador estable.
-- Detalle: códigos con el espacio de nombres de su entrada (`profile.…`),
-  validados por forma, nunca texto traducido ni valores clínicos.
-- Compatibilidad: v1 queda congelado y sus productores y consumidores no
-  cambian. Elevar una causa v1 a v2 (mismo motivo, sin detalle) no pierde nada.
-  Proyectar v2 a v1 pierde el detalle y no existe para `unconfirmed`: no se
+#### C.1 Admisibilidad por entrada
+
+| Motivo v2 | `glucose` | `profile` | `iob` | `meal` |
+|---|---|---|---|---|
+| `missing`, `invalid`, `expired`, `unknown`, `incomplete`, `conflicting`, `permission_denied`, `source_unavailable`, `authentication_failed`, `clock_anomaly`, `parse_failed`, `persistence_failed`, `policy_not_approved` (los 13 de v1) | admitido | admitido | admitido | admitido |
+| `unconfirmed` | no admitido | admitido | no admitido | no admitido |
+
+- Los 13 motivos de v1 siguen admitidos para las cuatro entradas, exactamente
+  como en v1 (52 combinaciones). v2 **no** restringe ninguna combinación que v1
+  permita: restringirla cambiaría su significado y haría parcial la elevación.
+- La única restricción nueva es `unconfirmed`, admitido solo para `profile`.
+  En total, 53 combinaciones admitidas.
+- Elevación v1 → v2: función total sobre las 52 combinaciones de v1, con el
+  mismo motivo, el mismo `code` y detalle vacío. Nunca falla y no pierde nada.
+- Que un motivo esté admitido no significa que un productor concreto pueda
+  emitirlo: cada productor sigue obligado a demostrar su causa (contrato v1).
+- Añadir otro motivo v2 o admitirlo para otra entrada exige revisar
+  consumidores y actualizar esta tabla y sus pruebas.
+
+#### C.2 Garantías de construcción
+
+Gramática del detalle (constantes técnicas, no clínicas):
+
+```text
+detalle  := entrada ( "." segmento )+
+entrada  := código de InputKind de la causa ("glucose" | "profile" | "iob" | "meal")
+segmento := [a-z] [a-z0-9_]*
+longitud del detalle: 1 a 128 caracteres ASCII
+detalles por causa: 0 a 16, después de eliminar duplicados
+```
+
+Ejemplos válidos: `profile.confirmation.revoked`,
+`profile.storage.read_failed`. Rechazados: `Profile.x` (mayúscula),
+`profile` (sin segmento), `glucose.x` en una causa de `profile` (espacio de
+nombres ajeno), texto traducido o valores numéricos de franjas.
+
+Identificadores estables de rechazo (mensaje de `IllegalArgumentException`):
+
+| Identificador | Cuándo |
+|---|---|
+| `input_unavailability.reason_not_admitted` | combinación entrada/motivo fuera de C.1 |
+| `input_unavailability.detail_malformed` | un detalle no cumple la gramática o la longitud |
+| `input_unavailability.detail_foreign_namespace` | un detalle no empieza por el código de la entrada de la causa |
+| `input_unavailability.too_many_details` | más de 16 detalles distintos |
+| `input_unavailability_report.empty` | informe v2 sin causas |
+
+Copias y normalización:
+
+- Cada causa copia la lista recibida **antes** de validarla, elimina detalles
+  idénticos y los ordena por código. Guarda solo esa copia. Mutar después la
+  lista del productor no cambia la causa.
+- `details` devuelve una copia nueva en cada acceso. Igualdad y `hashCode` se
+  calculan sobre motivo, entrada y la copia normalizada. No es una `data class`
+  con una lista expuesta, para no compartir la referencia mutable.
+- El informe v2 copia la lista de causas, une los detalles de las causas con
+  el mismo par entrada/motivo (unión ordenada y sin duplicados, que vuelve a
+  pasar el límite de 16), ordena las causas por `code` como v1 y devuelve una
+  copia en cada acceso a `entries`.
+- Nada es nulo: entrada, motivo y cada detalle son obligatorios.
+
+Límite con Swift:
+
+- Los constructores que validan declaran `@Throws(IllegalArgumentException::class)`,
+  como `UnavailableInputReport` v1. Sin esa declaración, Kotlin/Native termina el
+  proceso al cruzar el límite Objective-C (contrato del informe v1). Desde
+  Swift se invocan con `try` y el identificador estable llega en
+  `localizedDescription`.
+- Alternativa (D9): una fábrica que devuelve un resultado explícito
+  (`Built`/`Rejected(identificador)`) sin excepciones. Más verbosa en Kotlin y
+  sin precedente en el proyecto.
+- La elevación v1 → v2 no lanza y no necesita `@Throws`.
+- Comportamiento en iOS: no verificado. La prueba Swift queda prevista y su
+  ejecución requiere autorización explícita de macOS (ADR 0004).
+
+#### C.3 Compatibilidad y coste
+
+- v1 queda congelado y sus productores y consumidores no cambian.
+- Proyectar v2 a v1 pierde el detalle y no existe para `unconfirmed`: no se
   ofrece proyección automática.
 - En contra: dos versiones conviven, un tipo y un informe más, y cada consumidor
   nuevo debe elegir v2.
@@ -148,15 +220,21 @@ class InputUnavailabilityReport(entries: List<InputUnavailability>) // contractV
 
 **Opción C**, con estas precisiones:
 
-- Motivo general nuevo solo `unconfirmed` (E7 y E10), admitido únicamente para
-  `profile`. La retirada y la confirmación superada son detalle, no motivo.
-- Los 13 motivos v1 conservan su código y significado en v2.
+- Motivo general nuevo solo `unconfirmed`, admitido únicamente para `profile`
+  (tabla C.1). La retirada y la confirmación superada son detalle, no motivo.
+- Los 13 motivos v1 conservan su código, su significado y su admisibilidad para
+  las cuatro entradas.
+- Construcción con las garantías de C.2: gramática del detalle, identificadores
+  estables de rechazo, copias defensivas y `@Throws` hacia Swift.
 - El informe v2 agrupa por par entrada/motivo y une los detalles, ordenados y
   sin duplicados. Ordena las causas por código como v1. Lista vacía rechazada.
-- El detalle del perfil son los `detailCodes` de `ProfileGateState` y el código
-  de `ProfileFailure` de lectura. Las faltas concretas de completitud (franja,
-  parámetro) se quedan en el dominio: el consumidor que las necesite consulta la
-  puerta del perfil.
+- El adaptador deriva cada causa de las dimensiones de `ProfileGateState`
+  (lectura, completitud y confirmación) con las reglas de la sección 6, no
+  solo de `detailCodes`, que omite `confirmation.missing` cuando la versión es
+  incompleta. Los códigos de detalle son los ya publicados en
+  `ProfileGateCodes` y `ProfileFailure`. Las faltas concretas de completitud
+  (franja, parámetro) se quedan en el dominio: el consumidor que las necesite
+  consulta la puerta del perfil.
 - El adaptador `ProfileGateState` → v2 vive en un módulo común nuevo que
   depende del perfil y del contrato, nunca al revés. Motor, Bolo y
   `ReadOverview` siguen sin depender del perfil.
@@ -172,10 +250,43 @@ para la futura puerta clínica.
 
 ## 6. Correspondencias E1 a E11
 
-Columna «C recomendada»: motivos generales y, entre corchetes, detalle de
-dominio. En todas las filas, `allowsCalculation = false` y
-`allowsTreatment = false`. «+ política» indica `policy_not_approved` con el
-detalle `profile.not_approved_for_calculation`.
+### 6.1 Reglas de composición (opción C)
+
+Las causas se acumulan por dimensión y nunca se sustituyen entre sí. «+
+política» indica siempre `policy_not_approved`
+[`profile.not_approved_for_calculation`]. En todos los casos,
+`allowsCalculation = false` y `allowsTreatment = false`.
+
+| Dimensión (ADR 0014 §2.1) | Condición demostrada | Causa aportada |
+|---|---|---|
+| Lectura | pendiente | `unknown` [`profile.read.pending`]. No se evalúa nada más |
+| Lectura | fallida | `persistence_failed` [`profile.storage.read_failed` o `profile.storage.corrupt`]. No se evalúa nada más |
+| Lectura | historial inválido | `invalid` [`profile.storage.invalid_record`]. No se evalúa nada más |
+| Lectura | esquema no soportado | `parse_failed` [`profile.storage.unsupported_schema`]. No se evalúa nada más |
+| Lectura | ausencia demostrada | `missing` [`profile.history.missing`]. No hay completitud ni confirmación que evaluar |
+| Completitud | alguna falta distinta de la zona: unidad o zona sin declarar, o franja sin valor | `incomplete` [`profile.gate.incomplete`] |
+| Completitud | zona declarada que la plataforma no reconoce | `invalid` [`profile.gate.time_zone_unrecognized`] |
+| Confirmación | sin confirmar | `unconfirmed` [`profile.confirmation.missing`] |
+| Confirmación | retirada | `unconfirmed` [`profile.confirmation.revoked`] |
+| Confirmación | vigente | ninguna causa de confirmación |
+| Confirmación | hay confirmaciones superadas de versiones anteriores y la última no tiene confirmación vigente | añade [`profile.confirmation.superseded`] al detalle de `unconfirmed` |
+| Elegibilidad | siempre en este incremento | + política |
+
+Precisiones:
+
+- Las dos filas de completitud son independientes: si faltan valores y además
+  la zona no se reconoce, se emiten `incomplete` **e** `invalid`, cada una con
+  su detalle. Esto puede ocurrir con o sin confirmación vigente.
+- `invalid` por zona no reconocida y `invalid` por historial inválido no
+  coinciden nunca: el segundo impide evaluar la completitud.
+- `profile.confirmation.superseded` se emite también con una confirmación
+  retirada. El dominio solo lo incluye en `detailCodes` para «sin confirmar»;
+  el adaptador lo deriva de `ProfileGateState.superseded`. Ver D5.
+- Una versión confirmada fue completa al confirmarse y su contenido es
+  inmutable. Después solo puede fallar la zona, por la plataforma. La regla
+  cubre igualmente cualquier combinación.
+
+### 6.2 Matriz resultante
 
 | Estado | A (vigente) | B | C recomendada |
 |---|---|---|---|
@@ -184,20 +295,26 @@ detalle `profile.not_approved_for_calculation`.
 | E3 historial inválido | `invalid` + política | igual | `invalid` [`profile.storage.invalid_record`] + política |
 | E4 esquema no soportado | `parse_failed` + política | igual | `parse_failed` [`profile.storage.unsupported_schema`] + política |
 | E5 sin versión | `missing` + política | igual | `missing` [`profile.history.missing`] + política |
-| E6 incompleta | `incomplete` + política | igual | `incomplete` [`profile.gate.incomplete`] + `unconfirmed` [`profile.confirmation.missing`] + política |
+| E6 incompleta, solo faltas distintas de la zona | `incomplete` + política | igual | `incomplete` [`profile.gate.incomplete`] + `unconfirmed` [`profile.confirmation.missing`] + política |
+| E6 incompleta, solo zona no reconocida | `invalid` + política | igual | `invalid` [`profile.gate.time_zone_unrecognized`] + `unconfirmed` [`profile.confirmation.missing`] + política |
+| E6 incompleta, faltas y zona no reconocida | `incomplete` + `invalid` + política | igual | `incomplete` [`profile.gate.incomplete`] + `invalid` [`profile.gate.time_zone_unrecognized`] + `unconfirmed` [`profile.confirmation.missing`] + política |
 | E7 completa sin confirmar | solo política | `unconfirmed` + política | `unconfirmed` [`profile.confirmation.missing`] + política |
-| E8 anterior confirmada, última sin confirmar | como E6 o E7 | como E6 o E7 | como E6 o E7, con `profile.confirmation.superseded` añadido al detalle de `unconfirmed` |
+| E8 anterior confirmada, última sin confirmar | como E6 o E7 | como E6 o E7 | la fila de E6 o E7 que corresponda, con `unconfirmed` [`profile.confirmation.missing`, `profile.confirmation.superseded`] |
 | E9 confirmación vigente | solo política | igual | solo política |
-| E10 confirmación retirada | solo política | `revoked` (o `unconfirmed`) + política | `unconfirmed` [`profile.confirmation.revoked`] + política, y `incomplete` o `invalid` si además falla la completitud |
+| E10 confirmación retirada, completa | solo política | `revoked` (o `unconfirmed`) + política | `unconfirmed` [`profile.confirmation.revoked`] + política |
+| E10 confirmación retirada, con faltas | política más las causas de completitud | `revoked` y las de completitud + política | las causas de completitud que se demuestren (`incomplete` [`profile.gate.incomplete`], `invalid` [`profile.gate.time_zone_unrecognized`] o ambas) + `unconfirmed` [`profile.confirmation.revoked`] + política. Con superadas, también [`profile.confirmation.superseded`] |
 | E11 confirmada, zona no reconocida | `invalid` + política | igual | `invalid` [`profile.gate.time_zone_unrecognized`] + política. Sin `unconfirmed`: la confirmación sigue vigente |
 
 Notas:
 
-- E6 en C declara también `unconfirmed`, porque la última versión no tiene
-  confirmación. El ADR 0014 no emitía `confirmation.missing` para una versión
-  incompleta. Ver D5.
-- E1 a E4 nunca llevan `unconfirmed` ni `missing`: sin lectura demostrada no se
-  evalúa la confirmación (ADR 0014, sección 2.1).
+- E6 en C declara también `unconfirmed`, porque la lectura y la ausencia de
+  confirmación están demostradas. El ADR 0014 no emitía `confirmation.missing`
+  para una versión incompleta. Ver D5.
+- E1 a E5 nunca llevan `unconfirmed`, `incomplete` ni causas de zona: sin
+  lectura demostrada, o sin versión, no se evalúan completitud ni confirmación
+  (ADR 0014, sección 2.1).
+- La columna A aplica la regla del ADR 0014 §6.1: varias causas se conservan
+  juntas en el informe, sin prioridad, también para la completitud.
 - Un error de operación al confirmar o retirar no es un estado de entrada y no
   produce ninguna causa.
 
@@ -220,16 +337,27 @@ Comunes (`shared`, JVM):
 
 - v2: códigos `input.<entrada>.<motivo>` iguales a v1 para los 13 motivos, más
   `input.profile.unconfirmed`. `contractVersion = 2`.
-- admisibilidad: cada combinación no admitida falla con su identificador
-  estable. En particular `glucose`, `iob` y `meal` con `unconfirmed`.
-- detalle: forma válida, espacio de nombres de la entrada, sin duplicados,
-  orden determinista. Detalle vacío admitido para causas elevadas desde v1.
-- informe v2: vacío rechazado, unión de detalles por par entrada/motivo, orden
-  independiente del productor, aislamiento de mutaciones.
-- elevación v1 → v2 sin pérdida para cada motivo y entrada.
-- adaptador: la matriz E1 a E11 de la sección 6 exacta, con el detalle de
-  dominio conservado, sin `expired`, con `policy_not_approved` en todas las
-  filas y sin `conflicting` por errores de operación.
+- admisibilidad (C.1): las 53 combinaciones admitidas se construyen. Las 3
+  restantes (`glucose`, `iob` y `meal` con `unconfirmed`) fallan con
+  `input_unavailability.reason_not_admitted`. La tabla de la prueba se compara
+  con la del contrato publicado.
+- detalle (C.2): casos válidos e inválidos de la gramática en los límites (1 y
+  128 caracteres, 16 y 17 detalles, mayúsculas, segmento vacío, carácter no
+  ASCII, espacio de nombres ajeno), cada uno con su identificador estable.
+  Duplicados eliminados y orden determinista.
+- copias defensivas: mutar la lista del productor después de construir una
+  causa o un informe no los cambia. Mutar la lista devuelta por `details` o
+  `entries` tampoco. Igualdad por contenido normalizado.
+- informe v2: vacío rechazado con `input_unavailability_report.empty`, unión de
+  detalles por par entrada/motivo con el límite de 16 aplicado tras la unión,
+  orden independiente del productor.
+- elevación v1 → v2: las 52 combinaciones de v1 se elevan sin fallar, con el
+  mismo `code` y detalle vacío.
+- adaptador: las reglas de 6.1 y la matriz de 6.2 exactas, incluidas las
+  acumulaciones (faltas y zona juntas, con y sin confirmación vigente, con
+  retirada y con superadas), con el detalle de dominio conservado, sin
+  `expired`, con `policy_not_approved` en todas las filas y sin `conflicting`
+  por errores de operación.
 - regresión: `UnavailableInputTest`, `UnavailableInputReportTest`,
   `GlucoseStatusPresenterTest` y las pruebas de Dexcom sin cambios.
 
@@ -239,8 +367,12 @@ Android y arquitectura:
 - `verify.ps1`: el motor sigue sin depender del perfil, el módulo adaptador
   depende en una sola dirección, `ReadOverview` y `ScreenRenderer` siguen sin
   referenciar el perfil.
-- Swift: ampliar `UnavailableInputReportSmoke.swift` con v2, sin ejecutarlo
-  hasta una autorización explícita de macOS (ADR 0004).
+- Swift: ampliar `UnavailableInputReportSmoke.swift` con v2: un rechazo de
+  causa y uno de informe capturados con `try`, con su identificador en
+  `localizedDescription`, y una construcción correcta posterior en el mismo
+  proceso. Prevista, sin ejecutar hasta una autorización explícita de macOS
+  (ADR 0004). Hasta entonces el comportamiento en iOS figura como no
+  verificado.
 
 ## 9. Decisiones del propietario
 
@@ -249,11 +381,13 @@ Android y arquitectura:
 | D1 | ¿B o C? | C (sección 5) | sigue la opción A provisional. Ninguna aprobación clínica puede retirar `policy_not_approved` |
 | D2 | ¿Motivo general para «sin confirmar»? | `unconfirmed`, solo en v2 y solo para `profile` | E7 y E10 dependen de `policy_not_approved` |
 | D3 | ¿La retirada es motivo propio? | no: detalle `profile.confirmation.revoked` bajo `unconfirmed` | — |
-| D4 | ¿Admisibilidad por entrada en v2? | sí, con tabla fija y fallo estable | motivos sin sentido construibles, como en B |
-| D5 | ¿Una versión incompleta declara también `unconfirmed`? | sí: es verdad y evita inferir confirmación de la ausencia del motivo | E6 sin `unconfirmed`, como en el ADR 0014 |
+| D4 | ¿Admisibilidad por entrada en v2? | sí, tabla C.1: los 13 motivos v1 para las cuatro entradas y `unconfirmed` solo para `profile` | motivos sin sentido construibles, como en B |
+| D5 | ¿Cómo deriva el adaptador las causas de confirmación? | por dimensiones (6.1): `unconfirmed` también en una versión incompleta, y `superseded` también con una retirada | E6 sin `unconfirmed` y `superseded` solo como en `detailCodes`, como en el ADR 0014 |
 | D6 | ¿Detalle de completitud por franja en el contrato? | no: solo códigos de dominio. Las faltas se consultan en la puerta | — |
 | D7 | ¿Código estático de `ReadOverview`? | `input.profile.policy_not_approved` en la entrega de implementación | sigue `missing`, no demostrado cuando existe una versión |
 | D8 | ¿Ubicación del adaptador? | módulo común nuevo dependiente del perfil y del contrato | no se puede implementar sin romper las reglas de `verify.ps1` |
+| D9 | ¿Cómo se rechaza una construcción inválida hacia Swift? | `@Throws(IllegalArgumentException::class)` con identificador estable, como el informe v1 | sin decisión no se implementa: omitirlo puede terminar el proceso en iOS |
+| D10 | ¿Límites técnicos del detalle? | 128 caracteres y 16 detalles por causa (C.2), constantes técnicas no clínicas | sin límites, un productor defectuoso podría crecer sin cota |
 
 Ninguna decisión conecta el perfil con Bolo, `ReadOverview` (salvo el texto
 estático de D7) o el motor, ni aprueba límites, vigencia, DIA, IOB, resolución
@@ -276,3 +410,17 @@ Una aprobación clínica del perfil, la conexión de la puerta con Bolo, el moto
 u otro consumidor, una segunda entrada que necesite un motivo propio, la
 serialización o persistencia del contrato, o la verificación de iOS que muestre
 un problema del binding.
+
+## 12. Revisión del propietario sobre la PR #35 (2026-10-03)
+
+El propietario revisó el borrador `5582f41` (CI en verde, `verify.ps1`
+correcto) y pidió tres correcciones antes de decidir. Se incorporan sin cambiar
+la recomendación general (opción C). Confirmó como correctos D7 y que una
+versión incompleta declare `unconfirmed` cuando la lectura y la ausencia de
+confirmación están demostradas.
+
+| Punto | Corrección | Secciones | Decisiones afectadas |
+|---|---|---|---|
+| 1 | La matriz perdía causas de completitud: zona no reconocida sin confirmación vigente, y faltas y zona a la vez. Ahora las causas se componen por dimensión, `incomplete` e `invalid` se conservan juntas con sus detalles, junto a `unconfirmed` y la política, y E10 precisa la acumulación | 6.1, 6.2, 8 | D5 |
+| 2 | Faltaba la tabla de admisibilidad. Ahora enumera las 53 combinaciones: los 13 motivos v1 para las cuatro entradas, sin restricción nueva, y `unconfirmed` solo para `profile`. La elevación v1 → v2 es total sobre las 52 combinaciones de v1 | C.1, 5, 8 | D4 |
+| 3 | Garantías de construcción: gramática y límites del detalle, identificadores estables de rechazo, copias defensivas en causa e informe y `@Throws` hacia Swift (o un resultado explícito), con sus pruebas previstas e iOS sin verificar | C.2, 5, 8 | D9, D10 |
