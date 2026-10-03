@@ -50,11 +50,10 @@ docs/validation/profile-segment-editor-2026-09-28.md,
 docs/validation/profile-confirmation-domain-2026-10-03.md y
 docs/validation/profile-confirmation-ui-2026-10-03.md.
 Comprueba el CI del SHA exacto integrado antes de empezar. La última
-integración en `main` es la PR #35, solo documentación del ADR 0015 (merge
-commit b3cf7e6c869b2fe9aa7ed9a873a5323705145ec9, Verify 37139124635 en verde).
-La última integración de código es la PR #33 (merge commit
-89404989e451a3cc1899df309caedc759bdfdc44). Si `origin/main` avanzó, comprueba
-su SHA exacto.
+integración de código es la PR #36, implementación del ADR 0015 (merge commit
+a57d2e5ce6497220a54e3ae632087c688a13f002, Verify 37142410544 en verde). Después se integró una PR solo
+documental que registra esa integración: comprueba el SHA exacto de
+`origin/main` y su CI.
 Esta entrega no consultó ni modificó Legacy. Su última auditoría documentada
 continúa fijada en f5417721d8019a9831126f4d843edfc4de87653d; no afirmes que ese
 SHA sigue siendo el main remoto sin comprobarlo si necesitas nueva evidencia.
@@ -136,12 +135,13 @@ Ni Bolo, `ReadOverview` ni el motor leen el perfil. La traducción del estado
 del perfil a `input.profile.*` existe solo en el módulo del ADR 0015, sin
 consumidores. Sin cambios de esquema, serialización ni huellas.
 
-ADR 0015 — CONTRATO DE INDISPONIBILIDAD DEL PERFIL (implementado y aprobado)
+ADR 0015 — CONTRATO DE INDISPONIBILIDAD DEL PERFIL (implementado e integrado)
 docs/adr/0015-profile-unavailability-contract.md, aceptado el 2026-10-03 con D1
 a D10 (opción C) e integrado como documentación mediante la PR #35. El
 propietario autorizó después implementarlo. La implementación está en la rama
-`claude/profile-unavailability-v2` (PR #36), aprobada por el propietario y en
-proceso de integración mediante merge commit. Véanse
+`claude/profile-unavailability-v2` (PR #36), aprobada por el propietario e
+integrada en `main` mediante el merge commit
+`a57d2e5ce6497220a54e3ae632087c688a13f002` (Verify 37142410544 en verde). Véanse
 docs/contracts/unavailable-input-v2.md,
 docs/validation/profile-unavailability-v2-2026-10-03.md y la sección 13 del ADR:
 - `shared/bolus-engine`: contrato v2 aditivo (`UnavailabilityReasonV2`,
@@ -164,9 +164,9 @@ docs/validation/profile-unavailability-v2-2026-10-03.md y la sección 13 del ADR
 - Swift ampliado y sin ejecutar: **iOS no verificado** (ADR 0004).
 
 SIGUIENTE PASO
-Completar la integración autorizada de la PR #36 y registrar su merge commit y
-CI. No empieces otro incremento sin una petición explícita del propietario.
-Conectar el traductor con Bolo,
+Los ADR 0014 y 0015 están implementados e integrados. No hay ningún incremento
+autorizado: no empieces otro sin una petición explícita del propietario que
+fije su alcance. Conectar el traductor con Bolo,
 `ReadOverview`, el motor u otro consumidor exige su propio ADR. Siguen
 abiertas como decisiones del propietario, y cualquier avance clínico necesita
 antes su ADR: límites clínicos, vigencia (sin política aprobada), resolución de

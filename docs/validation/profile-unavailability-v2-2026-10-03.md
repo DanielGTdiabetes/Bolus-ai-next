@@ -89,3 +89,18 @@ fijan las pruebas existentes. Sin datos personales ni cambios de red.
   sección 13.
 - La prueba de dispositivo no cubre el traductor: ningún consumidor Android lo
   usa. Solo cubre el código estático de D7 en Bolo.
+
+## Integración
+
+- Revisión del propietario sobre `cf1f99b` (Verify
+  [37140829808](https://github.com/DanielGTdiabetes/Bolus-ai-next/actions/runs/37140829808)
+  y GitGuardian en verde): implementación aprobada, con D11.
+- `cff628e`: solo documentación, registra la aprobación y D11 en el ADR 0015.
+  `verify.ps1` local correcto. Windows verification
+  [37142054740](https://github.com/DanielGTdiabetes/Bolus-ai-next/actions/runs/37142054740)
+  y GitGuardian en verde sobre ese SHA exacto.
+- `gh pr merge 36 --merge --match-head-commit cff628eed5df99c5ad4d0196f4c793cef9bcd07c`:
+  merge commit `a57d2e5ce6497220a54e3ae632087c688a13f002`.
+- CI del merge commit en `main`: [Verify 37142410544](https://github.com/DanielGTdiabetes/Bolus-ai-next/actions/runs/37142410544), evento `push`, conclusión `success`.
+- Una PR posterior, solo documental, registra estos datos en el ADR, esta
+  validación, el plan y `NEXT_SESSION_PROMPT`.

@@ -2,7 +2,8 @@
 
 - Estado: **aceptado** para el diseño del contrato. **Implementado** en la rama
   `claude/profile-unavailability-v2` (PR #36), aprobado por el propietario el
-  2026-10-03 junto con la decisión D11 (sección 13). Integración en curso.
+  2026-10-03 junto con la decisión D11 (sección 13) e **integrado** en `main`
+  con el merge commit `a57d2e5`. Ver sección 13.
 - Aprobación: el propietario aceptó el ADR el 2026-10-03, tras incorporar las
   tres correcciones de su revisión (sección 12), con las decisiones D1 a D10
   aprobadas según la recomendación de cada una (sección 9). La aceptación fija
@@ -472,6 +473,14 @@ construye ese estado, y `report` declara `@Throws`. La decisión surgió en la
 implementación, sin regla previa en este ADR, y el propietario la aprobó al
 revisar la PR #36. Cambiarla (por ejemplo, admitir otro fallo como estado de
 lectura) exige revisar este ADR y sus pruebas.
+
+Integración: la PR #36 se integró el 2026-10-03 mediante merge commit
+`a57d2e5ce6497220a54e3ae632087c688a13f002`, comprobando la cabeza exacta `cff628eed5df99c5ad4d0196f4c793cef9bcd07c`
+(Windows verification
+[37142054740](https://github.com/DanielGTdiabetes/Bolus-ai-next/actions/runs/37142054740)
+y GitGuardian en verde). CI del merge commit en `main`: [Verify 37142410544](https://github.com/DanielGTdiabetes/Bolus-ai-next/actions/runs/37142410544), evento `push`,
+conclusión `success`. La revisión aprobada (`cf1f99b`) y el registro de D11
+(`cff628e`) son ancestros de `main`.
 
 Evidencia: [validación](../validation/profile-unavailability-v2-2026-10-03.md).
 Nada de esta implementación conecta el perfil con un consumidor ni aprueba uso
