@@ -114,7 +114,10 @@ docs/validation/profile-confirmation-ui-2026-10-03.md:
   `OperationIds`, petición completa en el estado guardado, recreación con
   `resolvePending`, `replayed` nunca como reconfirmación, historial con
   confirmadas, retiradas y superadas. Bolo: «Perfil · no se usa para calcular».
-- Pruebas: `ClinicalProfileConfirmationUiDeviceTest` (15) en `verify.ps1`.
+- Pruebas: `ClinicalProfileConfirmationUiDeviceTest` (17) en `verify.ps1`.
+  Corrección de revisión: al resolver una operación pendiente se borra el aviso
+  anterior antes de leer; regresiones de escritura fallida, estado guardado,
+  recreación, lectura fallida y recuperación para confirmar y retirar.
   `verify.ps1` comprueba también que `ScreenRenderer` no referencia el perfil.
 Ni Bolo, `ReadOverview` ni el motor leen el perfil. `input.profile.*` no se
 implementa ni se conecta. Sin cambios de esquema, serialización ni huellas.

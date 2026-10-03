@@ -63,6 +63,7 @@ class ClinicalProfileConfirmationUiDeviceTest {
 
     @After fun clear() {
         repositories.forEach { repository ->
+            repository.holdBeforeRead?.countDown()
             repository.holdBeforeWrite?.countDown()
             repository.holdAfterCommit?.countDown()
         }
@@ -129,10 +130,14 @@ class ClinicalProfileConfirmationUiDeviceTest {
     private fun view(activity: MainActivity, tag: String): View = requireNotNull(viewOrNull(activity, tag)) { tag }
     private fun text(activity: MainActivity, tag: String) = (view(activity, tag) as TextView).text.toString()
     private fun type(activity: MainActivity, tag: String, value: String) = (view(activity, tag) as EditText).setText(value)
-    private fun click(scenario: ActivityScenario<MainActivity>, tag: String) = scenario.onActivity {
-        val target = view(it, tag)
-        assertTrue("Disabled: $tag", target.isEnabled)
-        target.performClick()
+    /** Waits for asynchronous reads to render the control before clicking it. */
+    private fun click(scenario: ActivityScenario<MainActivity>, tag: String) {
+        awaitView(scenario, tag)
+        scenario.onActivity {
+            val target = view(it, tag)
+            assertTrue("Disabled: $tag", target.isEnabled)
+            target.performClick()
+        }
     }
 
     private fun awaitView(scenario: ActivityScenario<MainActivity>, tag: String, expected: String? = null) {
@@ -587,6 +592,148 @@ class ClinicalProfileConfirmationUiDeviceTest {
             a.dispose(); b.dispose(); c.dispose()
         }
         assertEquals(2, events().size)
+    }
+
+    /** No success or failure outcome is on screen: only the state of the read and, if any, the undetermined notice. */
+    private fun assertNoOutcome(panel: View) {
+        assertNull(panel.findViewWithTag<View>("profile:confirmation:notice"))
+        assertNull(panel.findViewWithTag<View>("profile:confirmation:code"))
+        val outcomes = listOf(R.string.profile_notice_confirmed, R.string.profile_notice_revoked,
+            R.string.profile_notice_confirm_replayed, R.string.profile_notice_revoke_replayed).map { s(it, 1) } +
+            listOf(s(R.string.profile_notice_write_failed, ProfileFailure.SAVE_FAILED.code),
+                s(R.string.profile_notice_revoke_failed, ProfileFailure.SAVE_FAILED.code),
+                s(R.string.profile_notice_confirm_replayed_revoked))
+        val all = texts(panel)
+        outcomes.forEach { outcome -> assertFalse(outcome, all.contains(outcome)) }
+        assertFalse(all.any { it.contains("No se pudo registrar") })
+    }
+
+    /** While the read is pending or unproven no state of the version is shown either: nothing confirmed or unconfirmed. */
+    private fun assertNoState(panel: View) {
+        assertNull(panel.findViewWithTag<View>("profile:gate"))
+        assertNull(panel.findViewWithTag<View>("profile:review:gate"))
+        assertFalse(texts(panel).any { it.contains("Datos confirmados") || it.contains("datos sin confirmar") ||
+            it.contains("Confirmación retirada") })
+    }
+
+    /**
+     * Regression: write failure, saved state, recreation, read failure and recovery. The failure notice saved with the
+     * state must not stay on screen while the read is pending or unproven, and the retry keeps the operation identity.
+     */
+    private fun failedWriteThenUnprovenReadThenRecovery(open: (ClinicalProfileModel) -> Unit,
+                                                       act: (ClinicalProfileModel) -> Unit,
+                                                       failure: ConfirmationNotice.Failed,
+                                                       undeterminedText: Int,
+                                                       pendingTag: String): ClinicalProfileModel {
+        val first = controlled().apply { writeFailure = ProfileFailure.SAVE_FAILED }
+        val a = model(first, null)
+        awaitModel(a) { it.evaluated != null }
+        instrumentation.runOnMainSync { open(a) }
+        // A review is bound to its fresh read before acting; a revocation question is bound at once.
+        awaitModel(a) { it.evaluated != null && (it.decision as? Decision.Review)?.target != null || it.decision is Decision.Revoke }
+        instrumentation.runOnMainSync { act(a) }
+        awaitModel(a) { it.recording == null && it.notice != null }
+        lateinit var saved: Bundle
+        lateinit var request: ConfirmationRequest
+        instrumentation.runOnMainSync {
+            assertEquals(failure, a.notice)
+            request = a.pending!!.request
+            saved = a.snapshot()
+            a.dispose()
+        }
+        // The saved state carries the failed attempt's notice and the complete request.
+        assertEquals(request.operationId.value, saved.getString("pendingId"))
+        assertNotNull(saved.getString("noticeKind"))
+        val eventsBefore = events()
+
+        // Recreation: the read is first pending, then fails.
+        val hold = CountDownLatch(1)
+        val second = controlled().apply { readFailure = ProfileFailure.READ_FAILED; holdBeforeRead = hold }
+        val b = model(second, Bundle(saved))
+        assertTrue(second.readStarted.await(8, TimeUnit.SECONDS))
+        instrumentation.runOnMainSync {
+            assertNull(b.gate)
+            assertNull(b.notice)
+            assertEquals(request, b.pending!!.request)
+        }
+        rendered(b).let {
+            assertNoOutcome(it)
+            assertNoState(it)
+            assertNull(it.findViewWithTag<View>("profile:undetermined"))
+        }
+        hold.countDown()
+        awaitModel(b) { it.undetermined != null }
+        instrumentation.runOnMainSync {
+            assertEquals(ProfileFailure.READ_FAILED, b.undetermined)
+            assertNull(b.notice)
+            assertEquals(request, b.pending!!.request)
+            // Saved again while unproven: same request and identity, no stale outcome.
+            val again = b.snapshot()
+            assertEquals(request.operationId.value, again.getString("pendingId"))
+            assertNull(again.getString("noticeKind"))
+        }
+        rendered(b).let {
+            assertNoOutcome(it)
+            assertNoState(it)
+            assertEquals(s(undeterminedText, ProfileFailure.READ_FAILED.code), shown(it, "profile:undetermined"))
+            assertNull(it.findViewWithTag<View>(pendingTag))
+        }
+        assertEquals(eventsBefore, events())
+
+        // Recovery: nothing was stored and nothing changed, so the decision reopens with the same identity.
+        second.holdBeforeRead = null
+        second.readFailure = null
+        instrumentation.runOnMainSync { b.retry() }
+        awaitModel(b) { it.evaluated != null }
+        instrumentation.runOnMainSync {
+            assertNull(b.undetermined)
+            assertNull(b.notice)
+            assertEquals(request, b.pending!!.request)
+        }
+        rendered(b).let {
+            assertNoOutcome(it)
+            assertTrue(it.findViewWithTag<View>(pendingTag).isEnabled)
+        }
+        instrumentation.runOnMainSync { act(b) }
+        awaitModel(b) { it.recording == null && it.notice != null }
+        assertEquals(request, second.requests.single())
+        assertEquals(request.operationId, events().last().operationId)
+        assertEquals(eventsBefore.size + 1, events().size)
+        return b
+    }
+
+    @Test fun confirmationAfterFailedWriteAndUnprovenReadKeepsItsIdentityWithoutStaleOutcomes() {
+        save(0, content())
+        val b = failedWriteThenUnprovenReadThenRecovery(
+            open = { it.openReview() },
+            act = { it.confirm() },
+            failure = ConfirmationNotice.Failed(ConfirmationEventKind.CONFIRM, 1, ProfileFailure.SAVE_FAILED),
+            undeterminedText = R.string.profile_review_undetermined,
+            pendingTag = "profile:review:confirm")
+        instrumentation.runOnMainSync {
+            assertEquals(ConfirmationNotice.Recorded(ConfirmationEventKind.CONFIRM, 1, 1, false), b.notice)
+            b.dispose()
+        }
+        assertEquals(1, issued.size)
+        assertEquals(issued.single(), events().single().operationId)
+    }
+
+    @Test fun revocationAfterFailedWriteAndUnprovenReadKeepsItsIdentityWithoutStaleOutcomes() {
+        save(0, content())
+        externalConfirm()
+        val b = failedWriteThenUnprovenReadThenRecovery(
+            open = { it.proposeRevoke() },
+            act = { it.revoke() },
+            failure = ConfirmationNotice.Failed(ConfirmationEventKind.REVOKE, 1, ProfileFailure.SAVE_FAILED),
+            undeterminedText = R.string.profile_revoke_undetermined,
+            pendingTag = "profile:revoke:confirm")
+        instrumentation.runOnMainSync {
+            assertEquals(ConfirmationNotice.Recorded(ConfirmationEventKind.REVOKE, 1, 2, false), b.notice)
+            b.dispose()
+        }
+        assertEquals(1, issued.size)
+        assertEquals(listOf(ConfirmationEventKind.CONFIRM, ConfirmationEventKind.REVOKE), events().map { it.kind })
+        assertEquals(issued.single(), events().last().operationId)
     }
 
     // Revocation, reconfirmation and history.

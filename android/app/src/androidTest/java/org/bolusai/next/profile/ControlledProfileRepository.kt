@@ -17,6 +17,9 @@ internal class ControlledProfileRepository(private val delegate: SqliteClinicalP
     @Volatile var holdBeforeWrite: CountDownLatch? = null
     @Volatile var holdAfterCommit: CountDownLatch? = null
     @Volatile var committed = CountDownLatch(1)
+    /** When set, every read signals [readStarted] and then waits here, so a pending read can be observed. */
+    @Volatile var holdBeforeRead: CountDownLatch? = null
+    @Volatile var readStarted = CountDownLatch(1)
     val requests = CopyOnWriteArrayList<ConfirmationRequest>()
     val reads = AtomicInteger()
 
@@ -27,6 +30,10 @@ internal class ControlledProfileRepository(private val delegate: SqliteClinicalP
 
     override fun readRecord(): ProfileRecordRead {
         reads.incrementAndGet()
+        holdBeforeRead?.let { hold ->
+            readStarted.countDown()
+            check(hold.await(20, TimeUnit.SECONDS))
+        }
         return readFailure?.let { ProfileRecordRead.Failed(it) } ?: delegate.readRecord()
     }
     override fun save(write: ProfileWrite, createdAtEpochMs: Long, writer: String): ProfileSave =

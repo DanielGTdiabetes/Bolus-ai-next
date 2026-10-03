@@ -90,6 +90,7 @@ siguen ejecutándose en el adaptador SQLite real sobre ficheros sintéticos.
 | En vuelo y rotación | `operationInFlightBlocksOtherActionsAndSurvivesRecreation` |
 | Commit terminado antes de recrear | `commitFinishedBeforeRecreationIsShownAsRecordedNeverAsConflictOrReconfirmation` (también con retirada posterior por otra conexión) |
 | Lectura no demostrada al recrear y reintento con la misma identidad | `unprovenReadKeepsTheOperationAndTheRetryReusesItsIdentity` |
+| Fallo de escritura → estado guardado → recreación → lectura pendiente y fallida → recuperación, sin avisos de éxito ni fracaso hasta demostrar la lectura y con la misma identidad | `confirmationAfterFailedWriteAndUnprovenReadKeepsItsIdentityWithoutStaleOutcomes`, `revocationAfterFailedWriteAndUnprovenReadKeepsItsIdentityWithoutStaleOutcomes` (corrección de revisión) |
 | Solo una operación no encontrada se cierra | `onlyAnOperationThatIsNotStoredIsClosedAsStaleOrChanged` |
 | Revocar, reconfirmar e historial | `revokeAndReconfirmAreSeparateActionsAndHistoryShowsEveryFact` |
 | Conflictos | `conflictsWhileReviewingAreVisibleAndRecordNothing` |
@@ -132,6 +133,41 @@ git diff --check
 Funcionamiento offline: todo es local. El manifest sigue sin permiso de
 Internet (`verify.ps1`) y las pruebas no cambian red, ajustes ni modo avión.
 Ninguna prueba usa datos personales. Todas las bases son sintéticas y se borran.
+
+## Corrección de revisión de la PR #33
+
+El propietario detectó que, tras un fallo de escritura, el aviso «No se pudo
+registrar…» viajaba en el estado guardado y seguía visible al recrear mientras
+la lectura que resuelve la operación pendiente estaba en curso o fallaba. Eso
+mostraba un resultado de un intento cuyo efecto aún no se había demostrado.
+
+- Corrección: `ClinicalProfileModel.resolvePending` borra el aviso anterior
+  antes de lanzar la lectura. Mientras la lectura está pendiente solo se ve
+  «Leyendo perfil y confirmaciones…» y, si falla, el texto de operación
+  indeterminada con su código. La petición y su `operation_id` no se tocan, y un
+  nuevo estado guardado conserva la operación sin el aviso obsoleto.
+- Regresiones, para confirmar y para retirar: escritura fallida con
+  `SAVE_FAILED`, estado guardado (con la petición completa y el aviso), modelo
+  recreado desde ese estado, lectura retenida y después fallida
+  (`READ_FAILED`), y recuperación. En la lectura pendiente y en la fallida se
+  comprueba que no hay aviso ni código de resultado, ni textos de éxito o de
+  fallo, ni estado de la versión. En la recuperación la decisión se reabre con
+  la misma petición, el reintento envía exactamente esa petición y el evento
+  almacenado lleva el `operation_id` original. Solo se generó una identidad.
+- Demostración: con la corrección retirada temporalmente, las dos regresiones
+  fallan (`expected null, but was: Failed(kind=CONFIRM|REVOKE, version=1,
+  reason=SAVE_FAILED)`). Con la corrección, pasan.
+- Al ejecutar la clase completa aparecieron carreras de la propia prueba:
+  algunas pulsaciones buscaban «Revisar y confirmar…» antes de que la lectura
+  asíncrona la dibujase. El ayudante `click` espera ahora a que el control
+  exista, y la comprobación de resultado no confunde el estado E9 con un aviso.
+
+Verificación tras la corrección, en Windows desde la rama:
+`.\scripts\verify.ps1` correcto, `.\scripts\verify.ps1 -DeviceTests` en el mismo
+Pixel 10 Pro Fold (API 37, `KEYCODE_WAKEUP` cada 10 s, sin cambios de ajustes ni
+red) con `OK (115 tests)` en 102,7 s (98 anteriores y 17 de
+`ClinicalProfileConfirmationUiDeviceTest`), paquetes de prueba desinstalados y
+`git diff --check` limpio.
 
 ## Riesgos y pendientes
 

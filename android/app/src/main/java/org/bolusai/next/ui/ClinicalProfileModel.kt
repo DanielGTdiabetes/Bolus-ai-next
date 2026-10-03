@@ -630,6 +630,10 @@ internal class ClinicalProfileModel(
         reading = true
         gate = null
         undetermined = null
+        // An earlier outcome (for example a failed write kept in the saved state) belongs to an attempt whose effect is
+        // being resolved now: while the read is pending or not proven, neither success nor failure is shown. The request
+        // and its operation identity stay untouched.
+        notice = null
         if (notify) changed?.invoke()
         worker.execute {
             val resolution = useCases.resolvePending(operation.request)
