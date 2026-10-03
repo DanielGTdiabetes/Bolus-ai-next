@@ -1,8 +1,12 @@
 # ADR 0014: perfil clínico confirmado y puertas de elegibilidad
 
-- Estado: **Propuesto**. Pendiente de revisión del propietario. Ninguna
-  recomendación de este documento está aprobada. Las decisiones C1 a C9 de la
-  sección 11 siguen pendientes.
+- Estado: **aceptado** para confirmación de datos. No habilita uso clínico.
+- Aprobación: el propietario aceptó el ADR el 2026-10-03, tras incorporar las
+  cuatro correcciones de su revisión (sección 16), con las decisiones C1 a C9
+  fijadas según la recomendación de cada una (sección 11). C7 queda aprobada como
+  solución provisional mientras `policy_not_approved` bloquee todo. La
+  aceptación no es aprobación clínica ni autoriza a empezar la implementación
+  sin una petición explícita.
 - Fecha: 2026-10-03.
 - Fase y criterio de aceptación: fase 6, trabajo 1 y 2 («confirmación de perfil»
   y «validar completitud, solapamientos, huecos, zona horaria, vigencia y límites
@@ -52,7 +56,13 @@ Invariantes aprobadas que este ADR no modifica en ninguna recomendación:
   autoriza nada (`unavailable-input-v1`, `unavailable-input-report-v1`).
 - Orden de prioridades: SEGURIDAD > CONSISTENCIA > DISPONIBILIDAD > COMODIDAD.
 
-**Recomendación central:** confirmar los datos de un perfil no aprueba límites,
+Estado de las marcas tras la aceptación (2026-10-03): las **recomendaciones**
+de las secciones 1 a 10 quedan aprobadas como decisiones de diseño. Siguen
+**pendientes** las marcadas como tales que dependen de decisiones futuras: la
+elección entre las opciones B y C de la sección 6.3 antes de cualquier
+aprobación clínica, y P4 y P6 del ADR 0012.
+
+**Decisión central:** confirmar los datos de un perfil no aprueba límites,
 reglas, vigencia ni aptitud para calcular o administrar insulina. Tras este
 incremento existiría el estado «Datos confirmados», y en todos los casos iría
 acompañado de «Cálculo todavía bloqueado».
@@ -1010,9 +1020,9 @@ Sin implementar en esta entrega. Todas con datos sintéticos.
 - `scripts/verify.ps1 -DeviceTests` con un único dispositivo autorizado y
   repositorios sintéticos aislados.
 
-## 11. Decisiones pendientes del propietario (C1 a C9)
+## 11. Decisiones del propietario (C1 a C9)
 
-Todas en estado **pendiente**. Ninguna aprueba límites clínicos, vigencia,
+Todas **aprobadas** el 2026-10-03 con la recomendación de cada una. Ninguna aprueba límites clínicos, vigencia,
 DIA, IOB ni resolución de cambios de hora, y ninguna sustituye pendientes
 anteriores (P4 y P6 del ADR 0012 siguen abiertas).
 
@@ -1029,7 +1039,7 @@ anteriores (P4 y P6 del ADR 0012 siguen abiertas).
 - Si no se resuelve: no hay forma de distinguir revisión de captura, el texto de
   Bolo sigue ambiguo y el futuro ADR de aprobación clínica no tiene sobre qué
   apoyarse.
-- Estado: pendiente.
+- Estado: aprobada (2026-10-03) con la recomendación.
 
 ### C2. Precondiciones estructurales, incluida la distinción entre 0 y ausencia
 
@@ -1044,7 +1054,7 @@ anteriores (P4 y P6 del ADR 0012 siguen abiertas).
   confirmación una etiqueta sin significado.
 - Si no se resuelve: no se puede implementar la puerta de completitud y el
   riesgo de confundir «Sin configurar» con `0` sigue sin cubrir en esta etapa.
-- Estado: pendiente.
+- Estado: aprobada (2026-10-03) con la recomendación.
 
 ### C3. Política de última versión y ausencia de fallback histórico
 
@@ -1057,7 +1067,7 @@ anteriores (P4 y P6 del ADR 0012 siguen abiertas).
   puntero mutable y perfiles alternativos, fuera de alcance.
 - Si no se resuelve: un futuro adaptador podría caer a una versión antigua sin
   decisión documentada.
-- Estado: pendiente.
+- Estado: aprobada (2026-10-03) con la recomendación.
 
 ### C4. Revocación y eventual reconfirmación explícita
 
@@ -1072,7 +1082,7 @@ anteriores (P4 y P6 del ADR 0012 siguen abiertas).
   conserva toda la historia. (c) no cambia ningún estado vigente y añade ruido.
 - Si no se resuelve: el usuario no puede retirar una confirmación errónea sin
   guardar una versión artificial.
-- Estado: pendiente.
+- Estado: aprobada (2026-10-03) con la recomendación.
 
 ### C5. Efecto de guardar, restaurar y cambiar unidad
 
@@ -1089,7 +1099,7 @@ anteriores (P4 y P6 del ADR 0012 siguen abiertas).
   versión concreta. Heredarla convertiría una coincidencia de huella en una
   revisión no hecha.
 - Si no se resuelve: restaurar podría parecer una forma de confirmar sin revisar.
-- Estado: pendiente.
+- Estado: aprobada (2026-10-03) con la recomendación.
 
 ### C6. Confirmación cuando existen cambios sin guardar en el editor
 
@@ -1101,7 +1111,7 @@ anteriores (P4 y P6 del ADR 0012 siguen abiertas).
 - Justificación: (b) y (c) facilitan confirmar algo distinto de lo que se ve.
 - Si no se resuelve: riesgo de confirmar por error contenido distinto del
   visible.
-- Estado: pendiente.
+- Estado: aprobada (2026-10-03) con la recomendación.
 
 ### C7. Correspondencia de estados y errores con `input.profile.*`
 
@@ -1110,7 +1120,7 @@ anteriores (P4 y P6 del ADR 0012 siguen abiertas).
   general para «sin confirmar» o «revocada», código de dominio conservado y
   `policy_not_approved` siempre presente. (b) añadir `unconfirmed` (y `revoked`)
   al contrato v1 con revisión de consumidores. (c) contrato v2.
-- Recomendación: (a) para este incremento, y decidir entre (b) y (c) antes de
+- Recomendación: (a) para el incremento de implementación, y decidir entre (b) y (c) antes de
   cualquier aprobación clínica. Incluye los motivos propuestos para pendiente
   (`unknown`), fallo de lectura (`persistence_failed`), historial inválido
   (`invalid`) y esquema no soportado (`parse_failed`), que `conflicting` no se
@@ -1120,7 +1130,9 @@ anteriores (P4 y P6 del ADR 0012 siguen abiertas).
   conecta todavía.
 - Si no se resuelve: la puerta futura no puede comunicar por qué un perfil
   completo no es candidato, y el texto actual de Bolo pasaría a ser falso.
-- Estado: pendiente.
+- Estado: aprobada (2026-10-03) como solución provisional mientras
+  `policy_not_approved` bloquee todo. Elegir entre (b) y (c) sigue pendiente
+  antes de cualquier aprobación clínica.
 
 ### C8. Identidad, concurrencia e idempotencia de las operaciones
 
@@ -1137,7 +1149,7 @@ anteriores (P4 y P6 del ADR 0012 siguen abiertas).
   reconfirmación tras revocar, que es justo el caso que no debe reactivarse.
 - Si no se resuelve: no se puede garantizar que un reintento no reactive una
   confirmación revocada.
-- Estado: pendiente.
+- Estado: aprobada (2026-10-03) con la recomendación.
 
 ### C9. Esquema v2, migración y recuperación
 
@@ -1156,7 +1168,7 @@ anteriores (P4 y P6 del ADR 0012 siguen abiertas).
   versión y su huella» de forma atómica.
 - Si no se resuelve: no hay forma durable de registrar confirmaciones y la
   migración no tiene criterios de aceptación.
-- Estado: pendiente.
+- Estado: aprobada (2026-10-03) con la recomendación.
 
 ## 12. Alternativas consideradas
 
@@ -1220,3 +1232,8 @@ provisional mientras `policy_not_approved` bloquee todo.
 
 Además se corrigen dos detalles del borrador publicado: el recuento de triggers
 nuevos (seis) y la puntuación de algunas listas.
+
+Aceptación: tras esta revisión (commit `0d4a3fd`, CI en verde) el propietario
+aceptó el ADR el 2026-10-03. C7 se aprueba como solución provisional: la
+elección entre añadir motivos al contrato v1 o crear un contrato v2 sigue
+pendiente y debe resolverse antes de cualquier aprobación clínica.
