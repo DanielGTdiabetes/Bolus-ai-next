@@ -69,17 +69,31 @@ try {
     # ADR 0012: the clinical profile is capture only. The engine and the Bolo overview must not depend on it.
     $engineReferences = @(Get-ChildItem -LiteralPath (Join-Path $repositoryRoot "shared\bolus-engine") -Recurse -File |
         Where-Object { $_.FullName -notmatch '\\build\\' } |
-        Select-String -Pattern 'clinical-profile|org\.bolusai\.profile' -List)
+        Select-String -Pattern 'clinical-profile|profile-unavailability|org\.bolusai\.profile' -List)
     if ($engineReferences.Count -gt 0) {
         throw "The bolus engine must not depend on the clinical profile: $($engineReferences.Path -join ', ')"
     }
+    # ADR 0015, D8: the translator ProfileGateState -> contract v2 depends on the profile and the contract, never the
+    # other way round, and no consumer is connected to it yet.
+    $profileReferences = @(Get-ChildItem -LiteralPath (Join-Path $repositoryRoot "shared\clinical-profile") -Recurse -File |
+        Where-Object { $_.FullName -notmatch '\\build\\' } |
+        Select-String -Pattern 'bolus-engine|org\.bolusai\.engine|profile-unavailability|org\.bolusai\.profileunavailability' -List)
+    if ($profileReferences.Count -gt 0) {
+        throw "The clinical profile must not depend on the contract or its translator: $($profileReferences.Path -join ', ')"
+    }
+    $translatorConsumers = @(Get-ChildItem -LiteralPath (Join-Path $repositoryRoot "android"), (Join-Path $repositoryRoot "shared\meal-drafts") -Recurse -File |
+        Where-Object { $_.FullName -notmatch '\\build\\' -and $_.Extension -in @(".kt", ".kts", ".java", ".xml") } |
+        Select-String -Pattern 'profile-unavailability|org\.bolusai\.profileunavailability|ProfileUnavailability' -List)
+    if ($translatorConsumers.Count -gt 0) {
+        throw "No consumer may use the profile unavailability translator without its own ADR (ADR 0015): $($translatorConsumers.Path -join ', ')"
+    }
     $overviewSource = Join-Path $repositoryRoot "android\app\src\main\java\org\bolusai\next\application\ReadOverview.kt"
-    if (Select-String -LiteralPath $overviewSource -Pattern 'org\.bolusai\.profile|ClinicalProfile' -Quiet) {
+    if (Select-String -LiteralPath $overviewSource -Pattern 'org\.bolusai\.profile|ClinicalProfile|ProfileGate|InputUnavailability|UnavailabilityReasonV2' -Quiet) {
         throw "The Bolo overview must keep reporting the profile as unavailable (ADR 0012)"
     }
     # ADR 0014: Bolo renders a fixed profile line and never reads the profile or its confirmations.
     $rendererSource = Join-Path $repositoryRoot "android\app\src\main\java\org\bolusai\next\ui\ScreenRenderer.kt"
-    if (Select-String -LiteralPath $rendererSource -Pattern 'org\.bolusai\.profile|ClinicalProfile|ProfileGate|Confirmation' -Quiet) {
+    if (Select-String -LiteralPath $rendererSource -Pattern 'org\.bolusai\.profile|ClinicalProfile|ProfileGate|Confirmation|InputUnavailability|UnavailabilityReasonV2' -Quiet) {
         throw "Bolo must not read the clinical profile or its confirmations (ADR 0014)"
     }
 

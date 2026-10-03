@@ -555,6 +555,20 @@ usa para calcular» sin leer el perfil. Cálculo y tratamiento siguen bloqueados
 Integrada mediante la PR #33 (merge commit `8940498`, Verify 37131464837 en
 verde). Véase la [validación](validation/profile-confirmation-ui-2026-10-03.md).
 
+### Entrega del contrato de indisponibilidad v2 — 2026-10-03
+
+Implementación del [ADR 0015](adr/0015-profile-unavailability-contract.md)
+(fases 2 y 6), autorizada por el propietario con D1 a D10: contrato v2 aditivo
+en el núcleo compartido (53 combinaciones admitidas, elevación total de las 52
+de v1, gramática y límites del detalle, rechazos con identificador estable,
+copias defensivas y unión de detalles sin recorte), módulo común
+`shared/profile-unavailability` que traduce `ProfileGateState` según las
+secciones 6.1 y 6.2, y `ReadOverview` con `input.profile.policy_not_approved`
+estático (D7). v1, SQLite, huellas, serialización y confirmaciones sin cambios.
+Ningún consumidor usa el traductor. iOS no verificado. PR #36 aprobada por el
+propietario, con la decisión D11 (rechazo de fallos ajenos a la lectura). Véanse el [contrato](contracts/unavailable-input-v2.md) y la
+[validación](validation/profile-unavailability-v2-2026-10-03.md).
+
 ### Secuencia de capacidades
 
 No intentar construir toda una fase en un solo cambio. Secuencia inicial:

@@ -145,7 +145,11 @@ en el núcleo compartido y pruebas comunes de sus códigos estables. Es un contr
 en memoria sin valores clínicos; aún no implementa validación ni cálculo.
 El [informe de entradas no disponibles](docs/contracts/unavailable-input-report-v1.md)
 reúne causas sin perder motivos distintos, con orden determinista y copia
-independiente de las listas del consumidor. CI prueba los contratos en JVM. La
+independiente de las listas del consumidor.
+El [contrato v2](docs/contracts/unavailable-input-v2.md) (ADR 0015) añade, sin
+tocar v1, el motivo `unconfirmed` solo para el perfil y un detalle de dominio
+validado. Un módulo común traduce el estado del perfil a ese contrato, pero
+ningún consumidor lo usa todavía. CI prueba los contratos en JVM. La
 ruta iOS KMP se conserva para el futuro, pero iOS no es actualmente una
 plataforma soportada y su ejecución automática en runners macOS quedó
 desactivada por coste según el

@@ -179,7 +179,8 @@ class NavigationDeviceTest {
                     assertEquals(View.VISIBLE, codes.visibility)
                     assertTrue(codes.text.contains("input.glucose.policy_not_approved"))
                     assertTrue(codes.text.contains("input.iob.unknown"))
-                    assertTrue(codes.text.contains("input.profile.missing"))
+                    assertTrue(codes.text.contains("input.profile.policy_not_approved"))
+                    assertFalse(codes.text.contains("input.profile.missing"))
                 }
             }
         }
