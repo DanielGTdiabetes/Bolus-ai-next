@@ -1,6 +1,8 @@
 # ADR 0015: evolución del contrato de indisponibilidad para el perfil
 
-- Estado: **aceptado** para el diseño del contrato. **No implementado.**
+- Estado: **aceptado** para el diseño del contrato. **Implementado** en la rama
+  `claude/profile-unavailability-v2` (PR en borrador, pendiente de revisión e
+  integración). Ver sección 13.
 - Aprobación: el propietario aceptó el ADR el 2026-10-03, tras incorporar las
   tres correcciones de su revisión (sección 12), con las decisiones D1 a D10
   aprobadas según la recomendación de cada una (sección 9). La aceptación fija
@@ -438,3 +440,35 @@ aceptó el ADR el 2026-10-03 con D1 a D10 según su recomendación. Antes de
 cerrar pidió explicitar en la fila «E10 confirmación retirada, completa» el
 detalle `profile.confirmation.superseded` cuando corresponda, como ya fijaba
 6.1. La aceptación no autoriza la implementación ni ninguna aprobación clínica.
+
+## 13. Estado de implementación (2026-10-03)
+
+El propietario autorizó el 2026-10-03 implementar este ADR con D1 a D10
+aprobadas, desde `b3cf7e6c869b2fe9aa7ed9a873a5323705145ec9` (PR #35 integrada,
+[Verify 37139124635](https://github.com/DanielGTdiabetes/Bolus-ai-next/actions/runs/37139124635),
+evento `push`, conclusión `success`). Alcance autorizado: contrato v2, módulo
+traductor, D7, documentación y pruebas. Sin integrar: la PR queda en borrador
+para revisión.
+
+| Elemento | Implementación |
+|---|---|
+| Contrato v2 (C.1, C.2, D2 a D4, D9, D10) | `shared/bolus-engine/.../InputUnavailability.kt`: `UnavailabilityReasonV2`, `InputUnavailability`, `InputUnavailabilityReport`, `InputUnavailabilityErrors`. v1 sin cambios |
+| Documento del contrato | [`unavailable-input-v2`](../contracts/unavailable-input-v2.md), con las tablas de admisibilidad y de rechazos comprobadas por `PublishedContractV2Test` |
+| Traductor (D5, D6, D8) | módulo común nuevo `shared/profile-unavailability`, `ProfileUnavailability.report(ProfileGateState)`. Depende del perfil y del contrato. Ni el motor ni el perfil dependen de él, ni Android lo usa |
+| D7 | `ReadOverview` emite `input.profile.policy_not_approved` estático. Sigue sin leer el perfil |
+| `verify.ps1` | el perfil no depende del contrato ni del traductor, ningún módulo de Android o de comidas usa el traductor, `ReadOverview` y `ScreenRenderer` no usan tipos v2 |
+| Swift | `UnavailableInputReportSmoke.swift` ampliado. **No ejecutado: iOS no verificado** (ADR 0004) |
+
+Decisión de implementación sin regla en este ADR, para revisión del
+propietario: `ProfileGateState.Unreadable` puede construirse con cualquier
+`ProfileFailure`, pero solo `read_failed`, `corrupt`, `invalid_record` y
+`unsupported_schema` son estados de entrada (E2 a E4). Para cualquier otro
+fallo (errores de guardado, conflicto o de operación de confirmación) el
+traductor rechaza con `IllegalArgumentException`
+`profile_unavailability.unreadable_reason_not_supported` en vez de inventar una
+causa o emitir `conflicting` (ADR 0014, sección 6.2). Ningún productor actual
+construye ese estado, y `report` declara `@Throws`.
+
+Evidencia: [validación](../validation/profile-unavailability-v2-2026-10-03.md).
+Nada de esta implementación conecta el perfil con un consumidor ni aprueba uso
+clínico. Cálculo y tratamiento siguen bloqueados en todos los estados.

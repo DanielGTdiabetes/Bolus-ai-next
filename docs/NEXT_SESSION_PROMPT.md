@@ -50,9 +50,11 @@ docs/validation/profile-segment-editor-2026-09-28.md,
 docs/validation/profile-confirmation-domain-2026-10-03.md y
 docs/validation/profile-confirmation-ui-2026-10-03.md.
 Comprueba el CI del SHA exacto integrado antes de empezar. La última
-integración de código es la PR #33 (merge commit
-89404989e451a3cc1899df309caedc759bdfdc44, Verify 37131464837 en verde); si
-`origin/main` avanzó, comprueba su SHA exacto.
+integración en `main` es la PR #35, solo documentación del ADR 0015 (merge
+commit b3cf7e6c869b2fe9aa7ed9a873a5323705145ec9, Verify 37139124635 en verde).
+La última integración de código es la PR #33 (merge commit
+89404989e451a3cc1899df309caedc759bdfdc44). Si `origin/main` avanzó, comprueba
+su SHA exacto.
 Esta entrega no consultó ni modificó Legacy. Su última auditoría documentada
 continúa fijada en f5417721d8019a9831126f4d843edfc4de87653d; no afirmes que ese
 SHA sigue siendo el main remoto sin comprobarlo si necesitas nueva evidencia.
@@ -130,31 +132,47 @@ docs/validation/profile-confirmation-ui-2026-10-03.md:
   anterior antes de leer; regresiones de escritura fallida, estado guardado,
   recreación, lectura fallida y recuperación para confirmar y retirar.
   `verify.ps1` comprueba también que `ScreenRenderer` no referencia el perfil.
-Ni Bolo, `ReadOverview` ni el motor leen el perfil. `input.profile.*` no se
-implementa ni se conecta. Sin cambios de esquema, serialización ni huellas.
+Ni Bolo, `ReadOverview` ni el motor leen el perfil. La traducción del estado
+del perfil a `input.profile.*` existe solo en el módulo del ADR 0015, sin
+consumidores. Sin cambios de esquema, serialización ni huellas.
 
-ADR 0015 — CONTRATO DE INDISPONIBILIDAD DEL PERFIL (aceptado, sin implementar)
-docs/adr/0015-profile-unavailability-contract.md compara las opciones B y C
-del ADR 0014 §6.3 con la evidencia de contratos, consumidores y pruebas
-actuales, define las correspondencias E1 a E11 y recomienda C (contrato v2
-aditivo con detalle de dominio, `unconfirmed` solo para `profile`, v1
-congelado, garantías de construcción y `@Throws` hacia Swift). Incorpora la
-revisión del propietario (sección 12). Aceptado el 2026-10-03 para el diseño
-del contrato, con D1 a D10 aprobadas según su recomendación, e integrado como
-documentación mediante la PR #35. **Sin implementar**: no hay tipos v2,
-adaptador, módulo nuevo ni cambio de `ReadOverview` (D7) en el código. La
-aceptación no autoriza implementarlo ni ninguna aprobación clínica.
+ADR 0015 — CONTRATO DE INDISPONIBILIDAD DEL PERFIL (implementado, PR en borrador)
+docs/adr/0015-profile-unavailability-contract.md, aceptado el 2026-10-03 con D1
+a D10 (opción C) e integrado como documentación mediante la PR #35. El
+propietario autorizó después implementarlo. La implementación está en la rama
+`claude/profile-unavailability-v2`, publicada como PR en **borrador** y
+pendiente de su revisión. **No está integrada en `main`.** Véanse
+docs/contracts/unavailable-input-v2.md,
+docs/validation/profile-unavailability-v2-2026-10-03.md y la sección 13 del ADR:
+- `shared/bolus-engine`: contrato v2 aditivo (`UnavailabilityReasonV2`,
+  `InputUnavailability`, `InputUnavailabilityReport`,
+  `InputUnavailabilityErrors`). 53 combinaciones admitidas, `unconfirmed` solo
+  para `profile`, elevación total de las 52 de v1, detalle validado (gramática,
+  128 caracteres, 16 detalles), rechazos con identificador estable, copias
+  defensivas, unión de detalles sin recorte y `@Throws`. v1 congelado.
+- `shared/profile-unavailability`: módulo común nuevo con
+  `ProfileUnavailability.report(ProfileGateState)` (secciones 6.1 y 6.2).
+  Depende del perfil y del contrato. Sin consumidores: `verify.ps1` impide
+  usarlo desde Android o comidas. `Unreadable` con un fallo que no es de
+  lectura se rechaza con `profile_unavailability.unreadable_reason_not_supported`
+  (decisión de implementación pendiente de revisión, ADR 0015 §13).
+- D7: `ReadOverview` emite `input.profile.policy_not_approved` estático, sin
+  leer el perfil. Bolo lo muestra en «Detalles técnicos».
+- Pruebas: motor 34, perfil 87, comidas 17, traductor 25, Android 44 y
+  `OK (115 tests)` en dispositivo. `PublishedContractV2Test` compara las tablas
+  del documento del contrato con el código.
+- Swift ampliado y sin ejecutar: **iOS no verificado** (ADR 0004).
 
 SIGUIENTE PASO
-El ADR 0014 está implementado e integrado. El ADR 0015 está aceptado y sin
-implementar. No hay ningún incremento autorizado: no implementes el ADR 0015 ni
-empieces otro incremento sin una petición explícita del propietario que fije su
-alcance. Conectar el perfil con Bolo, `ReadOverview` o el motor exige además su
-propio ADR. Siguen abiertas como decisiones del propietario, y cualquier avance
-clínico necesita antes su ADR: límites clínicos, vigencia (sin política
-aprobada), resolución de franjas en cambios de hora (P4 del ADR 0012),
-exportación/importación de copias (P6 del ADR 0012), DIA e IOB. Cálculo y
-tratamiento siguen bloqueados.
+Esperar la revisión del propietario de la PR en borrador del ADR 0015. No la
+integres ni empieces otro incremento sin su petición explícita. Si pide
+cambios, aplícalos en la misma rama y vuelve a verificar con `verify.ps1
+-DeviceTests` y el CI del SHA exacto. Conectar el traductor con Bolo,
+`ReadOverview`, el motor u otro consumidor exige su propio ADR. Siguen
+abiertas como decisiones del propietario, y cualquier avance clínico necesita
+antes su ADR: límites clínicos, vigencia (sin política aprobada), resolución de
+franjas en cambios de hora (P4 del ADR 0012), exportación/importación de copias
+(P6 del ADR 0012), DIA e IOB. Cálculo y tratamiento siguen bloqueados.
 
 TRABAJO
 1. Lee AGENTS.md, README, arquitectura, plan y ADRs relacionados. Actualiza origin,

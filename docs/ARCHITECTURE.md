@@ -105,6 +105,26 @@ llama a los casos de uso (`readState`, `confirmRequest`, `revokeRequest`,
 texto fijo y no lee el perfil. Véase el
 [ADR 0014](adr/0014-clinical-profile-confirmation-eligibility.md).
 
+### Contrato de indisponibilidad v2 y traductor del perfil
+
+`shared/bolus-engine` contiene, junto al contrato v1 congelado, el contrato v2
+(`InputUnavailability`, `InputUnavailabilityReport`): los 13 motivos v1 más
+`unconfirmed`, admitido solo para `profile`, con detalle de dominio en códigos
+de texto validados, copias defensivas y `@Throws` hacia Swift. El módulo común
+`shared/profile-unavailability` traduce un `ProfileGateState` recibido a un
+informe v2. Depende del perfil y del contrato. El motor y el perfil no dependen
+de él y ningún consumidor lo usa todavía: conectarlo exige su propio ADR.
+`ReadOverview` sigue sin leer el perfil y emite `input.profile.policy_not_approved`
+estático (D7). Véanse el [ADR 0015](adr/0015-profile-unavailability-contract.md)
+y el [contrato v2](contracts/unavailable-input-v2.md).
+
+```text
+shared/clinical-profile ──┐
+                          ├──> shared/profile-unavailability   (sin consumidores)
+shared/bolus-engine ──────┘
+     ^ contrato v1 y v2, sin dependencia del perfil
+```
+
 ## Conectividad
 
 Sin Internet deben seguir disponibles las funciones que solo requieren datos locales válidos.
