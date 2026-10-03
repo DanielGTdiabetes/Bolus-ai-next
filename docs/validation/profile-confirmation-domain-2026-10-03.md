@@ -128,17 +128,19 @@ Ninguna prueba usa datos personales. Todas las bases son sintéticas y se borran
 - Riesgo nuevo: interpretar «Datos confirmados» como aprobación clínica.
   Mitigación en esta entrega: `allowsCalculation = false`, bloqueo
   `profile.not_approved_for_calculation` en todos los estados y ninguna UI que lo
-  muestre todavía. Los textos de la sección 9 llegan con la segunda entrega.
+  muestre todavía. Los textos de la sección 9 llegan con la segunda entrega
+  (después integrada mediante la PR #33).
 - Rollback de código tras migrar: un build v1 no abre la base v2 (falla cerrado
   con `unsupported_schema`, sin pérdida). Se recupera con un build compatible.
 - La verificación por definición se hace al abrir y al migrar, como fija el
   ADR. Un cambio de esquema hecho por otra conexión mientras el repositorio está
   abierto se detecta en la siguiente apertura. Las filas se revalidan en cada
   lectura y escritura.
-- Pendiente del ADR 0014 (segunda entrega): pantalla de revisión desde una
-  lectura nueva, confirmar y retirar con `operation_id` conservado en el estado
-  guardado, bloqueo con editor con cambios, resolución de la operación pendiente
-  al recrear, historial con confirmaciones y superadas, textos de la sección 9,
+- Pendiente del ADR 0014 (segunda entrega, después integrada mediante la PR
+  #33; véase [su validación](profile-confirmation-ui-2026-10-03.md)): pantalla
+  de revisión desde una lectura nueva, confirmar y retirar con `operation_id`
+  conservado en el estado guardado, bloqueo con editor con cambios, resolución
+  de la operación pendiente al recrear, historial con confirmaciones y superadas, textos de la sección 9,
   pruebas de UI y layouts, y «Perfil · no se usa para calcular» en Bolo.
 - Pendiente fuera de este ADR: correspondencia `input.profile.*` (documentada,
   no implementada ni conectada), opción B o C de la sección 6.3 antes de

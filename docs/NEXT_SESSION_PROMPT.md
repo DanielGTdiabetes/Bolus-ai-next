@@ -38,22 +38,31 @@ estructura hasta guardar. Máximo de 48 franjas solo para dividir. «Modificada�
 es estado derivado del editor, fuera de la huella. Paneles en línea que
 sobreviven a la recreación. Sin cambios de esquema.
 
+Ajustes → Cálculo permite además revisar en solo lectura la última versión
+guardada, confirmar sus datos y retirar esa confirmación como acciones
+separadas, con historial de confirmaciones (ADR 0014, partes 1 y 2 integradas).
+Confirmar datos no aprueba uso clínico.
+
 Consulta docs/adr/0012-local-clinical-profile.md,
 docs/adr/0013-clinical-profile-segment-editor.md,
 docs/adr/0014-clinical-profile-confirmation-eligibility.md,
 docs/validation/profile-segment-editor-2026-09-28.md,
 docs/validation/profile-confirmation-domain-2026-10-03.md y
 docs/validation/profile-confirmation-ui-2026-10-03.md.
-Comprueba el CI del SHA exacto integrado antes de empezar.
+Comprueba el CI del SHA exacto integrado antes de empezar. La última
+integración de código es la PR #33 (merge commit
+89404989e451a3cc1899df309caedc759bdfdc44, Verify 37131464837 en verde); si
+`origin/main` avanzó, comprueba su SHA exacto.
 Esta entrega no consultó ni modificó Legacy. Su última auditoría documentada
 continúa fijada en f5417721d8019a9831126f4d843edfc4de87653d; no afirmes que ese
 SHA sigue siendo el main remoto sin comprobarlo si necesitas nueva evidencia.
 
 LÍMITES
 El perfil es captura. La confirmación de datos existe en dominio, base local
-(parte 1 del ADR 0014) y, en la rama de la parte 2, en pantalla. No aprueba uso
-clínico: no alimenta motor, Bolo, IOB ni recomendación. Bolo muestra
-«Perfil · no se usa para calcular» sin leer el perfil (parte 2). No hay
+(parte 1 del ADR 0014) y pantalla (parte 2). No aprueba uso clínico: no
+alimenta motor, Bolo, IOB ni recomendación, y cálculo y tratamiento siguen
+bloqueados en todos los estados. Bolo muestra «Perfil · no se usa para
+calcular» sin leer el perfil. No hay
 límites clínicos, DIA, curva, redondeo, conversión de unidades, propuestas del
 sistema, aprendizaje, exportación/importación, sync ni perfiles alternativos. La
 resolución de franjas en cambios de hora queda para el ADR del motor. Los macros
@@ -74,7 +83,7 @@ supera la verificación de esquema al abrirse de nuevo: cuenta filas en crudo.
 En Windows, los XML de recursos están en CRLF en la copia de trabajo: al editarlos
 con scripts conserva los finales de línea o `git diff --check` fallará.
 
-ADR 0014 — CONFIRMACIÓN DE DATOS DEL PERFIL (parte 1 integrada, parte 2 en revisión)
+ADR 0014 — CONFIRMACIÓN DE DATOS DEL PERFIL (partes 1 y 2 integradas)
 ADR 0014 (docs/adr/0014-clinical-profile-confirmation-eligibility.md), aceptado
 el 2026-10-03 con C1 a C9 según su recomendación (C7 como solución
 provisional). Confirmar datos es revisar una versión guardada identificada por
@@ -98,13 +107,15 @@ docs/validation/profile-confirmation-domain-2026-10-03.md:
   `V2_ADDITIONS`, y verifica por definición al abrir y al migrar.
   `ClinicalProfileRows.kt` es el códec estricto de filas. `save`, lecturas y
   `appendConfirmation` validan versiones y eventos en una transacción
-  exclusiva. `AndroidOperationIds` existe, pero ninguna pantalla lo usa aún.
+  exclusiva. `AndroidOperationIds` (usado por la pantalla desde la parte 2).
 - Pruebas: 87 comunes y `OK (98 tests)` en dispositivo, con
   `ClinicalProfileConfirmationDeviceTest` en `verify.ps1`. Las pruebas que
   manipulan filas recrean el trigger con su texto exacto. Si no, la apertura
   falla con `unsupported_schema`.
-Parte 2 implementada en la rama `claude/profile-confirmation-ui` desde
-`7b2b1d2` y publicada como PR para revisión, **sin integrar**. Véase
+Parte 2 integrada en `main` mediante la PR #33 (rama
+`claude/profile-confirmation-ui`, merge commit
+`89404989e451a3cc1899df309caedc759bdfdc44`, Verify 37131464837 en verde), tras
+la revisión del propietario y una corrección. Véase
 docs/validation/profile-confirmation-ui-2026-10-03.md:
 - `ClinicalProfileModel` lee con `readState()` y presenta `ProfileGateState`
   (E1 a E11). Revisión de solo lectura desde una lectura nueva, ligada a
@@ -123,15 +134,13 @@ Ni Bolo, `ReadOverview` ni el motor leen el perfil. `input.profile.*` no se
 implementa ni se conecta. Sin cambios de esquema, serialización ni huellas.
 
 SIGUIENTE PASO
-1. Revisión del propietario de la PR de la parte 2. Si pide cambios, aplicarlos
-   en la misma rama y revalidar (`verify.ps1`, `-DeviceTests`, CI del SHA).
-2. Solo con autorización, integrar por el flujo normal, comprobar el CI del SHA
-   integrado, la ancestralidad en origin/main y registrar la integración en el
-   ADR, la validación y este prompt.
-No empieces otro incremento sin autorización explícita. Siguen siendo
-decisiones del propietario: límites clínicos, vigencia (P4), DIA, IOB,
-resolución de franjas en cambios de hora, `input.profile.*` y la opción B o C
-de la sección 6.3, que debe elegirse antes de cualquier aprobación clínica.
+El ADR 0014 está implementado e integrado. No hay ningún incremento autorizado:
+no empieces otro sin una petición explícita del propietario que fije su
+alcance. Siguen abiertas como decisiones del propietario, y cualquier avance
+clínico necesita antes su ADR: límites clínicos, vigencia (P4), P6 del ADR
+0012, DIA, IOB, resolución de franjas en cambios de hora, `input.profile.*` y
+la opción B o C de la sección 6.3, que debe elegirse antes de cualquier
+aprobación clínica. Cálculo y tratamiento siguen bloqueados.
 
 TRABAJO
 1. Lee AGENTS.md, README, arquitectura, plan y ADRs relacionados. Actualiza origin,
