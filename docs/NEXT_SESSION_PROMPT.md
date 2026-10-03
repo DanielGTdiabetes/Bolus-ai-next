@@ -64,17 +64,29 @@ Toda prueba que abra Ajustes → Cálculo debe inyectar
 En Windows, los XML de recursos están en CRLF en la copia de trabajo: al editarlos
 con scripts conserva los finales de línea o `git diff --check` fallará.
 
-REVISIÓN PENDIENTE
-El propietario revisa la PR del editor de franjas (ADR 0013) antes de integrarla
-y antes de empezar otro bloque funcional. No avances sin esa revisión.
+DECISIÓN DOCUMENTAL ACEPTADA (sin implementar)
+ADR 0014 (docs/adr/0014-clinical-profile-confirmation-eligibility.md), aceptado
+el 2026-10-03 con C1 a C9 según su recomendación (C7 como solución
+provisional). Confirmar datos es revisar una versión guardada identificada por
+número y huella. No aprueba límites, vigencia ni aptitud para calcular o tratar.
+Dimensiones separadas: integridad, completitud, confirmación y elegibilidad
+clínica, esta última siempre bloqueada. Eventos append-only de confirmación y
+revocación con `operation_id` y `seq`, sin herencia entre versiones, solo la
+última versión, revocación sin exigir completitud, `clinical-profile.db` v2 con
+migración verificada por definición. Nada de esto existe aún en código: el
+perfil sigue sin confirmaciones y Bolo sigue con «Perfil · sin versión
+confirmada».
 
-SIGUIENTE INCREMENTO PROPUESTO (tras la revisión)
-ADR breve, sin código, sobre qué significa un perfil «confirmado» y qué puertas
-tendría que superar antes de que el motor pudiera leerlo: completitud de valores
-por franja, zona y unidad declaradas, y qué queda bloqueado mientras falten
-límites aprobados. Solo decisiones pendientes del propietario, sin límites ni
-valores inventados. Límites clínicos, DIA, IOB y resolución de franjas en
-cambios de hora siguen siendo decisiones del propietario.
+SIGUIENTE INCREMENTO PROPUESTO (solo con petición explícita del propietario)
+Implementar el ADR 0014 tal como está: completitud estructural, eventos y
+política compartida, migración v1 → v2 con prueba de copia previa, UI de
+revisión, confirmación y revocación, resolución de operación pendiente por
+identidad y cambio del texto de Bolo a «Perfil · no se usa para calcular», sin
+que Bolo, `ReadOverview` ni el motor lean el perfil. Cálculo y tratamiento
+siguen bloqueados en todos los estados. La correspondencia con `input.profile.*`
+se documenta y prueba, pero no se conecta. Límites clínicos, DIA, IOB,
+resolución de franjas en cambios de hora y la opción B o C de la sección 6.3
+siguen siendo decisiones del propietario.
 
 TRABAJO
 1. Lee AGENTS.md, README, arquitectura, plan y ADRs relacionados. Actualiza origin,
