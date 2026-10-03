@@ -565,8 +565,8 @@ copias defensivas y unión de detalles sin recorte), módulo común
 `shared/profile-unavailability` que traduce `ProfileGateState` según las
 secciones 6.1 y 6.2, y `ReadOverview` con `input.profile.policy_not_approved`
 estático (D7). v1, SQLite, huellas, serialización y confirmaciones sin cambios.
-Ningún consumidor usa el traductor. iOS no verificado. PR en borrador pendiente
-de revisión. Véanse el [contrato](contracts/unavailable-input-v2.md) y la
+Ningún consumidor usa el traductor. iOS no verificado. PR #36 aprobada por el
+propietario, con la decisión D11 (rechazo de fallos ajenos a la lectura). Véanse el [contrato](contracts/unavailable-input-v2.md) y la
 [validación](validation/profile-unavailability-v2-2026-10-03.md).
 
 ### Secuencia de capacidades

@@ -1,8 +1,8 @@
 # ADR 0015: evolución del contrato de indisponibilidad para el perfil
 
 - Estado: **aceptado** para el diseño del contrato. **Implementado** en la rama
-  `claude/profile-unavailability-v2` (PR en borrador, pendiente de revisión e
-  integración). Ver sección 13.
+  `claude/profile-unavailability-v2` (PR #36), aprobado por el propietario el
+  2026-10-03 junto con la decisión D11 (sección 13). Integración en curso.
 - Aprobación: el propietario aceptó el ADR el 2026-10-03, tras incorporar las
   tres correcciones de su revisión (sección 12), con las decisiones D1 a D10
   aprobadas según la recomendación de cada una (sección 9). La aceptación fija
@@ -447,8 +447,9 @@ El propietario autorizó el 2026-10-03 implementar este ADR con D1 a D10
 aprobadas, desde `b3cf7e6c869b2fe9aa7ed9a873a5323705145ec9` (PR #35 integrada,
 [Verify 37139124635](https://github.com/DanielGTdiabetes/Bolus-ai-next/actions/runs/37139124635),
 evento `push`, conclusión `success`). Alcance autorizado: contrato v2, módulo
-traductor, D7, documentación y pruebas. Sin integrar: la PR queda en borrador
-para revisión.
+traductor, D7, documentación y pruebas. El propietario revisó y aprobó la
+implementación de la PR #36 (cabeza revisada `cf1f99b`, Verify 37140829808 y
+GitGuardian en verde) el 2026-10-03 y pidió integrarla mediante merge commit.
 
 | Elemento | Implementación |
 |---|---|
@@ -459,15 +460,18 @@ para revisión.
 | `verify.ps1` | el perfil no depende del contrato ni del traductor, ningún módulo de Android o de comidas usa el traductor, `ReadOverview` y `ScreenRenderer` no usan tipos v2 |
 | Swift | `UnavailableInputReportSmoke.swift` ampliado. **No ejecutado: iOS no verificado** (ADR 0004) |
 
-Decisión de implementación sin regla en este ADR, para revisión del
-propietario: `ProfileGateState.Unreadable` puede construirse con cualquier
+**D11 (aprobada por el propietario el 2026-10-03).** Rechazo de motivos ajenos
+a la lectura: `ProfileGateState.Unreadable` puede construirse con cualquier
 `ProfileFailure`, pero solo `read_failed`, `corrupt`, `invalid_record` y
 `unsupported_schema` son estados de entrada (E2 a E4). Para cualquier otro
 fallo (errores de guardado, conflicto o de operación de confirmación) el
 traductor rechaza con `IllegalArgumentException`
 `profile_unavailability.unreadable_reason_not_supported` en vez de inventar una
 causa o emitir `conflicting` (ADR 0014, sección 6.2). Ningún productor actual
-construye ese estado, y `report` declara `@Throws`.
+construye ese estado, y `report` declara `@Throws`. La decisión surgió en la
+implementación, sin regla previa en este ADR, y el propietario la aprobó al
+revisar la PR #36. Cambiarla (por ejemplo, admitir otro fallo como estado de
+lectura) exige revisar este ADR y sus pruebas.
 
 Evidencia: [validación](../validation/profile-unavailability-v2-2026-10-03.md).
 Nada de esta implementación conecta el perfil con un consumidor ni aprueba uso

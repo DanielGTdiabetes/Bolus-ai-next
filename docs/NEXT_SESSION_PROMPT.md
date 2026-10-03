@@ -136,12 +136,12 @@ Ni Bolo, `ReadOverview` ni el motor leen el perfil. La traducción del estado
 del perfil a `input.profile.*` existe solo en el módulo del ADR 0015, sin
 consumidores. Sin cambios de esquema, serialización ni huellas.
 
-ADR 0015 — CONTRATO DE INDISPONIBILIDAD DEL PERFIL (implementado, PR en borrador)
+ADR 0015 — CONTRATO DE INDISPONIBILIDAD DEL PERFIL (implementado y aprobado)
 docs/adr/0015-profile-unavailability-contract.md, aceptado el 2026-10-03 con D1
 a D10 (opción C) e integrado como documentación mediante la PR #35. El
 propietario autorizó después implementarlo. La implementación está en la rama
-`claude/profile-unavailability-v2`, publicada como PR en **borrador** y
-pendiente de su revisión. **No está integrada en `main`.** Véanse
+`claude/profile-unavailability-v2` (PR #36), aprobada por el propietario y en
+proceso de integración mediante merge commit. Véanse
 docs/contracts/unavailable-input-v2.md,
 docs/validation/profile-unavailability-v2-2026-10-03.md y la sección 13 del ADR:
 - `shared/bolus-engine`: contrato v2 aditivo (`UnavailabilityReasonV2`,
@@ -155,7 +155,7 @@ docs/validation/profile-unavailability-v2-2026-10-03.md y la sección 13 del ADR
   Depende del perfil y del contrato. Sin consumidores: `verify.ps1` impide
   usarlo desde Android o comidas. `Unreadable` con un fallo que no es de
   lectura se rechaza con `profile_unavailability.unreadable_reason_not_supported`
-  (decisión de implementación pendiente de revisión, ADR 0015 §13).
+  (decisión D11, aprobada por el propietario, ADR 0015 §13).
 - D7: `ReadOverview` emite `input.profile.policy_not_approved` estático, sin
   leer el perfil. Bolo lo muestra en «Detalles técnicos».
 - Pruebas: motor 34, perfil 87, comidas 17, traductor 25, Android 44 y
@@ -164,10 +164,9 @@ docs/validation/profile-unavailability-v2-2026-10-03.md y la sección 13 del ADR
 - Swift ampliado y sin ejecutar: **iOS no verificado** (ADR 0004).
 
 SIGUIENTE PASO
-Esperar la revisión del propietario de la PR en borrador del ADR 0015. No la
-integres ni empieces otro incremento sin su petición explícita. Si pide
-cambios, aplícalos en la misma rama y vuelve a verificar con `verify.ps1
--DeviceTests` y el CI del SHA exacto. Conectar el traductor con Bolo,
+Completar la integración autorizada de la PR #36 y registrar su merge commit y
+CI. No empieces otro incremento sin una petición explícita del propietario.
+Conectar el traductor con Bolo,
 `ReadOverview`, el motor u otro consumidor exige su propio ADR. Siguen
 abiertas como decisiones del propietario, y cualquier avance clínico necesita
 antes su ADR: límites clínicos, vigencia (sin política aprobada), resolución de

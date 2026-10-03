@@ -84,7 +84,8 @@ fijan las pruebas existentes. Sin datos personales ni cambios de red.
 - El nombre Swift de la elevación (`InputUnavailability.companion.from(cause:)`)
   sigue la convención de Kotlin/Native y no está comprobado.
 - `Unreadable` con un fallo que no es de lectura se rechaza con
-  `profile_unavailability.unreadable_reason_not_supported`. Es una decisión de
-  implementación registrada en el ADR 0015, sección 13, para revisión.
+  `profile_unavailability.unreadable_reason_not_supported`. Decisión D11,
+  aprobada por el propietario el 2026-10-03 y registrada en el ADR 0015,
+  sección 13.
 - La prueba de dispositivo no cubre el traductor: ningún consumidor Android lo
   usa. Solo cubre el código estático de D7 en Bolo.
