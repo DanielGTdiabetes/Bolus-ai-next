@@ -9,9 +9,9 @@
   sin una petición explícita.
 - Fecha: 2026-10-03.
 - Implementación: parte 1 (dominio compartido y persistencia SQLite v2, con sus
-  pruebas) en la rama `claude/profile-confirmation-domain`, pendiente de
-  revisión. Parte 2 (UI de revisión, confirmación y revocación y texto de Bolo)
-  sin empezar. Véase la
+  pruebas) integrada en `main` mediante la PR #32 tras revisión y CI en verde.
+  Parte 2 (UI de revisión, confirmación y revocación y texto de Bolo) sin
+  empezar. Véase la
   [validación](../validation/profile-confirmation-domain-2026-10-03.md).
 - Fase y criterio de aceptación: fase 6, trabajo 1 y 2 («confirmación de perfil»
   y «validar completitud, solapamientos, huecos, zona horaria, vigencia y límites

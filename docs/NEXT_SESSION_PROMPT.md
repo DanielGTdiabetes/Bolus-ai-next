@@ -14,8 +14,8 @@ sigue en v3 (ADR 0008 a 0011).
 
 Ajustes → Cálculo captura el perfil clínico local (ADR 0012, aceptado con las
 ocho recomendaciones de su sección 12 y la regla de unidades 4.4). Módulo
-`shared/clinical-profile` y base propia `clinical-profile.db` (v1 en main, v2
-con la parte 1 del ADR 0014): versiones append-only con triggers, huella
+`shared/clinical-profile` y base propia `clinical-profile.db` v2 (parte 1 del
+ADR 0014, migrada desde v1): versiones append-only con triggers, huella
 SHA-256 canónica revalidada al leer, origen `manual`/`restored` (`system_proposal_accepted` reservado y rechazado), fecha y
 escritor. Unidad de glucosa (mg/dL o mmol/L) y zona IANA declaradas por versión.
 `carb_ratio` (g/U), `insulin_sensitivity` y `glucose_target` por franjas
@@ -68,14 +68,14 @@ Toda prueba que abra Ajustes → Cálculo debe inyectar
 En Windows, los XML de recursos están en CRLF en la copia de trabajo: al editarlos
 con scripts conserva los finales de línea o `git diff --check` fallará.
 
-ADR 0014 — CONFIRMACIÓN DE DATOS DEL PERFIL (parte 1 implementada, en revisión)
+ADR 0014 — CONFIRMACIÓN DE DATOS DEL PERFIL (parte 1 integrada, parte 2 sin empezar)
 ADR 0014 (docs/adr/0014-clinical-profile-confirmation-eligibility.md), aceptado
 el 2026-10-03 con C1 a C9 según su recomendación (C7 como solución
 provisional). Confirmar datos es revisar una versión guardada identificada por
 número y huella. No aprueba límites, vigencia ni aptitud para calcular o tratar.
 
-Parte 1 en la rama `claude/profile-confirmation-domain` y su PR, sin integrar
-hasta la revisión del propietario. Véase
+Parte 1 integrada en `main` mediante la PR #32 (rama
+`claude/profile-confirmation-domain`). Véase
 docs/validation/profile-confirmation-domain-2026-10-03.md:
 - `shared/clinical-profile`: `ProfileCompleteness.kt` (faltas deterministas,
   `0` configurado, zona comprobada con `TimeZoneRules`, sin límite de 48),
@@ -102,10 +102,9 @@ La UI no cambia: no hay botones de confirmar ni retirar, Bolo sigue con
 perfil. `input.profile.*` no se implementa ni se conecta.
 
 SIGUIENTE INCREMENTO PROPUESTO (solo con petición explícita del propietario)
-Primero, revisión del propietario e integración de la PR de la parte 1, con CI
-del SHA exacto en verde. Después, y solo con autorización, la parte 2 del ADR
-0014: vista de solo lectura de la última versión con «Revisar y confirmar los
-datos de la versión N…» construida desde una lectura nueva, nunca dentro del
+Solo con autorización explícita del propietario, la parte 2 del ADR 0014:
+vista de solo lectura de la última versión con «Revisar y confirmar los datos
+de la versión N…» construida desde una lectura nueva, nunca dentro del
 editor ni con cambios, textos pendientes, panel abierto o cambio de unidad
 pendiente. Confirmar y retirar con `AndroidOperationIds`, con `operation_id` y
 carga útil conservados en el estado guardado y resueltos por identidad al

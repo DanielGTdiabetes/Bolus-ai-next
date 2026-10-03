@@ -85,6 +85,12 @@ pruebas.
 
 ## Verificación
 
+Integración: PR #32, integrada en `main` por el flujo normal sin saltar checks.
+La cabeza con el código, `a42b2d4`, pasó Verify
+([37121897937](https://github.com/DanielGTdiabetes/Bolus-ai-next/actions/runs/37121897937)).
+La cabeza final solo añade esta actualización de documentación y pasó su propio
+Verify antes de integrar.
+
 Comandos ejecutados en Windows desde la rama de trabajo:
 
 ```powershell
