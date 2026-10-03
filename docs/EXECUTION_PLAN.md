@@ -543,6 +543,17 @@ la parte 2. Cálculo y tratamiento siguen bloqueados en todos los estados. Véan
 el [ADR 0014](adr/0014-clinical-profile-confirmation-eligibility.md) y la
 [validación](validation/profile-confirmation-domain-2026-10-03.md).
 
+### Entrega de confirmación de datos del perfil, parte 2 — 2026-10-03
+
+Pantalla de la parte 2 del ADR 0014 sobre el dominio de la parte 1, sin cambios
+de esquema ni de reglas: estados E1 a E11 con sus textos, revisión de solo
+lectura desde una lectura nueva con todas las franjas y los `0` destacados,
+confirmar y retirar como acciones separadas con `operation_id` conservado en
+reintentos y recreación, resolución de operaciones pendientes por identidad,
+historial de confirmaciones, retiradas y superadas, y Bolo con «Perfil · no se
+usa para calcular» sin leer el perfil. Cálculo y tratamiento siguen bloqueados.
+Véase la [validación](validation/profile-confirmation-ui-2026-10-03.md).
+
 ### Secuencia de capacidades
 
 No intentar construir toda una fase en un solo cambio. Secuencia inicial:

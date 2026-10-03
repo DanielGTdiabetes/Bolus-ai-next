@@ -117,11 +117,15 @@ ni objetivo. El perfil no se usa para calcular, recomendar ni tratar. Véanse el
 El dominio común y la base local ya registran la confirmación de datos de una
 versión guardada como hechos separados del contenido (confirmar, retirar y
 volver a confirmar, sin herencia entre versiones) y `clinical-profile.db` pasa a
-v2 con migración verificada. Confirmar datos no aprueba su uso clínico: cálculo y
-tratamiento siguen bloqueados. La pantalla para revisar y confirmar llega en una
-entrega posterior. Véanse el
-[ADR 0014](docs/adr/0014-clinical-profile-confirmation-eligibility.md) y la
-[validación](docs/validation/profile-confirmation-domain-2026-10-03.md).
+v2 con migración verificada. Ajustes → Cálculo permite revisar en solo lectura la
+última versión guardada, confirmar sus datos y retirar esa confirmación como
+acciones separadas, con el historial de confirmaciones. Confirmar datos no
+aprueba su uso clínico: «Datos confirmados» siempre aparece con «Cálculo todavía
+bloqueado», y Bolo muestra «Perfil · no se usa para calcular» sin leer el
+perfil. Véanse el
+[ADR 0014](docs/adr/0014-clinical-profile-confirmation-eligibility.md) y las
+validaciones del [dominio](docs/validation/profile-confirmation-domain-2026-10-03.md)
+y de la [pantalla](docs/validation/profile-confirmation-ui-2026-10-03.md).
 Se ha verificado el flujo en la pantalla interior del Pixel 10 Pro Fold, además
 de layouts anchos vertical/horizontal con texto ampliado. Pausar y reanudar los
 editores conserva sus campos, foco y posición de desplazamiento.
