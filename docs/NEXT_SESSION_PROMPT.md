@@ -163,10 +163,16 @@ docs/validation/profile-unavailability-v2-2026-10-03.md y la sección 13 del ADR
   del documento del contrato con el código.
 - Swift ampliado y sin ejecutar: **iOS no verificado** (ADR 0004).
 
+ADR 0016 — PRIMER CONSUMIDOR DEL INFORME DEL PERFIL (propuesto)
+docs/adr/0016-profile-unavailability-consumer.md propone, a petición del
+propietario, conectar el traductor del ADR 0015 solo con la pantalla del
+perfil (Ajustes → Cálculo), como bloque técnico plegado, y dejar Bolo para un
+ADR posterior. Decisiones A1 a A6 y B1 pendientes. Sin implementar.
+
 SIGUIENTE PASO
-Los ADR 0014 y 0015 están implementados e integrados. No hay ningún incremento
-autorizado: no empieces otro sin una petición explícita del propietario que
-fije su alcance. Conectar el traductor con Bolo,
+Los ADR 0014 y 0015 están implementados e integrados. El ADR 0016 espera la
+decisión del propietario. No lo implementes ni empieces otro incremento sin
+una petición explícita que fije su alcance. Conectar el traductor con Bolo,
 `ReadOverview`, el motor u otro consumidor exige su propio ADR. Siguen
 abiertas como decisiones del propietario, y cualquier avance clínico necesita
 antes su ADR: límites clínicos, vigencia (sin política aprobada), resolución de
