@@ -571,6 +571,17 @@ integrada mediante la PR #36 (merge commit `a57d2e5`, Verify 37142410544 en
 verde). Véanse el [contrato](contracts/unavailable-input-v2.md) y la
 [validación](validation/profile-unavailability-v2-2026-10-03.md).
 
+### Entrega del primer consumidor del informe del perfil — 2026-10-04
+
+Implementación de la opción A del
+[ADR 0016](adr/0016-profile-unavailability-consumer.md) (fases 2 y 6), con A1 a
+A6 y A4 precisada: Ajustes → Cálculo muestra, en un bloque técnico plegado, el
+informe v2 del estado que ya presenta, derivado en cada render del modelo de la
+pantalla. Solo se captura el rechazo conocido del traductor. Sin lecturas
+nuevas ni textos nuevos. Bolo, `ReadOverview`, el motor, SQLite y el contrato
+no cambian. Cálculo y tratamiento siguen bloqueados. Véase la
+[validación](validation/profile-unavailability-screen-2026-10-04.md).
+
 ### Secuencia de capacidades
 
 No intentar construir toda una fase en un solo cambio. Secuencia inicial:

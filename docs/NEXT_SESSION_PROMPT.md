@@ -152,8 +152,9 @@ docs/validation/profile-unavailability-v2-2026-10-03.md y la sección 13 del ADR
   defensivas, unión de detalles sin recorte y `@Throws`. v1 congelado.
 - `shared/profile-unavailability`: módulo común nuevo con
   `ProfileUnavailability.report(ProfileGateState)` (secciones 6.1 y 6.2).
-  Depende del perfil y del contrato. Sin consumidores: `verify.ps1` impide
-  usarlo desde Android o comidas. `Unreadable` con un fallo que no es de
+  Depende del perfil y del contrato. Su único consumidor es la pantalla del
+  perfil (ADR 0016): `verify.ps1` fija la lista cerrada de ficheros de Android
+  que pueden usarlo. `Unreadable` con un fallo que no es de
   lectura se rechaza con `profile_unavailability.unreadable_reason_not_supported`
   (decisión D11, aprobada por el propietario, ADR 0015 §13).
 - D7: `ReadOverview` emite `input.profile.policy_not_approved` estático, sin
@@ -163,17 +164,27 @@ docs/validation/profile-unavailability-v2-2026-10-03.md y la sección 13 del ADR
   del documento del contrato con el código.
 - Swift ampliado y sin ejecutar: **iOS no verificado** (ADR 0004).
 
-ADR 0016 — PRIMER CONSUMIDOR DEL INFORME DEL PERFIL (aceptado)
+ADR 0016 — PRIMER CONSUMIDOR DEL INFORME DEL PERFIL (aceptado, A implementada)
 docs/adr/0016-profile-unavailability-consumer.md conecta el traductor del ADR
 0015 solo con la pantalla del perfil (Ajustes → Cálculo), como bloque técnico
 plegado. Aceptado el 2026-10-04 con A1 a A6, A4 precisada (solo se captura el
 rechazo conocido del traductor) y B1 solo como planificación: Bolo sigue sin
-conectarse. Implementación de A autorizada.
+conectarse. Integrado como documentación mediante la PR #38. La opción A está
+implementada en la rama `claude/profile-unavailability-screen`, pendiente de
+revisión. Véanse la sección 11 del ADR y
+docs/validation/profile-unavailability-screen-2026-10-04.md:
+- `ProfileUnavailabilityBlock` (puro) y `ClinicalProfileModel.unavailability`,
+  derivada de `gate` en cada acceso. `gate` nulo se traduce como E1.
+- `ClinicalProfileScreen` añade el bloque (tags `profile:unavailability` y
+  `profile:unavailability:toggle`) en la vista principal. `MainActivity`
+  recuerda si está abierto sin guardarlo: se pliega tras recreación.
+- `ClinicalProfileUnavailabilityDeviceTest` en la lista de `verify.ps1`.
 
 SIGUIENTE PASO
-Los ADR 0014 y 0015 están implementados e integrados. El ADR 0016 está
-aceptado y su opción A autorizada: impleméntala sin tocar Bolo ni el motor.
-No empieces otro incremento sin una petición explícita que fije su alcance. Conectar el traductor con Bolo,
+Los ADR 0014 y 0015 están implementados e integrados. La opción A del ADR 0016
+está implementada y espera la revisión del propietario. No la integres ni
+empieces otro incremento sin una petición explícita. B1 (Bolo) es solo
+planificación: no conectes Bolo sin su ADR. Conectar el traductor con Bolo,
 `ReadOverview`, el motor u otro consumidor exige su propio ADR. Siguen
 abiertas como decisiones del propietario, y cualquier avance clínico necesita
 antes su ADR: límites clínicos, vigencia (sin política aprobada), resolución de

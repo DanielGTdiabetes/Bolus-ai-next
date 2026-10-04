@@ -1,8 +1,10 @@
 # ADR 0016: primer consumidor del informe de indisponibilidad del perfil
 
 - Estado: **aceptado** el 2026-10-04 con A1 a A6 según su recomendación, A4
-  precisada y B1 solo como planificación (sección 10). Implementación de A
-  autorizada en un incremento separado. Bolo y el motor quedan fuera.
+  precisada y B1 solo como planificación (sección 10), e integrado como
+  documentación mediante la PR #38. Opción A **implementada** en la rama
+  `claude/profile-unavailability-screen` (sección 11). Bolo y el motor quedan
+  fuera.
 - Fecha: 2026-10-04.
 - Fase y criterio de aceptación: fases 2 y 6. Decide si el informe v2 del
   perfil ([ADR 0015](0015-profile-unavailability-contract.md)) se conecta con
@@ -204,3 +206,22 @@ Pruebas añadidas a la sección 6 a petición del propietario:
 - Reintento tras un error: tras una lectura fallida (E2) y un reintento que
   pasa por la lectura pendiente y termina en otro estado, el bloque nunca
   conserva códigos del estado anterior.
+
+## 11. Estado de implementación (2026-10-04)
+
+Base: `14093c3e51a87b36031007a8d84f950f8665a51c` (PR #38 integrada).
+
+| Elemento | Implementación |
+|---|---|
+| A2 | `ProfileUnavailabilityBlock` (puro, `android/.../ui`) y la propiedad derivada `ClinicalProfileModel.unavailability`, recalculada en cada acceso desde `gate`. `gate` nulo se traduce como E1, igual que lo presenta la pantalla |
+| A3 | `MainActivity.profileDetailsOpen`, sin guardar en el estado: el bloque sigue abierto mientras la pantalla se repinta, se pliega al cambiar de sección o destino y tras recreación |
+| A4 | solo se captura `IllegalArgumentException` con el mensaje `profile_unavailability.unreadable_reason_not_supported`. Se muestra ese identificador. Cualquier otra excepción se propaga. El estado recibido no cambia |
+| A5 | un `code` por línea, con sus detalles entre corchetes separados por coma, en el orden del informe |
+| A6 | título del bloque `R.string.technical_details` (el de Bolo). Sin textos nuevos |
+| Pantalla | `ClinicalProfileScreen.current()` añade el bloque en todos los estados de la vista principal (E1 a E11). Revisión, editor e historial no lo muestran |
+| `verify.ps1` | lista cerrada de ficheros de Android que pueden usar el traductor. `MainActivity` no construye informes v2. `ReadOverview` y `ScreenRenderer` siguen sin perfil ni tipos v2. Nueva clase de instrumentación en la lista |
+
+Bolo, `ReadOverview`, el motor, SQLite, el contrato y las confirmaciones no
+cambian. Cálculo y tratamiento siguen bloqueados en todos los estados.
+
+Evidencia: [validación](../validation/profile-unavailability-screen-2026-10-04.md).

@@ -113,14 +113,17 @@ texto fijo y no lee el perfil. Véase el
 de texto validados, copias defensivas y `@Throws` hacia Swift. El módulo común
 `shared/profile-unavailability` traduce un `ProfileGateState` recibido a un
 informe v2. Depende del perfil y del contrato. El motor y el perfil no dependen
-de él y ningún consumidor lo usa todavía: conectarlo exige su propio ADR.
+de él. Su único consumidor es la pantalla del perfil (Ajustes → Cálculo), que
+muestra el informe del estado que ya presenta en un bloque técnico plegado
+([ADR 0016](adr/0016-profile-unavailability-consumer.md), opción A). Bolo,
+`ReadOverview` y el motor siguen sin usarlo: conectarlos exige otro ADR.
 `ReadOverview` sigue sin leer el perfil y emite `input.profile.policy_not_approved`
 estático (D7). Véanse el [ADR 0015](adr/0015-profile-unavailability-contract.md)
 y el [contrato v2](contracts/unavailable-input-v2.md).
 
 ```text
 shared/clinical-profile ──┐
-                          ├──> shared/profile-unavailability   (sin consumidores)
+                          ├──> shared/profile-unavailability ──> pantalla del perfil (Android)
 shared/bolus-engine ──────┘
      ^ contrato v1 y v2, sin dependencia del perfil
 ```
