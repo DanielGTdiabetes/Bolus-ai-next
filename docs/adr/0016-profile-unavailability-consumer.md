@@ -1,7 +1,8 @@
 # ADR 0016: primer consumidor del informe de indisponibilidad del perfil
 
-- Estado: **propuesto**. Sin implementar. Pendiente de las decisiones del
-  propietario (sección 8).
+- Estado: **aceptado** el 2026-10-04 con A1 a A6 según su recomendación, A4
+  precisada y B1 solo como planificación (sección 10). Implementación de A
+  autorizada en un incremento separado. Bolo y el motor quedan fuera.
 - Fecha: 2026-10-04.
 - Fase y criterio de aceptación: fases 2 y 6. Decide si el informe v2 del
   perfil ([ADR 0015](0015-profile-unavailability-contract.md)) se conecta con
@@ -171,3 +172,35 @@ aprueba límites, vigencia, DIA, IOB o P4 y P6 del ADR 0012.
 
 La conexión de Bolo (B), una puerta de cálculo en el motor, una aprobación
 clínica del perfil, un cambio del contrato v2 o la verificación de iOS.
+
+## 10. Decisiones del propietario (2026-10-04)
+
+| Id | Decisión |
+|---|---|
+| A1 | aprobada: opción C, implementando ahora solo A (pantalla del perfil) |
+| A2 | aprobada: propiedad derivada en `ClinicalProfileModel`, nunca en la vista |
+| A3 | aprobada: el bloque se abre siempre plegado |
+| A4 | aprobada **con precisión**, ver abajo |
+| A5 | aprobada: un `code` por línea con sus detalles entre corchetes, en el orden del informe |
+| A6 | aprobada: sin textos explicativos nuevos, solo el título del bloque |
+| B1 | aprobada **solo como planificación** de un ADR posterior. No autoriza conectar Bolo |
+
+Precisión de A4:
+
+- Se captura **únicamente** el rechazo conocido del traductor:
+  `IllegalArgumentException` con el mensaje exacto
+  `profile_unavailability.unreadable_reason_not_supported`.
+- El bloque muestra ese identificador estable. No se fabrica un informe válido
+  ni una causa sustitutiva.
+- Los bloqueos de cálculo y tratamiento se conservan: el estado del perfil no
+  cambia y `allowsCalculation` y `allowsTreatment` siguen en `false`.
+- Cualquier otra excepción no se captura ni se oculta: se propaga como hoy.
+
+Pruebas añadidas a la sección 6 a petición del propietario:
+
+- Transición de lectura pendiente al resultado: el bloque muestra primero
+  `input.profile.unknown` [`profile.read.pending`] y después exactamente las
+  causas del estado leído, sin conservar las de la lectura pendiente.
+- Reintento tras un error: tras una lectura fallida (E2) y un reintento que
+  pasa por la lectura pendiente y termina en otro estado, el bloque nunca
+  conserva códigos del estado anterior.
