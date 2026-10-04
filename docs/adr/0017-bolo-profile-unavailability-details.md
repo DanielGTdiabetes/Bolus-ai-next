@@ -1,8 +1,9 @@
 # ADR 0017: informe del perfil en los detalles del bloqueo de Bolo
 
-- Estado: **propuesto**. Nada implementado. Las decisiones B2 a B10 siguen
-  **pendientes de aprobación** del propietario (sección 9). Ninguna
-  recomendación de este documento está aprobada.
+- Estado: **aceptado** el 2026-10-04 con B2 a B10 según su recomendación,
+  incluida expresamente la ampliación a Diagnóstico (B10), y con las
+  precisiones de la sección 14. La implementación queda autorizada con ese
+  alcance y con cálculo y tratamiento bloqueados.
 - Fecha: 2026-10-04.
 - Fase y criterio de aceptación: fases 2 y 6. Desarrolla la opción B que el
   [ADR 0016](0016-profile-unavailability-consumer.md) aprobó solo como
@@ -190,10 +191,9 @@ Los tres códigos v1 y debajo el informe v2 del perfil.
 - Un resultado tardío de una lectura superada no pinta nada (`stateToken`).
 - `onSaveInstanceState` no cambia.
 
-## 9. Decisiones del propietario (pendientes)
+## 9. Decisiones del propietario
 
-Todas las decisiones de esta tabla están **pendientes de aprobación**. La
-columna «Recomendación» es la propuesta de este ADR, no una decisión tomada.
+Tabla de la propuesta. Las decisiones tomadas están en la sección 14.
 
 | Id | Pregunta | Recomendación | Si no se decide |
 |---|---|---|---|
@@ -286,3 +286,44 @@ límites, vigencia, DIA, IOB o P4 y P6 del ADR 0012.
 Una puerta de cálculo en el motor, una aprobación clínica del perfil, un
 segundo escritor del perfil (sync, importación o perfiles alternativos), un
 cambio del contrato v2 o la verificación de iOS.
+
+## 14. Decisiones del propietario (2026-10-04)
+
+| Id | Decisión |
+|---|---|
+| B2 | aprobada: E1 traducido antes de la primera lectura |
+| B3 | aprobada: un único informe v2, sin la causa estática del perfil |
+| B4 | aprobada: retirada acotada de «Bolo no lee el perfil» mediante R1, con la precisión de abajo |
+| B5 | aprobada: comportamiento ante errores de la sección 6 |
+| B6 | aprobada: Bolo y Diagnóstico nunca invocan `retry()` ni releen por su cuenta |
+| B7 | aprobada: repintado de los destinos con el bloque y estado abierto sin guardar |
+| B8 | aprobada: recreación de la sección 8 |
+| B9 | aprobada: sin textos nuevos |
+| B10 | aprobada **expresamente**, incluida la ampliación de alcance a Diagnóstico |
+
+Precisión de B4 y B6:
+
+- `ensureLoaded()` se invoca **únicamente** al pintar las pantallas
+  autorizadas que muestran este informe: Ajustes → Cálculo (como hoy) y
+  `BOLUS`, `MANUAL`, `OFFLINE_BOLUS` y `DIAGNOSTICS`. Ningún otro destino
+  inicia lecturas del perfil. `verify.ps1` fija los ficheros que pueden
+  invocarlo y la lista cerrada de destinos.
+- La resolución de operaciones pendientes que `ensureLoaded()` puede iniciar
+  (`resolvePending`, ADR 0014 §9.3) es **exclusivamente de lectura**: lee el
+  estado y lo compara con la operación conservada. No guarda versiones, no
+  añade confirmaciones ni retiradas y no reenvía la petición pendiente.
+- Bolo y Diagnóstico no invocan `retry()`, `record`, `save`, confirmaciones ni
+  ninguna otra operación de escritura del modelo.
+
+Pruebas añadidas a la sección 11 a petición del propietario:
+
+- Cero escrituras al abrir Bolo y Diagnóstico, contadas en el repositorio de
+  prueba (versiones guardadas y eventos de confirmación) y en filas de la base
+  sintética, sin operaciones pendientes y con una operación pendiente
+  conservada.
+- Un modelo nuevo creado desde el estado guardado (muerte del proceso) pasa
+  por E1 (`input.profile.unknown` [`profile.read.pending`]) antes de mostrar
+  el resultado, también cuando conserva una operación pendiente, y sin
+  escrituras.
+- Abrir destinos sin el bloque (Inicio, Más, Escanear) no inicia lecturas del
+  perfil.
