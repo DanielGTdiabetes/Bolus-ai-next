@@ -70,3 +70,13 @@ del ADR 0016. Se corrigió antes de la ejecución con dispositivo.
   sin verificar en iOS (ADR 0004).
 - Bolo sigue con el código estático del perfil. Su conexión (B1) es solo
   planificación.
+
+## Integración
+
+- Aprobación del propietario sobre `a267f67` (Windows verification
+  [37177046158](https://github.com/DanielGTdiabetes/Bolus-ai-next/actions/runs/37177046158)
+  y GitGuardian en verde).
+- `gh pr merge 39 --merge --match-head-commit a267f67f3e3e834b317d2a17dd5f6fe6f2be3ed9`:
+  merge commit `c583e6a3cdeb34fb4ddaf75bbcffdc620c629f0b`.
+- CI del merge commit en `main`: [Verify 37177820636](https://github.com/DanielGTdiabetes/Bolus-ai-next/actions/runs/37177820636), evento `push`, conclusión `success`.
+- Una PR posterior, solo documental, registra estos datos.

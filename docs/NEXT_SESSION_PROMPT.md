@@ -50,8 +50,8 @@ docs/validation/profile-segment-editor-2026-09-28.md,
 docs/validation/profile-confirmation-domain-2026-10-03.md y
 docs/validation/profile-confirmation-ui-2026-10-03.md.
 Comprueba el CI del SHA exacto integrado antes de empezar. La última
-integración de código es la PR #36, implementación del ADR 0015 (merge commit
-a57d2e5ce6497220a54e3ae632087c688a13f002, Verify 37142410544 en verde). Después se integró una PR solo
+integración de código es la PR #39, opción A del ADR 0016 (merge commit
+c583e6a3cdeb34fb4ddaf75bbcffdc620c629f0b, Verify 37177820636 en verde). Después se integró una PR solo
 documental que registra esa integración: comprueba el SHA exacto de
 `origin/main` y su CI.
 Esta entrega no consultó ni modificó Legacy. Su última auditoría documentada
@@ -164,14 +164,14 @@ docs/validation/profile-unavailability-v2-2026-10-03.md y la sección 13 del ADR
   del documento del contrato con el código.
 - Swift ampliado y sin ejecutar: **iOS no verificado** (ADR 0004).
 
-ADR 0016 — PRIMER CONSUMIDOR DEL INFORME DEL PERFIL (aceptado, A implementada)
+ADR 0016 — PRIMER CONSUMIDOR DEL INFORME DEL PERFIL (aceptado, A integrada)
 docs/adr/0016-profile-unavailability-consumer.md conecta el traductor del ADR
 0015 solo con la pantalla del perfil (Ajustes → Cálculo), como bloque técnico
 plegado. Aceptado el 2026-10-04 con A1 a A6, A4 precisada (solo se captura el
 rechazo conocido del traductor) y B1 solo como planificación: Bolo sigue sin
-conectarse. Integrado como documentación mediante la PR #38. La opción A está
-implementada en la rama `claude/profile-unavailability-screen`, pendiente de
-revisión. Véanse la sección 11 del ADR y
+conectarse. Integrado como documentación mediante la PR #38. La opción A,
+aprobada por el propietario, está integrada en `main` mediante la PR #39
+(merge commit `c583e6a3cdeb34fb4ddaf75bbcffdc620c629f0b`, Verify 37177820636 en verde). Véanse la sección 11 del ADR y
 docs/validation/profile-unavailability-screen-2026-10-04.md:
 - `ProfileUnavailabilityBlock` (puro) y `ClinicalProfileModel.unavailability`,
   derivada de `gate` en cada acceso. `gate` nulo se traduce como E1.
@@ -181,10 +181,10 @@ docs/validation/profile-unavailability-screen-2026-10-04.md:
 - `ClinicalProfileUnavailabilityDeviceTest` en la lista de `verify.ps1`.
 
 SIGUIENTE PASO
-Los ADR 0014 y 0015 están implementados e integrados. La opción A del ADR 0016
-está implementada y espera la revisión del propietario. No la integres ni
-empieces otro incremento sin una petición explícita. B1 (Bolo) es solo
-planificación: no conectes Bolo sin su ADR. Conectar el traductor con Bolo,
+Los ADR 0014 y 0015 y la opción A del ADR 0016 están implementados e
+integrados. No hay ningún incremento autorizado: no empieces otro sin una
+petición explícita del propietario que fije su alcance. B1 (Bolo) es solo
+planificación: conectar Bolo exige su propio ADR. Conectar el traductor con Bolo,
 `ReadOverview`, el motor u otro consumidor exige su propio ADR. Siguen
 abiertas como decisiones del propietario, y cualquier avance clínico necesita
 antes su ADR: límites clínicos, vigencia (sin política aprobada), resolución de

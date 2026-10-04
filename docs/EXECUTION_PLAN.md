@@ -579,7 +579,8 @@ A6 y A4 precisada: Ajustes → Cálculo muestra, en un bloque técnico plegado, 
 informe v2 del estado que ya presenta, derivado en cada render del modelo de la
 pantalla. Solo se captura el rechazo conocido del traductor. Sin lecturas
 nuevas ni textos nuevos. Bolo, `ReadOverview`, el motor, SQLite y el contrato
-no cambian. Cálculo y tratamiento siguen bloqueados. Véase la
+no cambian. Cálculo y tratamiento siguen bloqueados. Integrada mediante la PR
+#39 (merge commit `c583e6a`, Verify 37177820636 en verde). Véase la
 [validación](validation/profile-unavailability-screen-2026-10-04.md).
 
 ### Secuencia de capacidades
