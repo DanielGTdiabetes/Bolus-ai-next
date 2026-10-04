@@ -2,9 +2,9 @@
 
 - Estado: **aceptado** el 2026-10-04 con A1 a A6 según su recomendación, A4
   precisada y B1 solo como planificación (sección 10), e integrado como
-  documentación mediante la PR #38. Opción A **implementada** en la rama
-  `claude/profile-unavailability-screen` (sección 11). Bolo y el motor quedan
-  fuera.
+  documentación mediante la PR #38. Opción A **implementada e integrada** en
+  `main` mediante la PR #39 (merge commit `c583e6a`, sección 11). Bolo y el
+  motor quedan fuera.
 - Fecha: 2026-10-04.
 - Fase y criterio de aceptación: fases 2 y 6. Decide si el informe v2 del
   perfil ([ADR 0015](0015-profile-unavailability-contract.md)) se conecta con
@@ -223,5 +223,12 @@ Base: `14093c3e51a87b36031007a8d84f950f8665a51c` (PR #38 integrada).
 
 Bolo, `ReadOverview`, el motor, SQLite, el contrato y las confirmaciones no
 cambian. Cálculo y tratamiento siguen bloqueados en todos los estados.
+
+Integración: el propietario aprobó la implementación en
+`a267f67f3e3e834b317d2a17dd5f6fe6f2be3ed9` (Windows verification
+[37177046158](https://github.com/DanielGTdiabetes/Bolus-ai-next/actions/runs/37177046158)
+y GitGuardian en verde). La PR #39 se integró el 2026-10-04 mediante merge
+commit `c583e6a3cdeb34fb4ddaf75bbcffdc620c629f0b`, comprobando esa cabeza exacta. CI del merge commit en `main`:
+[Verify 37177820636](https://github.com/DanielGTdiabetes/Bolus-ai-next/actions/runs/37177820636), evento `push`, conclusión `success`.
 
 Evidencia: [validación](../validation/profile-unavailability-screen-2026-10-04.md).
