@@ -40,6 +40,12 @@ internal class ClinicalProfileModel(
         }
 
     val evaluated: ProfileGateState.Evaluated? get() = gate as? ProfileGateState.Evaluated
+
+    /**
+     * Contract v2 report of the state shown now (ADR 0016, A2). Derived on every access from [gate], so it can never
+     * keep the causes of an earlier state; it reads nothing and allows nothing.
+     */
+    val unavailability: ProfileUnavailabilityBlock get() = ProfileUnavailabilityBlock.of(gate)
     private var reading = false
     /**
      * Every task that produces a gate state takes a new token. The single worker runs tasks in order, and only the

@@ -14,6 +14,7 @@ import android.widget.LinearLayout
 import android.widget.RadioButton
 import android.widget.RadioGroup
 import android.widget.TextView
+import androidx.core.view.isVisible
 import androidx.core.widget.doAfterTextChanged
 import org.bolusai.next.R
 import org.bolusai.profile.*
@@ -31,6 +32,9 @@ internal class ClinicalProfileScreen(
     private val content: LinearLayout,
     private val model: ClinicalProfileModel,
     private val deviceZone: String?,
+    /** Whether the technical block is open. Kept by the activity only while the section stays open (ADR 0016, A3). */
+    private val detailsOpen: Boolean = false,
+    private val onDetailsToggled: (Boolean) -> Unit = {},
 ) {
     private fun dp(value: Int) = (value * context.resources.displayMetrics.density).toInt()
 
@@ -124,6 +128,23 @@ internal class ClinicalProfileScreen(
                     model.openHistory()
                 }
             }
+        }
+        unavailabilityBlock()
+    }
+
+    /**
+     * ADR 0016, option A: contract codes of the state above, folded by default, one cause per line (A5). No new user
+     * text (A6): the title is the one of Bolo's technical details and the explanation stays in the texts of E1 to E11.
+     */
+    private fun unavailabilityBlock() {
+        val codes = label(model.unavailability.lines.joinToString("\n"), "profile:unavailability", 12f).apply {
+            setTextColor(context.getColor(R.color.secondary_text))
+            setTextIsSelectable(true)
+            isVisible = detailsOpen
+        }
+        action(R.string.technical_details, "profile:unavailability:toggle", enabled = true) {
+            codes.isVisible = !codes.isVisible
+            onDetailsToggled(codes.isVisible)
         }
     }
 

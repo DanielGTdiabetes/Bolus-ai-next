@@ -42,6 +42,8 @@ dependencies {
     implementation(project(":shared:bolus-engine"))
     implementation(project(":shared:meal-drafts"))
     implementation(project(":shared:clinical-profile"))
+    // ADR 0016: only the profile screen model uses the translator; verify.ps1 limits it to those files.
+    implementation(project(":shared:profile-unavailability"))
 
     testImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test:runner:1.7.0")

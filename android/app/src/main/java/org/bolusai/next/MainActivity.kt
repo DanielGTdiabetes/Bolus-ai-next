@@ -50,6 +50,8 @@ class MainActivity : ComponentActivity() {
     private val scrollPositions = mutableMapOf<String, Int>()
     private var pausedPosition: Pair<Destination, Int>? = null
     private var settingsSection = SettingsSection.NIGHTSCOUT
+    /** Technical block of the profile screen; deliberately not saved, so it opens folded after recreation (ADR 0016, A3). */
+    private var profileDetailsOpen = false
     private val overview = ReadOverview(ReadLocalGlucoseStatus(PendingDexcomSource))
     private val backCallback = object : OnBackPressedCallback(false) {
         override fun handleOnBackPressed() = goBack()
@@ -89,7 +91,7 @@ class MainActivity : ComponentActivity() {
             }
         })[ClinicalProfileModel::class.java]
         renderer = ScreenRenderer(this, findViewById(R.id.screen_content), ::open,
-            { settingsSection = it; render() }, ::renderMeals, ::renderSelection, ::renderProfile)
+            { settingsSection = it; profileDetailsOpen = false; render() }, ::renderMeals, ::renderSelection, ::renderProfile)
         meals.changed = { render() }
         // Keep the reading position while the profile section rebuilds after a model change.
         profile.changed = { if (navigation.current == Destination.SETTINGS) { rememberScroll(); render() } }
@@ -183,7 +185,9 @@ class MainActivity : ComponentActivity() {
 
     private fun renderProfile() {
         val zone = java.util.TimeZone.getDefault().id.takeIf { AndroidTimeZoneRules.exists(it) }
-        ClinicalProfileScreen(this, findViewById(R.id.screen_content), profile, zone).render()
+        ClinicalProfileScreen(this, findViewById(R.id.screen_content), profile, zone, profileDetailsOpen) {
+            profileDetailsOpen = it
+        }.render()
     }
 
     /** Audit metadata only: application build, no device identifier or personal data. */
@@ -208,6 +212,7 @@ class MainActivity : ComponentActivity() {
 
     private fun render() {
         val destination = navigation.current
+        if (destination != Destination.SETTINGS) profileDetailsOpen = false
         val canGoBack = navigation.canGoBack || isHistoryOpenHere()
         backCallback.isEnabled = canGoBack
         findViewById<TextView>(R.id.screen_title).apply {
