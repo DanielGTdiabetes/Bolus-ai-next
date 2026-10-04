@@ -114,10 +114,46 @@ datos. La segunda ejecución no la modificó. Esas tres clases inyectan ahora un
 repositorio en memoria y `verify.ps1` exige que toda clase de instrumentación
 que lanza `MainActivity` inyecte un repositorio de perfil sintético.
 
+### Barrera en tiempo de ejecución
+
+A petición del propietario, la comprobación estática pasa a ser solo apoyo. La
+protección efectiva está en el proceso de instrumentación:
+
+- `ProfileStorageGuard` (código de la app): solo se puede activar, nunca
+  desactivar. Producción no lo activa.
+- `ProfileIsolationTestRunner` (androidTest) lo activa en `onCreate`, antes de
+  crear la aplicación. Es el `testInstrumentationRunner` del módulo y el que
+  usa `verify.ps1` en `am instrument`.
+- `SqliteClinicalProfileRepository` comprueba la barrera en su primer `init`,
+  antes de construir el `SQLiteOpenHelper`: si el nombre resuelve, con rutas
+  canónicas y el mismo contexto que usa SQLite, a la `clinical-profile.db`
+  propia, falla con `profile_storage.real_database_denied_in_instrumentation`.
+  Cubre el nombre por defecto, el explícito, la ruta absoluta y rutas con `.`.
+- `MainActivity.profileRepository` falla con
+  `profile_storage.synthetic_factory_missing_in_instrumentation` si no hay
+  fábrica sintética, antes de construir ningún repositorio.
+- `ProfileStorageGuardDeviceTest` (4 pruebas) lo demuestra con un contexto
+  aislado cuyo directorio de bases es una carpeta nueva en la caché de pruebas:
+  allí la base «real» es la de esa carpeta, nunca la de la app instalada.
+  Barrera activa antes de cualquier prueba, fábrica ausente, cuatro fábricas
+  que apuntan a la base real y repositorios sintéticos permitidos. En los
+  casos rechazados la carpeta queda vacía: nada se abrió ni se creó.
+- `verify.ps1` conserva la comprobación estática de fábricas y añade que el
+  runner y la llamada a la barrera sigan conectados.
+
+Revalidación con la barrera: `verify.ps1` sin dispositivo `RESULT=OK` (JVM sin
+cambios) y, con confirmación del propietario de que el móvil estaba libre,
+`verify.ps1 -DeviceTests` con `OK (131 tests)` (127 más las 4 de la barrera)
+en el mismo Pixel, único dispositivo en adb. La `clinical-profile.db` vacía de
+la app conserva la fecha de modificación 2026-10-04 08:14:33: ninguna
+ejecución posterior la ha abierto. Paquetes desechables desinstalados.
+
 ## Limitaciones
 
-- La base vacía `clinical-profile.db` de la app en el Pixel sigue allí. Borrarla
-  es decisión del propietario.
+- La base vacía `clinical-profile.db` de la app en el Pixel se conserva por
+  decisión del propietario.
+- La barrera protege solo `clinical-profile.db`. La base de comidas sigue
+  protegida únicamente por las fábricas de cada prueba.
 - La muerte real del proceso no se provoca en instrumentación. Se reproduce
   creando un modelo nuevo desde el estado guardado, como en el ADR 0014.
 - iOS no aplica: son pantallas Android. El traductor común sigue sin

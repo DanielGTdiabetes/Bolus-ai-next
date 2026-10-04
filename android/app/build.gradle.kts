@@ -12,7 +12,7 @@ android {
         targetSdk = 36
         versionCode = 1
         versionName = "0.1.0-dev"
-        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        testInstrumentationRunner = "org.bolusai.next.ProfileIsolationTestRunner"
     }
 
     buildTypes {

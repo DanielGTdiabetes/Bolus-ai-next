@@ -202,10 +202,15 @@ docs/validation/bolo-profile-details-2026-10-04.md:
 - `verify.ps1`: usuarios cerrados del modelo y de `ensureLoaded`, destinos
   exactos y toda clase de instrumentación que lance `MainActivity` debe
   inyectar un repositorio de perfil sintético.
-- Pruebas: Android JVM 57 y `OK (127 tests)` en dispositivo.
+- Pruebas: Android JVM 57 y `OK (131 tests)` en dispositivo, con
+  `ProfileStorageGuardDeviceTest`. La instrumentación usa
+  `ProfileIsolationTestRunner`.
 - La primera ejecución en dispositivo abrió la `clinical-profile.db` propia
-  de la app en el Pixel desde tres pruebas de comidas. Está vacía. Borrarla es
-  decisión del propietario.
+  de la app en el Pixel desde tres pruebas de comidas. Está vacía y se
+  conserva por decisión del propietario. Desde entonces
+  `ProfileIsolationTestRunner` activa `ProfileStorageGuard` y la
+  instrumentación falla explícitamente si una fábrica falta o apunta a la base
+  real (`ProfileStorageGuardDeviceTest`).
 
 SIGUIENTE PASO
 Los ADR 0014 y 0015 y la opción A del ADR 0016 están implementados e

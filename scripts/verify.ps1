@@ -134,6 +134,16 @@ try {
     if ($unisolatedLaunches.Count -gt 0) {
         throw "Instrumentation launching MainActivity must inject a synthetic profile repository (ADR 0017): $($unisolatedLaunches.FullName -join ', ')"
     }
+    # The runtime barrier is the real protection: the app tests run with the runner that activates it before the
+    # application starts. These static checks only keep it wired.
+    if (-not (Select-String -LiteralPath (Join-Path $repositoryRoot "android\app\build.gradle.kts") -SimpleMatch -Quiet `
+            -Pattern 'testInstrumentationRunner = "org.bolusai.next.ProfileIsolationTestRunner"')) {
+        throw "App instrumentation must run with ProfileIsolationTestRunner (ADR 0017)"
+    }
+    if (-not (Select-String -LiteralPath (Join-Path $mainSources "java\org\bolusai\next\profile\SqliteClinicalProfileRepository.kt") -SimpleMatch -Quiet `
+            -Pattern 'init { ProfileStorageGuard.checkDatabase(context.applicationContext, name) }')) {
+        throw "The profile repository must check the instrumentation barrier before opening its file (ADR 0017)"
+    }
     $blockingDetailsSource = Join-Path $mainSources "java\org\bolusai\next\ui\BlockingDetails.kt"
     $expectedDestinations = 'setOf(Destination.BOLUS, Destination.MANUAL, Destination.OFFLINE_BOLUS, Destination.DIAGNOSTICS)'
     if (-not (Select-String -LiteralPath $blockingDetailsSource -SimpleMatch -Pattern $expectedDestinations -Quiet)) {
@@ -256,8 +266,8 @@ jobs:
             }
             # Direct instrumentation avoids collecting unrelated device logcat or clinical data.
             $instrumentation = @(adb shell am instrument -w -r `
-                -e class org.bolusai.next.glucose.dexcom.AndroidDexcomSenderEvidenceTest,org.bolusai.next.NavigationDeviceTest,org.bolusai.next.MealDraftDeviceTest,org.bolusai.next.MealHistoryDeviceTest,org.bolusai.next.MealRestoreDeviceTest,org.bolusai.next.meals.SqliteMealRepositoryDeviceTest,org.bolusai.next.DarkThemeDeviceTest,org.bolusai.next.profile.SqliteClinicalProfileRepositoryDeviceTest,org.bolusai.next.profile.ClinicalProfileConfirmationDeviceTest,org.bolusai.next.ClinicalProfileDeviceTest,org.bolusai.next.ClinicalProfileConfirmationUiDeviceTest,org.bolusai.next.ClinicalProfileUnavailabilityDeviceTest,org.bolusai.next.BolusProfileDetailsDeviceTest `
-                org.bolusai.next.test/androidx.test.runner.AndroidJUnitRunner)
+                -e class org.bolusai.next.glucose.dexcom.AndroidDexcomSenderEvidenceTest,org.bolusai.next.NavigationDeviceTest,org.bolusai.next.MealDraftDeviceTest,org.bolusai.next.MealHistoryDeviceTest,org.bolusai.next.MealRestoreDeviceTest,org.bolusai.next.meals.SqliteMealRepositoryDeviceTest,org.bolusai.next.DarkThemeDeviceTest,org.bolusai.next.profile.SqliteClinicalProfileRepositoryDeviceTest,org.bolusai.next.profile.ClinicalProfileConfirmationDeviceTest,org.bolusai.next.ClinicalProfileDeviceTest,org.bolusai.next.ClinicalProfileConfirmationUiDeviceTest,org.bolusai.next.ClinicalProfileUnavailabilityDeviceTest,org.bolusai.next.BolusProfileDetailsDeviceTest,org.bolusai.next.ProfileStorageGuardDeviceTest `
+                org.bolusai.next.test/org.bolusai.next.ProfileIsolationTestRunner)
             $instrumentationExit = $LASTEXITCODE
             $instrumentation | Write-Output
             $instrumentationText = $instrumentation -join "`n"

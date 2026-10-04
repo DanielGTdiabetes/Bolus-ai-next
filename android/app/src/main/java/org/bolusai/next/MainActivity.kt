@@ -38,6 +38,7 @@ import org.bolusai.next.ui.ClinicalProfileScreen
 import org.bolusai.next.profile.AndroidOperationIds
 import org.bolusai.next.profile.AndroidTimeZoneRules
 import org.bolusai.next.profile.ClosableProfileRepository
+import org.bolusai.next.profile.ProfileStorageGuard
 import org.bolusai.next.profile.SqliteClinicalProfileRepository
 import org.bolusai.profile.ClinicalProfiles
 import org.bolusai.profile.OperationIds
@@ -91,8 +92,7 @@ class MainActivity : ComponentActivity() {
         profile = ViewModelProvider(this, object : ViewModelProvider.Factory {
             @Suppress("UNCHECKED_CAST")
             override fun <T : ViewModel> create(modelClass: Class<T>): T {
-                val repository = profileRepositoryFactory?.invoke(applicationContext)
-                    ?: SqliteClinicalProfileRepository(applicationContext)
+                val repository = profileRepository(applicationContext)
                 val clock = profileClock ?: ProfileClock { System.currentTimeMillis() }
                 val zones = profileTimeZoneRules ?: AndroidTimeZoneRules
                 return ClinicalProfileModel(ClinicalProfiles(repository, clock, writer(), zones),
@@ -275,6 +275,16 @@ class MainActivity : ComponentActivity() {
         var mealRepositoryFactory: ((Context) -> SqliteMealRepository)? = null
         /** Process-local test seams for the clinical profile; production always uses the app database and clock. */
         var profileRepositoryFactory: ((Context) -> ClosableProfileRepository)? = null
+
+        /**
+         * The repository the activity uses. During instrumentation a missing synthetic factory fails explicitly, and a
+         * factory that targets the app's own database fails when the repository is built, before the file is opened.
+         */
+        internal fun profileRepository(context: Context): ClosableProfileRepository {
+            val factory = profileRepositoryFactory
+            ProfileStorageGuard.checkFactory(factory)
+            return factory?.invoke(context) ?: SqliteClinicalProfileRepository(context)
+        }
         var profileClock: ProfileClock? = null
         var profileTimeZoneRules: TimeZoneRules? = null
         var profileOperationIds: OperationIds? = null

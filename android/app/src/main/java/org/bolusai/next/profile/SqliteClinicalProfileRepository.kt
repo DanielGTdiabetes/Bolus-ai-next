@@ -21,6 +21,9 @@ internal class SqliteClinicalProfileRepository(context: Context, name: String? =
     ClosableProfileRepository {
     private class CorruptStorage : RuntimeException()
 
+    // Before SQLite sees the name: during instrumentation the app's own file is never opened (ProfileStorageGuard).
+    init { ProfileStorageGuard.checkDatabase(context.applicationContext, name) }
+
     private val helper = object : SQLiteOpenHelper(context.applicationContext, name, null, SCHEMA_VERSION,
         DatabaseErrorHandler { throw SQLiteDatabaseCorruptException(ProfileFailure.CORRUPT_STORAGE.code) }) {
         override fun onConfigure(db: SQLiteDatabase) {
