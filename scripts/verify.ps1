@@ -126,6 +126,14 @@ try {
     if (Select-String -LiteralPath (Join-Path $mainSources "java\org\bolusai\next\MainActivity.kt") -Pattern 'profile\.retry\(' -Quiet) {
         throw "Bolo and Diagnostico never retry profile reads (ADR 0017, B6)"
     }
+    # Every instrumentation class that launches the activity injects a synthetic profile repository: Bolo and
+    # Diagnostico read the profile, and tests never open the app's own clinical-profile.db.
+    $unisolatedLaunches = @(Get-ChildItem -LiteralPath (Join-Path $repositoryRoot "android\app\src\androidTest") -Recurse -File -Include *.kt |
+        Where-Object { (Select-String -LiteralPath $_.FullName -Pattern 'ActivityScenario\.launch\(MainActivity' -Quiet) -and
+            -not (Select-String -LiteralPath $_.FullName -Pattern 'profileRepositoryFactory\s*=\s*\{' -Quiet) })
+    if ($unisolatedLaunches.Count -gt 0) {
+        throw "Instrumentation launching MainActivity must inject a synthetic profile repository (ADR 0017): $($unisolatedLaunches.FullName -join ', ')"
+    }
     $blockingDetailsSource = Join-Path $mainSources "java\org\bolusai\next\ui\BlockingDetails.kt"
     $expectedDestinations = 'setOf(Destination.BOLUS, Destination.MANUAL, Destination.OFFLINE_BOLUS, Destination.DIAGNOSTICS)'
     if (-not (Select-String -LiteralPath $blockingDetailsSource -SimpleMatch -Pattern $expectedDestinations -Quiet)) {

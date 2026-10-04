@@ -39,7 +39,15 @@ class MealHistoryDeviceTest {
             }
         }
 
-    @After fun clearFactory() { MainActivity.mealRepositoryFactory = null }
+    /** Opening Bolo now reads the profile (ADR 0017): never the app's own clinical-profile.db. */
+    @org.junit.Before fun isolateProfile() {
+        MainActivity.profileRepositoryFactory = { org.bolusai.next.profile.SqliteClinicalProfileRepository(it, null) }
+    }
+
+    @After fun clearFactory() {
+        MainActivity.mealRepositoryFactory = null
+        MainActivity.profileRepositoryFactory = null
+    }
 
     private fun viewOrNull(activity: MainActivity, tag: String): View? =
         activity.findViewById<View>(R.id.screen_content).findViewWithTag(tag)

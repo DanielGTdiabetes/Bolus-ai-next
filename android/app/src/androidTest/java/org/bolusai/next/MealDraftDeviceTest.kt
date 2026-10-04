@@ -41,7 +41,15 @@ class MealDraftDeviceTest {
         }
     }
 
-    @After fun clearFactory() { MainActivity.mealRepositoryFactory = null }
+    /** Opening Bolo now reads the profile (ADR 0017): never the app's own clinical-profile.db. */
+    @org.junit.Before fun isolateProfile() {
+        MainActivity.profileRepositoryFactory = { org.bolusai.next.profile.SqliteClinicalProfileRepository(it, null) }
+    }
+
+    @After fun clearFactory() {
+        MainActivity.mealRepositoryFactory = null
+        MainActivity.profileRepositoryFactory = null
+    }
 
     private fun viewOrNull(activity: MainActivity, tag: String): View? =
         activity.findViewById<View>(R.id.screen_content).findViewWithTag(tag)
@@ -474,7 +482,9 @@ class MealDraftDeviceTest {
                                     renderer.render(org.bolusai.next.navigation.Destination.BOLUS,
                                         org.bolusai.next.application.ReadOverview(org.bolusai.next.glucose.ReadLocalGlucoseStatus(
                                             org.bolusai.next.glucose.PendingDexcomSource)).execute(),
-                                        org.bolusai.next.ui.SettingsSection.NIGHTSCOUT)
+                                        org.bolusai.next.ui.SettingsSection.NIGHTSCOUT,
+                                        // Synthetic E1 lines: this layout check never reads a profile (ADR 0017).
+                                        org.bolusai.next.ui.BlockingView(PENDING_LINES, false) {})
                                 }
                                 org.bolusai.next.navigation.Destination.primary.forEach {
                                     renderer.addTab(shell.findViewById(R.id.bottom_navigation), it,
@@ -596,5 +606,11 @@ class MealDraftDeviceTest {
             }
         }
         model.dispose()
+    }
+
+    private companion object {
+        val PENDING_LINES = listOf("input.glucose.policy_not_approved", "input.iob.unknown", "input.meal.missing",
+            "input.profile.policy_not_approved [profile.not_approved_for_calculation]",
+            "input.profile.unknown [profile.read.pending]")
     }
 }

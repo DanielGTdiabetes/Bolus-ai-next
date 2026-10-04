@@ -51,9 +51,12 @@ docs/validation/profile-confirmation-domain-2026-10-03.md y
 docs/validation/profile-confirmation-ui-2026-10-03.md.
 Comprueba el CI del SHA exacto integrado antes de empezar. La última
 integración de código es la PR #39, opción A del ADR 0016 (merge commit
-c583e6a3cdeb34fb4ddaf75bbcffdc620c629f0b, Verify 37177820636 en verde). Después se integró una PR solo
-documental que registra esa integración: comprueba el SHA exacto de
-`origin/main` y su CI.
+c583e6a3cdeb34fb4ddaf75bbcffdc620c629f0b, Verify 37177820636 en verde). El ADR
+0017 se integró como documentación mediante la PR #41 (merge commit
+6f101fa2f3c03d21b957b9f6029badfa93759011, Verify 37181107344 en verde). Su
+implementación está en la PR #42 (rama `claude/bolo-profile-details`),
+pendiente de revisión del propietario y **no integrada**: comprueba su estado,
+el SHA exacto de `origin/main` y su CI.
 Esta entrega no consultó ni modificó Legacy. Su última auditoría documentada
 continúa fijada en f5417721d8019a9831126f4d843edfc4de87653d; no afirmes que ese
 SHA sigue siendo el main remoto sin comprobarlo si necesitas nueva evidencia.
@@ -63,18 +66,21 @@ El perfil es captura. La confirmación de datos existe en dominio, base local
 (parte 1 del ADR 0014) y pantalla (parte 2). No aprueba uso clínico: no
 alimenta motor, Bolo, IOB ni recomendación, y cálculo y tratamiento siguen
 bloqueados en todos los estados. Bolo muestra «Perfil · no se usa para
-calcular» sin leer el perfil. No hay
+calcular». Con la PR #42 sus detalles técnicos y los de Diagnóstico leen el
+perfil solo para mostrar sus causas, sin escribir. No hay
 límites clínicos, DIA, curva, redondeo, conversión de unidades, propuestas del
 sistema, aprendizaje, exportación/importación, sync ni perfiles alternativos. La
 resolución de franjas en cambios de hora queda para el ADR del motor. Los macros
 de comida son textos sin validar/convertir; ausencia nunca equivale a cero. No
 hay recepción Dexcom, IOB local, catálogo ni historial clínico. iOS sigue
 pendiente de verificación. Cálculo y confirmación clínica siguen bloqueados.
-Las pruebas USB necesitan el Pixel desbloqueado y con la pantalla encendida
+Avisa al propietario antes de usar el móvil: otro proceso puede estar probando
+en él, y `verify.ps1` exige un único dispositivo en adb. Las pruebas USB necesitan el Pixel desbloqueado y con la pantalla encendida
 durante toda la ejecución. Enviar `adb shell input keyevent KEYCODE_WAKEUP` cada
 10 s mientras corre verify.ps1 lo evita sin cambiar ajustes. Toda clase nueva de
 instrumentación debe añadirse a la lista `-e class` de scripts/verify.ps1.
-Toda prueba que abra Ajustes → Cálculo debe inyectar
+Toda prueba que lance `MainActivity` (Bolo y Diagnóstico leen el perfil desde
+el ADR 0017) o abra Ajustes → Cálculo debe inyectar
 `MainActivity.profileRepositoryFactory` en memoria o sobre un fichero sintético
 (la fábrica devuelve `ClosableProfileRepository`; `ControlledProfileRepository`
 de androidTest falla lecturas o escrituras y retiene escrituras).
@@ -180,12 +186,34 @@ docs/validation/profile-unavailability-screen-2026-10-04.md:
   recuerda si está abierto sin guardarlo: se pliega tras recreación.
 - `ClinicalProfileUnavailabilityDeviceTest` en la lista de `verify.ps1`.
 
+ADR 0017 — INFORME DEL PERFIL EN BOLO Y DIAGNÓSTICO (aceptado, implementación en revisión)
+docs/adr/0017-bolo-profile-unavailability-details.md, aceptado el 2026-10-04
+con B2 a B10, la ampliación a Diagnóstico y la sección 14: `ensureLoaded()`
+solo en las pantallas autorizadas, resolución de pendientes solo de lectura,
+cero escrituras al abrir Bolo o Diagnóstico y E1 antes del resultado en un
+modelo nuevo. Integrado como documentación mediante la PR #41. Implementación
+en la PR #42, sin integrar. Véanse la sección 15 del ADR y
+docs/validation/bolo-profile-details-2026-10-04.md:
+- `ui/BlockingDetails.kt` (puro): un único informe v2 con glucosa, IOB y comida
+  elevadas y las causas del perfil. `destinations` = `BOLUS`, `MANUAL`,
+  `OFFLINE_BOLUS`, `DIAGNOSTICS`.
+- `MainActivity`: `ensureLoaded()` solo para esos destinos, nunca `retry()`.
+  `blockingDetailsOpen` sin guardar. `ScreenRenderer` recibe `BlockingView`.
+- `verify.ps1`: usuarios cerrados del modelo y de `ensureLoaded`, destinos
+  exactos y toda clase de instrumentación que lance `MainActivity` debe
+  inyectar un repositorio de perfil sintético.
+- Pruebas: Android JVM 57 y `OK (127 tests)` en dispositivo.
+- La primera ejecución en dispositivo abrió la `clinical-profile.db` propia
+  de la app en el Pixel desde tres pruebas de comidas. Está vacía. Borrarla es
+  decisión del propietario.
+
 SIGUIENTE PASO
 Los ADR 0014 y 0015 y la opción A del ADR 0016 están implementados e
-integrados. No hay ningún incremento autorizado: no empieces otro sin una
-petición explícita del propietario que fije su alcance. B1 (Bolo) es solo
-planificación: conectar Bolo exige su propio ADR. Conectar el traductor con Bolo,
-`ReadOverview`, el motor u otro consumidor exige su propio ADR. Siguen
+integrados. La PR #42 (ADR 0017) espera la revisión del propietario: no la
+integres sin su aprobación explícita. Después, comprueba el CI del merge
+commit y registra la integración en una PR solo documental. No hay otro
+incremento autorizado. Conectar el traductor con `ReadOverview`, el motor u
+otro consumidor exige su propio ADR. Siguen
 abiertas como decisiones del propietario, y cualquier avance clínico necesita
 antes su ADR: límites clínicos, vigencia (sin política aprobada), resolución de
 franjas en cambios de hora (P4 del ADR 0012), exportación/importación de copias

@@ -44,6 +44,7 @@ deshabilitados no cambian. Sin textos nuevos.
 | `BlockingDetailsTest` (JVM Android) | 7 | lista cerrada de destinos. E1 antes de la primera lectura. Para `null`, E1 a E11, retirada y zona retirada: líneas del perfil idénticas al traductor, entradas elevadas, orden por código, `policy_not_approved` presente una sola vez. Formato con detalle. Los 13 motivos de glucosa con todos los estados sin rechazo. Rechazo conocido: tres líneas y el identificador, ninguna `input.profile.*`. Otra excepción del traductor se propaga |
 | `BolusProfileDetailsDeviceTest` (dispositivo) | 8 | ver abajo |
 | `ClinicalProfileUnavailabilityDeviceTest` (dispositivo) | 4 | se retira la prueba que exigía el código estático en Bolo. El resto sin cambios |
+| Regresiones ajustadas (dispositivo) | — | `NavigationDeviceTest`: con el perfil sintético en memoria, Bolo muestra `input.profile.missing` y `policy_not_approved` con su detalle. `ClinicalProfileConfirmationUiDeviceTest`: Bolo con datos confirmados mantiene el texto fijo y los botones deshabilitados, hace una lectura y cero escrituras. `MealDraftDeviceTest` y `DarkThemeDeviceTest` pasan líneas sintéticas de E1 a `ScreenRenderer`. `MealDraftDeviceTest`, `MealHistoryDeviceTest` y `MealRestoreDeviceTest` inyectan un repositorio de perfil en memoria |
 
 `BolusProfileDetailsDeviceTest`, con repositorios sintéticos
 (`ControlledProfileRepository` cuenta lecturas, versiones guardadas y
@@ -69,8 +70,11 @@ peticiones de confirmación) y recuento de filas en crudo de la base sintética:
 ## Comandos y resultados (Windows, PC del propietario)
 
 ```powershell
-git switch -c claude/bolo-profile-details origin/main   # 6f101fa
+git switch -c claude/bolo-profile-details origin/main   # 6f101fa, Verify 37181107344 success
 .\scripts\verify.ps1                                     # RESULT=OK
+adb disconnect 192.168.0.38:45015                        # reloj desconectado por el propietario, entrada offline
+.\scripts\verify.ps1 -DeviceTests                        # con adb keyevent KEYCODE_WAKEUP cada 10 s
+git diff --check                                         # sin salida
 ```
 
 `verify.ps1` sin dispositivo: `BUILD SUCCESSFUL`, comprobaciones de manifiesto,
@@ -81,12 +85,39 @@ Una primera ejecución falló en la regla nueva de reintentos, que también
 detectaba el `retry()` del modelo de comidas. Se limitó al modelo del perfil
 antes de repetir.
 
-Instrumentación en dispositivo: **pendiente**. Se ejecuta con
-`verify.ps1 -DeviceTests` cuando el propietario confirme que el móvil está
-libre.
+`verify.ps1 -DeviceTests`, tras confirmar el propietario que el móvil estaba
+libre: `BUILD SUCCESSFUL`, comprobaciones superadas e instrumentación
+`OK (127 tests)` (120 anteriores, menos la retirada, más 8 nuevas) en un Pixel
+10 Pro Fold (API 37), único dispositivo autorizado. Paquetes desechables
+desinstalados al terminar. Repositorios sintéticos y aislados. Sin datos
+personales ni cambios de red.
+
+### Primera ejecución en dispositivo: fallida
+
+`Tests run: 127, Failures: 4`. Las 8 pruebas nuevas pasaron. Fallaron:
+
+- `NavigationDeviceTest` y `ClinicalProfileConfirmationUiDeviceTest`: exigían
+  el código estático y ninguna lectura en Bolo, el comportamiento que el ADR
+  0017 sustituye. Se actualizaron a la conducta aprobada.
+- `MealDraftDeviceTest` y `DarkThemeDeviceTest`: llamaban a
+  `ScreenRenderer.render` para Bolo sin líneas y el renderizador rechazó
+  pintar el bloque vacío (`blocking_details.missing`). Ahora reciben líneas
+  sintéticas de E1.
+
+Además, `MealDraftDeviceTest`, `MealHistoryDeviceTest` y `MealRestoreDeviceTest`
+abrían Bolo sin inyectar repositorio de perfil, así que esa ejecución leyó la
+`clinical-profile.db` propia de la app en el Pixel. Se comprobó sin extraer
+contenido que la base está vacía (0 versiones, 0 franjas, 0 eventos,
+`user_version` 2). Su fecha de modificación es la de esa ejecución
+(2026-10-04 08:14:33): esa ejecución la creó o la abrió, pero no contiene
+datos. La segunda ejecución no la modificó. Esas tres clases inyectan ahora un
+repositorio en memoria y `verify.ps1` exige que toda clase de instrumentación
+que lanza `MainActivity` inyecte un repositorio de perfil sintético.
 
 ## Limitaciones
 
+- La base vacía `clinical-profile.db` de la app en el Pixel sigue allí. Borrarla
+  es decisión del propietario.
 - La muerte real del proceso no se provoca en instrumentación. Se reproduce
   creando un modelo nuevo desde el estado guardado, como en el ADR 0014.
 - iOS no aplica: son pantallas Android. El traductor común sigue sin

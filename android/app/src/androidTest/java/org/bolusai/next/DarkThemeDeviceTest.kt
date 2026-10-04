@@ -123,7 +123,7 @@ class DarkThemeDeviceTest {
                                 renderMeals = { MealDraftScreen(context, panel, model) {}.render(it) },
                                 renderSelection = { MealSelectionScreen(context, panel, model) {}.render() })
                             renderer.render(destination, ReadOverview(ReadLocalGlucoseStatus(PendingDexcomSource)).execute(),
-                                SettingsSection.NIGHTSCOUT)
+                                SettingsSection.NIGHTSCOUT, BlockingView(PENDING_LINES, false) {})
                             Destination.primary.forEach { renderer.addTab(shell.findViewById(R.id.bottom_navigation), it,
                                 it == destination.tab) {} }
                             val density = context.resources.displayMetrics.density
@@ -166,5 +166,12 @@ class DarkThemeDeviceTest {
             MainActivity.profileRepositoryFactory = null
             instrumentation.runOnMainSync { model.dispose() }
         }
+    }
+
+    private companion object {
+        /** Synthetic E1 lines for the layout check; it never reads a profile (ADR 0017). */
+        val PENDING_LINES = listOf("input.glucose.policy_not_approved", "input.iob.unknown", "input.meal.missing",
+            "input.profile.policy_not_approved [profile.not_approved_for_calculation]",
+            "input.profile.unknown [profile.read.pending]")
     }
 }

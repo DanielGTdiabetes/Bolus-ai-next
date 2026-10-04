@@ -906,8 +906,11 @@ class ClinicalProfileConfirmationUiDeviceTest {
                 assertFalse(view(activity, "blocked:confirm").isEnabled)
             }
         }
-        // Bolo never reads the profile or its confirmations.
-        assertTrue(repositories.all { it.reads.get() == 0 })
+        // Bolo reads the profile only for its blocking details (ADR 0017) and never writes to it.
+        val limit = SystemClock.uptimeMillis() + 8_000
+        while (repositories.sumOf { it.reads.get() } == 0 && SystemClock.uptimeMillis() < limit) SystemClock.sleep(20)
+        assertEquals(1, repositories.sumOf { it.reads.get() })
+        assertEquals(0, repositories.sumOf { it.saves.get() + it.requests.size })
     }
 
     // Layouts.

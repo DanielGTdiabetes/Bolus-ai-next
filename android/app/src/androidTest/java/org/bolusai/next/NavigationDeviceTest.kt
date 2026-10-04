@@ -179,8 +179,10 @@ class NavigationDeviceTest {
                     assertEquals(View.VISIBLE, codes.visibility)
                     assertTrue(codes.text.contains("input.glucose.policy_not_approved"))
                     assertTrue(codes.text.contains("input.iob.unknown"))
-                    assertTrue(codes.text.contains("input.profile.policy_not_approved"))
-                    assertFalse(codes.text.contains("input.profile.missing"))
+                    // ADR 0017: the synthetic in-memory profile has no version, so Bolo shows its real causes.
+                    assertTrue(codes.text.contains(
+                        "input.profile.policy_not_approved [profile.not_approved_for_calculation]"))
+                    assertTrue(codes.text.contains("input.profile.missing [profile.history.missing]"))
                 }
             }
         }
