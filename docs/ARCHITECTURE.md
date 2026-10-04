@@ -102,7 +102,8 @@ definición al abrir y al migrar desde v1, y evalúa la política en una
 transacción exclusiva. La pantalla de Ajustes → Cálculo presenta esos estados y
 llama a los casos de uso (`readState`, `confirmRequest`, `revokeRequest`,
 `record`, `resolvePending`); no decide reglas ni abre SQLite. Bolo muestra un
-texto fijo y no lee el perfil. Véase el
+texto fijo sobre el perfil. Desde el ADR 0017 sus detalles técnicos muestran el
+informe del perfil a través del mismo modelo, sin escribir. Véase el
 [ADR 0014](adr/0014-clinical-profile-confirmation-eligibility.md).
 
 ### Contrato de indisponibilidad v2 y traductor del perfil
@@ -113,12 +114,17 @@ texto fijo y no lee el perfil. Véase el
 de texto validados, copias defensivas y `@Throws` hacia Swift. El módulo común
 `shared/profile-unavailability` traduce un `ProfileGateState` recibido a un
 informe v2. Depende del perfil y del contrato. El motor y el perfil no dependen
-de él. Su único consumidor es la pantalla del perfil (Ajustes → Cálculo), que
-muestra el informe del estado que ya presenta en un bloque técnico plegado
-([ADR 0016](adr/0016-profile-unavailability-consumer.md), opción A). Bolo,
-`ReadOverview` y el motor siguen sin usarlo: conectarlos exige otro ADR.
-`ReadOverview` sigue sin leer el perfil y emite `input.profile.policy_not_approved`
-estático (D7). Véanse el [ADR 0015](adr/0015-profile-unavailability-contract.md)
+de él. Lo consumen la pantalla del perfil (Ajustes → Cálculo), que muestra el
+informe del estado que ya presenta en un bloque técnico plegado
+([ADR 0016](adr/0016-profile-unavailability-consumer.md), opción A), y
+«Detalles del bloqueo» de Bolo y Diagnóstico
+([ADR 0017](adr/0017-bolo-profile-unavailability-details.md)). Allí
+`BlockingDetails` combina en un único informe v2 glucosa, IOB y comida elevadas
+desde v1 con las causas del perfil, leídas del mismo `ClinicalProfileModel`.
+Solo esas pantallas inician lecturas del perfil y ninguna escribe en él.
+`ReadOverview`, `ScreenRenderer` y el motor siguen sin usarlo. `ReadOverview`
+sigue sin leer el perfil y emite `input.profile.policy_not_approved` estático
+(D7), que ya no se muestra porque todo informe válido del perfil lo contiene. Véanse el [ADR 0015](adr/0015-profile-unavailability-contract.md)
 y el [contrato v2](contracts/unavailable-input-v2.md).
 
 ```text

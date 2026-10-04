@@ -165,8 +165,10 @@ de operación de confirmación) no es un estado de entrada (ADR 0014, sección
 `profile_unavailability.unreadable_reason_not_supported` en lugar de inventar
 una causa. Ningún productor actual construye ese estado.
 
-Ningún consumidor usa el traductor todavía. Conectarlo con Bolo, el motor u
-otro consumidor exige un ADR propio (ADR 0014, C7). `verify.ps1` lo comprueba.
+Consumidores: la pantalla del perfil (ADR 0016) y «Detalles del bloqueo» de
+Bolo y Diagnóstico (ADR 0017). Conectarlo con el motor, `ReadOverview` u otro
+consumidor exige un ADR propio (ADR 0014, C7). `verify.ps1` fija la lista
+cerrada de ficheros que pueden usarlo.
 
 ## Verificación
 

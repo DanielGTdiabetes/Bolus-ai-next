@@ -3,7 +3,9 @@
 - Estado: **aceptado** el 2026-10-04 con B2 a B10 según su recomendación,
   incluida expresamente la ampliación a Diagnóstico (B10), y con las
   precisiones de la sección 14. La implementación queda autorizada con ese
-  alcance y con cálculo y tratamiento bloqueados.
+  alcance y con cálculo y tratamiento bloqueados. Implementada en la rama
+  `claude/bolo-profile-details`, pendiente de revisión e integración
+  (sección 15).
 - Fecha: 2026-10-04.
 - Fase y criterio de aceptación: fases 2 y 6. Desarrolla la opción B que el
   [ADR 0016](0016-profile-unavailability-consumer.md) aprobó solo como
@@ -327,3 +329,22 @@ Pruebas añadidas a la sección 11 a petición del propietario:
   escrituras.
 - Abrir destinos sin el bloque (Inicio, Más, Escanear) no inicia lecturas del
   perfil.
+
+## 15. Estado de implementación (2026-10-04)
+
+Base: `6f101fa2f3c03d21b957b9f6029badfa93759011` (PR #41 integrada).
+Pendiente de revisión del propietario. No integrada.
+
+| Elemento | Implementación |
+|---|---|
+| B2 | `MainActivity` llama a `profile.ensureLoaded()` al pintar los destinos de `BlockingDetails.destinations`. `gate` nulo se muestra como E1 |
+| B3 | `BlockingDetails.lines`: un único `InputUnavailabilityReport` con glucosa, IOB y comida elevadas y las causas del traductor. Formato `ProfileUnavailabilityBlock.line` (A5) |
+| B4 | solo `ClinicalProfileModel`, `ClinicalProfileScreen` y `MainActivity` usan el modelo y `ensureLoaded`. `ScreenRenderer` recibe líneas ya compuestas (`BlockingView`) |
+| B5 | `Rejected`: líneas elevadas y el identificador. Nada se captura |
+| B6 | sin `retry()` fuera de Ajustes. `verify.ps1` lo comprueba en `MainActivity` |
+| B7 | `profile.changed` repinta los destinos con el bloque. `blockingDetailsOpen` sin guardar |
+| B8 | sin cambios en `onSaveInstanceState` |
+| B9 | sin textos nuevos. `R.string.technical_codes` eliminado |
+| B10 | Diagnóstico usa el mismo bloque |
+
+Evidencia: [validación](../validation/bolo-profile-details-2026-10-04.md).

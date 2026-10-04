@@ -583,6 +583,18 @@ no cambian. Cálculo y tratamiento siguen bloqueados. Integrada mediante la PR
 #39 (merge commit `c583e6a`, Verify 37177820636 en verde). Véase la
 [validación](validation/profile-unavailability-screen-2026-10-04.md).
 
+### Entrega del informe del perfil en Bolo y Diagnóstico — 2026-10-04
+
+Implementación del [ADR 0017](adr/0017-bolo-profile-unavailability-details.md)
+(fases 2 y 6), aceptado con B2 a B10 y la ampliación a Diagnóstico:
+«Detalles del bloqueo» de Bolo y Diagnóstico muestra un único informe v2 con
+glucosa, IOB y comida elevadas y las causas reales del perfil. E1 antes de la
+primera lectura, sin reintentos, sin escrituras y sin textos nuevos. Solo esas
+pantallas y Ajustes → Cálculo inician lecturas del perfil. `ReadOverview`, el
+motor, SQLite y el contrato no cambian. Cálculo y tratamiento siguen
+bloqueados. Pendiente de revisión del propietario. Véase la
+[validación](validation/bolo-profile-details-2026-10-04.md).
+
 ### Secuencia de capacidades
 
 No intentar construir toda una fase en un solo cambio. Secuencia inicial:

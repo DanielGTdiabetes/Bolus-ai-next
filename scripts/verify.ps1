@@ -81,22 +81,55 @@ try {
     if ($profileReferences.Count -gt 0) {
         throw "The clinical profile must not depend on the contract or its translator: $($profileReferences.Path -join ', ')"
     }
-    # ADR 0016, option A: only the profile screen (its model, its pure block, the screen and their tests) may use the
-    # translator. Bolo, ReadOverview, the engine and any other Android source stay without it.
+    # ADR 0016, option A, and ADR 0017: only the profile screen and the blocking details of Bolo and Diagnostico (their
+    # model, their pure blocks, the screen and their tests) may use the translator. ReadOverview, ScreenRenderer, the
+    # engine and any other Android source stay without it.
     $allowedTranslatorConsumers = @(
         "android\app\build.gradle.kts",
         "android\app\src\main\java\org\bolusai\next\ui\ProfileUnavailabilityBlock.kt",
+        "android\app\src\main\java\org\bolusai\next\ui\BlockingDetails.kt",
         "android\app\src\main\java\org\bolusai\next\ui\ClinicalProfileModel.kt",
         "android\app\src\main\java\org\bolusai\next\ui\ClinicalProfileScreen.kt",
         "android\app\src\test\java\org\bolusai\next\ProfileUnavailabilityBlockTest.kt",
-        "android\app\src\androidTest\java\org\bolusai\next\ClinicalProfileUnavailabilityDeviceTest.kt"
+        "android\app\src\test\java\org\bolusai\next\BlockingDetailsTest.kt",
+        "android\app\src\androidTest\java\org\bolusai\next\ClinicalProfileUnavailabilityDeviceTest.kt",
+        "android\app\src\androidTest\java\org\bolusai\next\BolusProfileDetailsDeviceTest.kt"
     ) | ForEach-Object { Join-Path $repositoryRoot $_ }
     $translatorConsumers = @(Get-ChildItem -LiteralPath (Join-Path $repositoryRoot "android"), (Join-Path $repositoryRoot "shared\meal-drafts") -Recurse -File |
         Where-Object { $_.FullName -notmatch '\\build\\' -and $_.Extension -in @(".kt", ".kts", ".java", ".xml") } |
         Where-Object { $allowedTranslatorConsumers -notcontains $_.FullName } |
         Select-String -Pattern 'profile-unavailability|org\.bolusai\.profileunavailability|ProfileUnavailability' -List)
     if ($translatorConsumers.Count -gt 0) {
-        throw "Only the profile screen may use the profile unavailability translator (ADR 0016): $($translatorConsumers.Path -join ', ')"
+        throw "Only the profile screen and the blocking details may use the profile unavailability translator (ADR 0016, ADR 0017): $($translatorConsumers.Path -join ', ')"
+    }
+    # ADR 0017, section 14: only Ajustes -> Calculo and the destinations that show the profile report start profile
+    # reads, through ensureLoaded(). Nothing outside the profile screen retries, and the destination list is closed.
+    $mainSources = Join-Path $repositoryRoot "android\app\src\main"
+    $allowedEnsureLoaded = @("ClinicalProfileModel.kt", "ClinicalProfileScreen.kt", "MainActivity.kt")
+    $ensureLoadedCallers = @(Get-ChildItem -LiteralPath $mainSources -Recurse -File -Include *.kt, *.java |
+        Where-Object { $allowedEnsureLoaded -notcontains $_.Name } |
+        Select-String -Pattern 'ensureLoaded' -List)
+    if ($ensureLoadedCallers.Count -gt 0) {
+        throw "Only the profile screen and the blocking details may start profile reads (ADR 0017): $($ensureLoadedCallers.Path -join ', ')"
+    }
+    $mainActivityEnsureLoaded = @(Select-String -LiteralPath (Join-Path $mainSources "java\org\bolusai\next\MainActivity.kt") -Pattern 'ensureLoaded\(')
+    if ($mainActivityEnsureLoaded.Count -ne 1) {
+        throw "MainActivity must start profile reads only for the blocking details (ADR 0017)"
+    }
+    # The profile model is reachable only from its own screen and the activity, and the activity never retries.
+    $profileModelUsers = @(Get-ChildItem -LiteralPath $mainSources -Recurse -File -Include *.kt, *.java |
+        Where-Object { $allowedEnsureLoaded -notcontains $_.Name } |
+        Select-String -Pattern 'ClinicalProfileModel' -List)
+    if ($profileModelUsers.Count -gt 0) {
+        throw "Only the profile screen and MainActivity may use the profile model (ADR 0017): $($profileModelUsers.Path -join ', ')"
+    }
+    if (Select-String -LiteralPath (Join-Path $mainSources "java\org\bolusai\next\MainActivity.kt") -Pattern 'profile\.retry\(' -Quiet) {
+        throw "Bolo and Diagnostico never retry profile reads (ADR 0017, B6)"
+    }
+    $blockingDetailsSource = Join-Path $mainSources "java\org\bolusai\next\ui\BlockingDetails.kt"
+    $expectedDestinations = 'setOf(Destination.BOLUS, Destination.MANUAL, Destination.OFFLINE_BOLUS, Destination.DIAGNOSTICS)'
+    if (-not (Select-String -LiteralPath $blockingDetailsSource -SimpleMatch -Pattern $expectedDestinations -Quiet)) {
+        throw "The blocking details destinations must stay Bolo and Diagnostico only (ADR 0017, B10)"
     }
     $mainActivitySource = Join-Path $repositoryRoot "android\app\src\main\java\org\bolusai\next\MainActivity.kt"
     if (Select-String -LiteralPath $mainActivitySource -Pattern 'InputUnavailability|UnavailabilityReasonV2' -Quiet) {
@@ -106,10 +139,11 @@ try {
     if (Select-String -LiteralPath $overviewSource -Pattern 'org\.bolusai\.profile|ClinicalProfile|ProfileGate|InputUnavailability|UnavailabilityReasonV2' -Quiet) {
         throw "The Bolo overview must keep reporting the profile as unavailable (ADR 0012)"
     }
-    # ADR 0014: Bolo renders a fixed profile line and never reads the profile or its confirmations.
+    # ADR 0014 and ADR 0017: the renderer receives composed lines only and never reads the profile, its confirmations
+    # or contract v2 types.
     $rendererSource = Join-Path $repositoryRoot "android\app\src\main\java\org\bolusai\next\ui\ScreenRenderer.kt"
     if (Select-String -LiteralPath $rendererSource -Pattern 'org\.bolusai\.profile|ClinicalProfile|ProfileGate|Confirmation|InputUnavailability|UnavailabilityReasonV2' -Quiet) {
-        throw "Bolo must not read the clinical profile or its confirmations (ADR 0014)"
+        throw "ScreenRenderer must not read the clinical profile, its confirmations or contract v2 types (ADR 0014, ADR 0017)"
     }
 
     $workflowDirectory = Join-Path $repositoryRoot ".github\workflows"
@@ -214,7 +248,7 @@ jobs:
             }
             # Direct instrumentation avoids collecting unrelated device logcat or clinical data.
             $instrumentation = @(adb shell am instrument -w -r `
-                -e class org.bolusai.next.glucose.dexcom.AndroidDexcomSenderEvidenceTest,org.bolusai.next.NavigationDeviceTest,org.bolusai.next.MealDraftDeviceTest,org.bolusai.next.MealHistoryDeviceTest,org.bolusai.next.MealRestoreDeviceTest,org.bolusai.next.meals.SqliteMealRepositoryDeviceTest,org.bolusai.next.DarkThemeDeviceTest,org.bolusai.next.profile.SqliteClinicalProfileRepositoryDeviceTest,org.bolusai.next.profile.ClinicalProfileConfirmationDeviceTest,org.bolusai.next.ClinicalProfileDeviceTest,org.bolusai.next.ClinicalProfileConfirmationUiDeviceTest,org.bolusai.next.ClinicalProfileUnavailabilityDeviceTest `
+                -e class org.bolusai.next.glucose.dexcom.AndroidDexcomSenderEvidenceTest,org.bolusai.next.NavigationDeviceTest,org.bolusai.next.MealDraftDeviceTest,org.bolusai.next.MealHistoryDeviceTest,org.bolusai.next.MealRestoreDeviceTest,org.bolusai.next.meals.SqliteMealRepositoryDeviceTest,org.bolusai.next.DarkThemeDeviceTest,org.bolusai.next.profile.SqliteClinicalProfileRepositoryDeviceTest,org.bolusai.next.profile.ClinicalProfileConfirmationDeviceTest,org.bolusai.next.ClinicalProfileDeviceTest,org.bolusai.next.ClinicalProfileConfirmationUiDeviceTest,org.bolusai.next.ClinicalProfileUnavailabilityDeviceTest,org.bolusai.next.BolusProfileDetailsDeviceTest `
                 org.bolusai.next.test/androidx.test.runner.AndroidJUnitRunner)
             $instrumentationExit = $LASTEXITCODE
             $instrumentation | Write-Output
