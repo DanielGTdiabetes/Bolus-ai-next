@@ -4,9 +4,9 @@ import android.content.Context
 
 /**
  * Barrier for instrumentation (ADR 0017, follow-up to the 2026-10-04 incident). Once activated by the test runner, before
- * the application starts, no code in the process may open the app's own `clinical-profile.db`: constructing a
- * repository on that file, or starting the activity without a synthetic repository factory, fails explicitly before
- * any file is opened. Production never activates it. It can only be switched on, never off.
+ * `Application.onCreate` and any activity, no code in the process may open the app's own `clinical-profile.db`:
+ * constructing a repository on that file, or starting the activity without a synthetic repository factory, fails
+ * explicitly before any file is opened. Production never activates it. It can only be switched on, never off.
  */
 internal object ProfileStorageGuard {
     const val REAL_DATABASE_DENIED = "profile_storage.real_database_denied_in_instrumentation"

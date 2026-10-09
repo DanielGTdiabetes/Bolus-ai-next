@@ -134,8 +134,17 @@ try {
     if ($unisolatedLaunches.Count -gt 0) {
         throw "Instrumentation launching MainActivity must inject a synthetic profile repository (ADR 0017): $($unisolatedLaunches.FullName -join ', ')"
     }
-    # The runtime barrier is the real protection: the app tests run with the runner that activates it before the
-    # application starts. These static checks only keep it wired.
+    # The runtime barrier is the real protection: the app tests run with the runner that activates it in
+    # Instrumentation.onCreate, before Application.onCreate and any activity. Android instantiates the Application and
+    # installs content providers before that call, so the app must declare neither its own Application nor providers:
+    # otherwise app code could open the profile database before the barrier. These static checks only keep it wired.
+    [xml]$appManifest = Get-Content -LiteralPath (Join-Path $repositoryRoot "android\app\src\main\AndroidManifest.xml") -Raw
+    $androidNamespace = "http://schemas.android.com/apk/res/android"
+    $appApplication = $appManifest.SelectSingleNode("/manifest/application")
+    if ($null -eq $appApplication -or $appApplication.HasAttribute("name", $androidNamespace) -or
+            $appManifest.SelectNodes("//provider").Count -gt 0) {
+        throw "The app must declare no Application class or content provider: they run before the instrumentation barrier (ADR 0017)"
+    }
     if (-not (Select-String -LiteralPath (Join-Path $repositoryRoot "android\app\build.gradle.kts") -SimpleMatch -Quiet `
             -Pattern 'testInstrumentationRunner = "org.bolusai.next.ProfileIsolationTestRunner"')) {
         throw "App instrumentation must run with ProfileIsolationTestRunner (ADR 0017)"

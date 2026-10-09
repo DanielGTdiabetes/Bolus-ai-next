@@ -121,9 +121,15 @@ protección efectiva está en el proceso de instrumentación:
 
 - `ProfileStorageGuard` (código de la app): solo se puede activar, nunca
   desactivar. Producción no lo activa.
-- `ProfileIsolationTestRunner` (androidTest) lo activa en `onCreate`, antes de
-  crear la aplicación. Es el `testInstrumentationRunner` del módulo y el que
-  usa `verify.ps1` en `am instrument`.
+- `ProfileIsolationTestRunner` (androidTest) lo activa en `onCreate`. Android
+  llama a ese método después de instanciar `Application` e instalar los
+  providers, y antes de `Application.onCreate`, de cualquier actividad y de
+  cualquier prueba. La app no declara `Application` propia ni providers
+  (manifiesto fuente y fusionado comprobados el 2026-10-09), así que ningún
+  código de la app se ejecuta antes de la barrera. `verify.ps1` falla si el
+  manifiesto de la app declara cualquiera de los dos. Es el
+  `testInstrumentationRunner` del módulo y el que usa `verify.ps1` en
+  `am instrument`.
 - `SqliteClinicalProfileRepository` comprueba la barrera en su primer `init`,
   antes de construir el `SQLiteOpenHelper`: si el nombre resuelve, con rutas
   canónicas y el mismo contexto que usa SQLite, a la `clinical-profile.db`
@@ -147,6 +153,55 @@ cambios) y, con confirmación del propietario de que el móvil estaba libre,
 en el mismo Pixel, único dispositivo en adb. La `clinical-profile.db` vacía de
 la app conserva la fecha de modificación 2026-10-04 08:14:33: ninguna
 ejecución posterior la ha abierto. Paquetes desechables desinstalados.
+
+## Revisión previa a la aprobación (2026-10-09)
+
+Base `origin/main` `6f101fa2f3c03d21b957b9f6029badfa93759011`. Rama revisada en
+`b45343f86f8fda6ee585828e959f00726aea85aa` (Windows verification y GitGuardian
+en verde). Diff completo contra `origin/main` revisado:
+
+- `ensureLoaded()` solo lo invocan `ClinicalProfileScreen` (Ajustes → Cálculo) y
+  `MainActivity.blockingView`, que retorna antes para cualquier destino fuera de
+  `BlockingDetails.destinations`. Nadie fuera de Ajustes llama a `retry()`.
+- `ensureLoaded()` lleva a `read` o a `resolvePending`. Ambos acaban en
+  `ClinicalProfiles.readState`/`resolvePending`, que solo usan
+  `repository.readRecord()`. Ninguno guarda, confirma, retira ni reenvía.
+- `blockingView` invoca `ensureLoaded()` antes de leer `unavailability`, y
+  `read`/`resolvePending` ponen `gate = null` de forma síncrona: un modelo nuevo
+  pinta E1 antes del resultado, también con operación pendiente.
+- `BlockingDetails.lines` une glucosa, IOB y comida elevadas con las causas del
+  traductor y descarta la causa estática del perfil. `of()` solo captura el
+  rechazo conocido. Lo demás se propaga.
+- Sin cambios en `shared/`, `ReadOverview`, esquema SQLite ni contrato v2. En
+  `SqliteClinicalProfileRepository` solo se añade la comprobación de la barrera.
+
+Corrección: la documentación decía que la barrera se activa «antes de crear la
+aplicación». `Instrumentation.onCreate` corre después de instanciar
+`Application` e instalar los providers, y antes de `Application.onCreate`. La
+barrera es efectiva porque la app no declara ni `Application` propia ni
+providers (manifiesto fuente y fusionado). Se precisan los textos y
+`verify.ps1` falla ahora si el manifiesto de la app declara cualquiera de los
+dos. El check se probó contra copias temporales del manifiesto: actual
+aceptado, con `android:name` en `<application>` rechazado, con `<provider>`
+rechazado.
+
+Observación para el propietario, sin cambio: la primera lectura de la sesión
+abre la base del perfil con `readableDatabase`. En una instalación sin base, o
+con la base en v1, abrir Bolo o Diagnóstico crea el esquema o migra a v2, igual
+que ya hacía Ajustes → Cálculo. No añade versiones, franjas ni eventos.
+
+```powershell
+git fetch --all --prune                 # origin/main 6f101fa, rama b45343f
+.\scripts\verify.ps1                    # exit 0, BUILD SUCCESSFUL. JVM: shared 163, Android 57, 0 fallos
+git diff --check origin/main...HEAD     # sin salida
+# tras la corrección
+.\scripts\verify.ps1                    # exit 0, BUILD SUCCESSFUL. Android 57, 0 fallos
+git diff --check                        # sin salida
+```
+
+Sin pruebas en dispositivo en esta revisión: la corrección solo toca comentarios,
+documentación y una comprobación estática. Los 131 de la instrumentación son
+evidencia del 2026-10-04.
 
 ## Limitaciones
 
