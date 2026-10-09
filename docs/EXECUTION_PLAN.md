@@ -593,7 +593,9 @@ primera lectura, sin reintentos, sin modificar versiones, franjas ni eventos
 (la apertura de SQLite puede crear o migrar el esquema) y sin textos nuevos. Solo esas
 pantallas y Ajustes → Cálculo inician lecturas del perfil. `ReadOverview`, el
 motor, SQLite y el contrato no cambian. Cálculo y tratamiento siguen
-bloqueados. Pendiente de revisión del propietario. Véase la
+bloqueados. `verify.ps1` comprueba el manifiesto empaquetado de los APK de
+instrumentación. Aprobada por el propietario e integrada mediante la PR #42
+(merge commit `929d5c1`, Verify 37901021591 en verde). Véase la
 [validación](validation/bolo-profile-details-2026-10-04.md).
 
 ### Secuencia de capacidades

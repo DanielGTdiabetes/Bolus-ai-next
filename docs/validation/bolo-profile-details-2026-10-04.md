@@ -275,6 +275,27 @@ La rama `-DeviceTests` (recomprobación de hashes, instalación y
 móvil. El script completo se analiza y ejecuta sin errores en Windows
 PowerShell 5.1. CI lo ejecuta con PowerShell 7.
 
+## Integración (2026-10-09)
+
+Verificaciones nuevas de este cierre:
+
+- HEAD aprobado comprobado antes de integrar: PR #42 abierta, `MERGEABLE`,
+  estado `CLEAN`, HEAD `779b9f25bac31d56ce5594bf8c31403499dc616c`, base
+  `origin/main` `6f101fa` sin cambios. Checks de ese HEAD: Windows
+  verification 37897059557 y GitGuardian en `SUCCESS`. `main` no tiene reglas
+  de protección configuradas en GitHub.
+- `gh pr merge 42 --merge --match-head-commit 779b9f25bac31d56ce5594bf8c31403499dc616c`:
+  merge commit `929d5c137feb2329dd3792d33f3653f6a05ff3cb`, padres `6f101fa`
+  y `779b9f2`.
+- CI del SHA integrado: Verify 37901021591, rama `main`, evento `push`,
+  conclusión `success`.
+- Sin pruebas en dispositivo en el cierre, por indicación del propietario.
+
+Evidencia histórica, no repetida en el cierre: `OK (131 tests)` en
+dispositivo del 2026-10-04, anterior a la comprobación del manifiesto
+empaquetado. Las ejecuciones de `verify.ps1` del 2026-10-09 descritas arriba
+son locales y sin dispositivo.
+
 ## Limitaciones
 
 - La base vacía `clinical-profile.db` de la app en el Pixel se conserva por

@@ -3,9 +3,10 @@
 - Estado: **aceptado** el 2026-10-04 con B2 a B10 según su recomendación,
   incluida expresamente la ampliación a Diagnóstico (B10), y con las
   precisiones de la sección 14. La implementación queda autorizada con ese
-  alcance y con cálculo y tratamiento bloqueados. Implementada en la rama
-  `claude/bolo-profile-details`, pendiente de revisión e integración
-  (sección 15).
+  alcance y con cálculo y tratamiento bloqueados. Implementada, aprobada por
+  el propietario el 2026-10-09 e integrada en `main` mediante la PR #42
+  (merge commit `929d5c137feb2329dd3792d33f3653f6a05ff3cb`, Verify
+  37901021591 en verde). Véase la sección 15.
 - Fecha: 2026-10-04.
 - Fase y criterio de aceptación: fases 2 y 6. Desarrolla la opción B que el
   [ADR 0016](0016-profile-unavailability-consumer.md) aprobó solo como
@@ -347,7 +348,16 @@ adelantarlo al abrir Bolo o Diagnóstico antes que Ajustes.
 ## 15. Estado de implementación (2026-10-04)
 
 Base: `6f101fa2f3c03d21b957b9f6029badfa93759011` (PR #41 integrada).
-Pendiente de revisión del propietario. No integrada.
+
+Integración (2026-10-09): el propietario aprobó integrar la PR #42 en el HEAD
+exacto `779b9f25bac31d56ce5594bf8c31403499dc616c` y aceptó la precisión de la
+sección 14 sobre la apertura de SQLite. Checks de ese HEAD: [Windows
+verification 37897059557](https://github.com/DanielGTdiabetes/Bolus-ai-next/actions/runs/37897059557)
+y GitGuardian en verde. Merge commit
+`929d5c137feb2329dd3792d33f3653f6a05ff3cb` (padres `6f101fa` y `779b9f2`).
+CI del SHA integrado: [Verify 37901021591](https://github.com/DanielGTdiabetes/Bolus-ai-next/actions/runs/37901021591),
+rama `main`, evento `push`, conclusión `success`. Cálculo y tratamiento siguen
+bloqueados.
 
 | Elemento | Implementación |
 |---|---|

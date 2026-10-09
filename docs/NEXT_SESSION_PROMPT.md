@@ -50,13 +50,11 @@ docs/validation/profile-segment-editor-2026-09-28.md,
 docs/validation/profile-confirmation-domain-2026-10-03.md y
 docs/validation/profile-confirmation-ui-2026-10-03.md.
 Comprueba el CI del SHA exacto integrado antes de empezar. La última
-integración de código es la PR #39, opción A del ADR 0016 (merge commit
-c583e6a3cdeb34fb4ddaf75bbcffdc620c629f0b, Verify 37177820636 en verde). El ADR
-0017 se integró como documentación mediante la PR #41 (merge commit
-6f101fa2f3c03d21b957b9f6029badfa93759011, Verify 37181107344 en verde). Su
-implementación está en la PR #42 (rama `claude/bolo-profile-details`),
-pendiente de revisión del propietario y **no integrada**: comprueba su estado,
-el SHA exacto de `origin/main` y su CI.
+integración de código es la PR #42, implementación del ADR 0017 (merge commit
+929d5c137feb2329dd3792d33f3653f6a05ff3cb, Verify 37901021591 en verde),
+aprobada por el propietario el 2026-10-09 en el HEAD
+779b9f25bac31d56ce5594bf8c31403499dc616c. Su registro documental llega en una
+PR posterior: comprueba el SHA exacto de `origin/main` y su CI.
 Esta entrega no consultó ni modificó Legacy. Su última auditoría documentada
 continúa fijada en f5417721d8019a9831126f4d843edfc4de87653d; no afirmes que ese
 SHA sigue siendo el main remoto sin comprobarlo si necesitas nueva evidencia.
@@ -66,7 +64,7 @@ El perfil es captura. La confirmación de datos existe en dominio, base local
 (parte 1 del ADR 0014) y pantalla (parte 2). No aprueba uso clínico: no
 alimenta motor, Bolo, IOB ni recomendación, y cálculo y tratamiento siguen
 bloqueados en todos los estados. Bolo muestra «Perfil · no se usa para
-calcular». Con la PR #42 sus detalles técnicos y los de Diagnóstico leen el
+calcular». Desde el ADR 0017 sus detalles técnicos y los de Diagnóstico leen el
 perfil solo para mostrar sus causas, sin modificar versiones, franjas ni
 eventos (la apertura de SQLite puede crear o migrar el esquema). No hay
 límites clínicos, DIA, curva, redondeo, conversión de unidades, propuestas del
@@ -187,7 +185,7 @@ docs/validation/profile-unavailability-screen-2026-10-04.md:
   recuerda si está abierto sin guardarlo: se pliega tras recreación.
 - `ClinicalProfileUnavailabilityDeviceTest` en la lista de `verify.ps1`.
 
-ADR 0017 — INFORME DEL PERFIL EN BOLO Y DIAGNÓSTICO (aceptado, implementación en revisión)
+ADR 0017 — INFORME DEL PERFIL EN BOLO Y DIAGNÓSTICO (implementado e integrado)
 docs/adr/0017-bolo-profile-unavailability-details.md, aceptado el 2026-10-04
 con B2 a B10, la ampliación a Diagnóstico y la sección 14: `ensureLoaded()`
 solo en las pantallas autorizadas, resolución de pendientes solo de lectura,
@@ -195,7 +193,9 @@ cero escrituras del perfil (versiones, franjas y eventos) al abrir Bolo o
 Diagnóstico, aunque la apertura de SQLite puede crear o migrar el esquema, y
 E1 antes del resultado en un
 modelo nuevo. Integrado como documentación mediante la PR #41. Implementación
-en la PR #42, sin integrar. Véanse la sección 15 del ADR y
+aprobada por el propietario e integrada mediante la PR #42 (merge commit
+`929d5c137feb2329dd3792d33f3653f6a05ff3cb`, Verify 37901021591 en verde).
+Véanse la sección 15 del ADR y
 docs/validation/bolo-profile-details-2026-10-04.md:
 - `ui/BlockingDetails.kt` (puro): un único informe v2 con glucosa, IOB y comida
   elevadas y las causas del perfil. `destinations` = `BOLUS`, `MANUAL`,
@@ -225,11 +225,10 @@ docs/validation/bolo-profile-details-2026-10-04.md:
   un provider, verify falla: no la amplíes sin decidir cómo aislarla.
 
 SIGUIENTE PASO
-Los ADR 0014 y 0015 y la opción A del ADR 0016 están implementados e
-integrados. La PR #42 (ADR 0017) espera la revisión del propietario: no la
-integres sin su aprobación explícita. Después, comprueba el CI del merge
-commit y registra la integración en una PR solo documental. No hay otro
-incremento autorizado. Conectar el traductor con `ReadOverview`, el motor u
+Los ADR 0014, 0015 y 0017 y la opción A del ADR 0016 están implementados e
+integrados. No hay ningún incremento funcional ni clínico autorizado.
+Cualquier capacidad nueva necesita antes un ADR que defina su alcance y sus
+decisiones pendientes, y la aprobación explícita del propietario. Conectar el traductor con `ReadOverview`, el motor u
 otro consumidor exige su propio ADR. Siguen
 abiertas como decisiones del propietario, y cualquier avance clínico necesita
 antes su ADR: límites clínicos, vigencia (sin política aprobada), resolución de
