@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Synthetic manifest for the instrumentation isolation self-test (ADR 0017). Linked into a temporary APK, never installed. -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="org.bolusai.next.test">
+    <instrumentation
+        android:name="org.bolusai.next.ProfileIsolationTestRunner"
+        android:targetPackage="org.bolusai.synthetic.other" />
+    <application />
+</manifest>

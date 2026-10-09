@@ -103,7 +103,9 @@ transacción exclusiva. La pantalla de Ajustes → Cálculo presenta esos estado
 llama a los casos de uso (`readState`, `confirmRequest`, `revokeRequest`,
 `record`, `resolvePending`); no decide reglas ni abre SQLite. Bolo muestra un
 texto fijo sobre el perfil. Desde el ADR 0017 sus detalles técnicos muestran el
-informe del perfil a través del mismo modelo, sin escribir. Véase el
+informe del perfil a través del mismo modelo, sin modificar versiones, franjas
+ni eventos. La apertura de SQLite de la primera lectura puede crear o migrar el
+esquema, como en Ajustes. Véase el
 [ADR 0014](adr/0014-clinical-profile-confirmation-eligibility.md).
 
 ### Contrato de indisponibilidad v2 y traductor del perfil

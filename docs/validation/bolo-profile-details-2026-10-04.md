@@ -185,10 +185,11 @@ dos. El check se probó contra copias temporales del manifiesto: actual
 aceptado, con `android:name` en `<application>` rechazado, con `<provider>`
 rechazado.
 
-Observación para el propietario, sin cambio: la primera lectura de la sesión
-abre la base del perfil con `readableDatabase`. En una instalación sin base, o
-con la base en v1, abrir Bolo o Diagnóstico crea el esquema o migra a v2, igual
-que ya hacía Ajustes → Cálculo. No añade versiones, franjas ni eventos.
+Observación para el propietario, sin cambio de comportamiento: la primera
+lectura de la sesión abre la base del perfil con `readableDatabase`. En una
+instalación sin base, o con la base en v1, abrir Bolo o Diagnóstico crea el
+esquema o migra a v2, igual que ya hacía Ajustes → Cálculo. No añade
+versiones, franjas ni eventos. El ADR 0017 lo precisa desde el 2026-10-09.
 
 ```powershell
 git fetch --all --prune                 # origin/main 6f101fa, rama b45343f
@@ -202,6 +203,77 @@ git diff --check                        # sin salida
 Sin pruebas en dispositivo en esta revisión: la corrección solo toca comentarios,
 documentación y una comprobación estática. Los 131 de la instrumentación son
 evidencia del 2026-10-04.
+
+## Manifiesto empaquetado de la app bajo prueba (2026-10-09)
+
+Hueco: la comprobación anterior solo leía `android/app/src/main/AndroidManifest.xml`.
+Una dependencia o un manifiesto de variante pueden añadir una `Application`, una
+factoría de componentes o un provider en el manifiesto fusionado. Android los
+crea antes de `Instrumentation.onCreate`, es decir, antes de la barrera. La app
+ya tiene un manifiesto de variante versionado, `android/app/src/debug/AndroidManifest.xml`
+(permiso y `queries` del emisor sintético), que la comprobación anterior no veía.
+
+Corrección en `scripts/InstrumentationIsolation.ps1`, invocado por
+`verify.ps1` tras compilar y antes de cualquier paso con dispositivo, también
+sin `-DeviceTests`:
+
+- Lee con `aapt2 dump xmltree` el manifiesto binario empaquetado en
+  `app-debug.apk` y en `app-debug-androidTest.apk`, los mismos ficheros que
+  instala `-DeviceTests`. Es el resultado final de la fusión.
+- Rechaza en ambos APK una `Application` propia, una `appComponentFactory`
+  distinta de `androidx.core.app.CoreComponentFactory` (la que añade
+  `androidx.core`, que solo usa constructores por defecto) y cualquier
+  provider. Un volcado que no sabe interpretar falla.
+- Exige que el APK de pruebas declare una única `instrumentation` con
+  `targetPackage` igual al paquete de `app-debug.apk` y con
+  `org.bolusai.next.ProfileIsolationTestRunner`.
+- Guarda el SHA-256 de ambos APK. `-DeviceTests` los recalcula justo antes de
+  `adb install` y no instala si cambiaron. `am instrument` usa el mismo runner
+  comprobado.
+- Antes de comprobar los APK reales, compila con `aapt2 link` siete
+  manifiestos sintéticos (`scripts/fixtures/instrumentation-isolation/`) en
+  APK temporales que nunca se instalan, y exige el resultado exacto de cada
+  uno. La carpeta temporal se borra al terminar.
+
+La comprobación del manifiesto fuente `main` se conserva como aviso temprano
+con mensaje claro. La autoritativa es la del APK.
+
+Resultados reales (`verify.ps1`, exit 0):
+
+```text
+Instrumentation isolation self-test: app-accepted + test-accepted: accepted
+Instrumentation isolation self-test: app-application + test-accepted: rejected app:application_class:org.bolusai.synthetic.EarlyApplication
+Instrumentation isolation self-test: app-provider + test-accepted: rejected app:provider:org.bolusai.synthetic.EarlyProvider
+Instrumentation isolation self-test: app-component-factory + test-accepted: rejected app:component_factory:org.bolusai.synthetic.EarlyComponentFactory
+Instrumentation isolation self-test: app-accepted + test-provider: rejected test:provider:org.bolusai.synthetic.TestProvider
+Instrumentation isolation self-test: app-accepted + test-wrong-target: rejected test:target_package:org.bolusai.synthetic.other
+Instrumentation isolation self-test: app-accepted + test-wrong-runner: rejected test:runner:androidx.test.runner.AndroidJUnitRunner
+Instrumentation isolation: org.bolusai.next (...\apk\debug\app-debug.apk) instrumented by ...\apk\androidTest\debug\app-debug-androidTest.apk with org.bolusai.next.ProfileIsolationTestRunner; component factory androidx.core.app.CoreComponentFactory
+```
+
+Que se inspecciona el artefacto fusionado lo prueban dos hechos:
+
+- La factoría `androidx.core.app.CoreComponentFactory` aparece en
+  `app-debug.apk` y no está en ningún manifiesto fuente de la app: llega por
+  la fusión con `androidx.core`.
+- Experimento puntual, sin commit: se añadió un provider sintético
+  (`org.bolusai.synthetic.VariantProvider`) solo al manifiesto de variante
+  `src/debug`. El manifiesto `main` seguía sin providers, así que la
+  comprobación anterior habría pasado. Tras `gradlew :android:app:assembleDebug
+  :android:app:assembleDebugAndroidTest` (exit 0), la comprobación del APK lo
+  rechazó con `app:provider:org.bolusai.synthetic.VariantProvider`. El
+  fichero se restauró byte a byte (hash idéntico, `git status` limpio) y la
+  siguiente compilación reprodujo el mismo SHA-256 de `app-debug.apk`.
+
+```powershell
+.\scripts\verify.ps1     # exit 0, BUILD SUCCESSFUL. JVM Android 57, 0 fallos. Autoprueba y APK reales superados
+git diff --check         # sin salida
+```
+
+La rama `-DeviceTests` (recomprobación de hashes, instalación y
+`am instrument` con el runner comprobado) no se ejecutó: este paso no usa el
+móvil. El script completo se analiza y ejecuta sin errores en Windows
+PowerShell 5.1. CI lo ejecuta con PowerShell 7.
 
 ## Limitaciones
 

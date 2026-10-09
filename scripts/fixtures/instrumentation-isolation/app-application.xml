@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Synthetic manifest for the instrumentation isolation self-test (ADR 0017). Linked into a temporary APK, never installed. -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="org.bolusai.next">
+    <application
+        android:name="org.bolusai.synthetic.EarlyApplication"
+        android:appComponentFactory="androidx.core.app.CoreComponentFactory">
+        <activity android:name="org.bolusai.next.MainActivity" android:exported="false" />
+    </application>
+</manifest>

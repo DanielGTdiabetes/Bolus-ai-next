@@ -66,6 +66,30 @@ try {
         }
     }
 
+    # ADR 0017: the instrumentation barrier activates in Instrumentation.onCreate, after Android has instantiated the
+    # Application, its component factory and the content providers of the app under test. None of them may be app
+    # code. The check reads the binary manifests packaged in the very APKs installed below (the merged result of the
+    # app, its dependencies and its variant), proves the test APK instruments that app with the isolating runner, and
+    # first proves with synthetic APKs that each route is rejected.
+    . (Join-Path $PSScriptRoot "InstrumentationIsolation.ps1")
+    $androidTestApk = Join-Path $repositoryRoot "android\app\build\outputs\apk\androidTest\debug\app-debug-androidTest.apk"
+    $isolationRunner = "org.bolusai.next.ProfileIsolationTestRunner"
+    $compileSdkMatch = Select-String -LiteralPath (Join-Path $repositoryRoot "android\app\build.gradle.kts") -Pattern '^\s*compileSdk\s*=\s*(\d+)\s*$' |
+        Select-Object -First 1
+    if ($null -eq $compileSdkMatch) {
+        throw "Could not read compileSdk for the instrumentation isolation self-test"
+    }
+    $aapt2 = Get-InstrumentationAapt2 -AndroidHome $env:ANDROID_HOME
+    $androidJar = Get-InstrumentationAndroidJar -AndroidHome $env:ANDROID_HOME -CompileSdk ([int]$compileSdkMatch.Matches[0].Groups[1].Value)
+    Invoke-InstrumentationIsolationSelfTest -Aapt2 $aapt2 -AndroidJar $androidJar -Runner $isolationRunner `
+        -FixtureDirectory (Join-Path $PSScriptRoot "fixtures\instrumentation-isolation") |
+        ForEach-Object { Write-Output "Instrumentation isolation self-test: $_" }
+    $instrumentationIsolation = Assert-InstrumentationIsolation -Aapt2 $aapt2 -AppApk $debugApk -TestApk $androidTestApk -Runner $isolationRunner
+    Write-Output ("Instrumentation isolation: {0} ({1}) instrumented by {2} with {3}; component factory {4}; app SHA-256 {5}; test SHA-256 {6}" -f
+        $instrumentationIsolation.AppPackage, $instrumentationIsolation.AppApk, $instrumentationIsolation.TestApk,
+        $instrumentationIsolation.Runner, $instrumentationIsolation.ComponentFactory, $instrumentationIsolation.AppSha256,
+        $instrumentationIsolation.TestSha256)
+
     # ADR 0012: the clinical profile is capture only. The engine and the Bolo overview must not depend on it.
     $engineReferences = @(Get-ChildItem -LiteralPath (Join-Path $repositoryRoot "shared\bolus-engine") -Recurse -File |
         Where-Object { $_.FullName -notmatch '\\build\\' } |
@@ -135,9 +159,9 @@ try {
         throw "Instrumentation launching MainActivity must inject a synthetic profile repository (ADR 0017): $($unisolatedLaunches.FullName -join ', ')"
     }
     # The runtime barrier is the real protection: the app tests run with the runner that activates it in
-    # Instrumentation.onCreate, before Application.onCreate and any activity. Android instantiates the Application and
-    # installs content providers before that call, so the app must declare neither its own Application nor providers:
-    # otherwise app code could open the profile database before the barrier. These static checks only keep it wired.
+    # Instrumentation.onCreate, before Application.onCreate and any activity. The authoritative check of what runs
+    # earlier reads the packaged APK manifests (above). This early check of the main source manifest only gives a
+    # clearer message at the source. These static checks only keep it wired.
     [xml]$appManifest = Get-Content -LiteralPath (Join-Path $repositoryRoot "android\app\src\main\AndroidManifest.xml") -Raw
     $androidNamespace = "http://schemas.android.com/apk/res/android"
     $appApplication = $appManifest.SelectSingleNode("/manifest/application")
@@ -260,23 +284,28 @@ jobs:
                 throw "Disposable test package already exists; refusing to overwrite or remove it: $package"
             }
         }
+        # The files about to be installed must be the ones whose manifests passed the isolation check (ADR 0017).
+        if ((Get-FileHash -LiteralPath $debugApk -Algorithm SHA256).Hash -ne $instrumentationIsolation.AppSha256 -or
+            (Get-FileHash -LiteralPath $androidTestApk -Algorithm SHA256).Hash -ne $instrumentationIsolation.TestSha256) {
+            throw "The APKs changed after the instrumentation isolation check; refusing to install them (ADR 0017)"
+        }
         $installedTestPackages = [System.Collections.Generic.List[string]]::new()
         try {
             adb install -r $debugApk
             if ($LASTEXITCODE -ne 0) { throw "Next APK installation failed" }
             $testApks = @(
-                @{ Package = $fixturePackage; Path = "android\sender-fixture\build\outputs\apk\debug\sender-fixture-debug.apk" },
-                @{ Package = $testPackage; Path = "android\app\build\outputs\apk\androidTest\debug\app-debug-androidTest.apk" }
+                @{ Package = $fixturePackage; Path = Join-Path $repositoryRoot "android\sender-fixture\build\outputs\apk\debug\sender-fixture-debug.apk" },
+                @{ Package = $testPackage; Path = $androidTestApk }
             )
             foreach ($testApk in $testApks) {
-                adb install -t (Join-Path $repositoryRoot $testApk.Path)
+                adb install -t $testApk.Path
                 if ($LASTEXITCODE -ne 0) { throw "Synthetic test APK installation failed" }
                 $installedTestPackages.Add($testApk.Package)
             }
             # Direct instrumentation avoids collecting unrelated device logcat or clinical data.
             $instrumentation = @(adb shell am instrument -w -r `
                 -e class org.bolusai.next.glucose.dexcom.AndroidDexcomSenderEvidenceTest,org.bolusai.next.NavigationDeviceTest,org.bolusai.next.MealDraftDeviceTest,org.bolusai.next.MealHistoryDeviceTest,org.bolusai.next.MealRestoreDeviceTest,org.bolusai.next.meals.SqliteMealRepositoryDeviceTest,org.bolusai.next.DarkThemeDeviceTest,org.bolusai.next.profile.SqliteClinicalProfileRepositoryDeviceTest,org.bolusai.next.profile.ClinicalProfileConfirmationDeviceTest,org.bolusai.next.ClinicalProfileDeviceTest,org.bolusai.next.ClinicalProfileConfirmationUiDeviceTest,org.bolusai.next.ClinicalProfileUnavailabilityDeviceTest,org.bolusai.next.BolusProfileDetailsDeviceTest,org.bolusai.next.ProfileStorageGuardDeviceTest `
-                org.bolusai.next.test/org.bolusai.next.ProfileIsolationTestRunner)
+                "$testPackage/$isolationRunner")
             $instrumentationExit = $LASTEXITCODE
             $instrumentation | Write-Output
             $instrumentationText = $instrumentation -join "`n"

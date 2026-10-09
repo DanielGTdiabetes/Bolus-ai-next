@@ -589,7 +589,8 @@ Implementación del [ADR 0017](adr/0017-bolo-profile-unavailability-details.md)
 (fases 2 y 6), aceptado con B2 a B10 y la ampliación a Diagnóstico:
 «Detalles del bloqueo» de Bolo y Diagnóstico muestra un único informe v2 con
 glucosa, IOB y comida elevadas y las causas reales del perfil. E1 antes de la
-primera lectura, sin reintentos, sin escrituras y sin textos nuevos. Solo esas
+primera lectura, sin reintentos, sin modificar versiones, franjas ni eventos
+(la apertura de SQLite puede crear o migrar el esquema) y sin textos nuevos. Solo esas
 pantallas y Ajustes → Cálculo inician lecturas del perfil. `ReadOverview`, el
 motor, SQLite y el contrato no cambian. Cálculo y tratamiento siguen
 bloqueados. Pendiente de revisión del propietario. Véase la

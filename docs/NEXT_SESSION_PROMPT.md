@@ -67,7 +67,8 @@ El perfil es captura. La confirmación de datos existe en dominio, base local
 alimenta motor, Bolo, IOB ni recomendación, y cálculo y tratamiento siguen
 bloqueados en todos los estados. Bolo muestra «Perfil · no se usa para
 calcular». Con la PR #42 sus detalles técnicos y los de Diagnóstico leen el
-perfil solo para mostrar sus causas, sin escribir. No hay
+perfil solo para mostrar sus causas, sin modificar versiones, franjas ni
+eventos (la apertura de SQLite puede crear o migrar el esquema). No hay
 límites clínicos, DIA, curva, redondeo, conversión de unidades, propuestas del
 sistema, aprendizaje, exportación/importación, sync ni perfiles alternativos. La
 resolución de franjas en cambios de hora queda para el ADR del motor. Los macros
@@ -190,7 +191,9 @@ ADR 0017 — INFORME DEL PERFIL EN BOLO Y DIAGNÓSTICO (aceptado, implementació
 docs/adr/0017-bolo-profile-unavailability-details.md, aceptado el 2026-10-04
 con B2 a B10, la ampliación a Diagnóstico y la sección 14: `ensureLoaded()`
 solo en las pantallas autorizadas, resolución de pendientes solo de lectura,
-cero escrituras al abrir Bolo o Diagnóstico y E1 antes del resultado en un
+cero escrituras del perfil (versiones, franjas y eventos) al abrir Bolo o
+Diagnóstico, aunque la apertura de SQLite puede crear o migrar el esquema, y
+E1 antes del resultado en un
 modelo nuevo. Integrado como documentación mediante la PR #41. Implementación
 en la PR #42, sin integrar. Véanse la sección 15 del ADR y
 docs/validation/bolo-profile-details-2026-10-04.md:
@@ -211,6 +214,15 @@ docs/validation/bolo-profile-details-2026-10-04.md:
   `ProfileIsolationTestRunner` activa `ProfileStorageGuard` y la
   instrumentación falla explícitamente si una fábrica falta o apunta a la base
   real (`ProfileStorageGuardDeviceTest`).
+- `verify.ps1` lee con `aapt2` el manifiesto empaquetado de `app-debug.apk` y
+  del APK de pruebas (resultado fusionado, incluida la variante `src/debug`).
+  Rechaza `Application` propia, factoría de componentes distinta de
+  `androidx.core.app.CoreComponentFactory` y providers, porque Android los
+  crea antes de la barrera. Exige que el APK de pruebas instrumente esa app con
+  `ProfileIsolationTestRunner` y no instala si los APK cambian tras comprobarlos.
+  Se autoprueba con manifiestos sintéticos en
+  `scripts/fixtures/instrumentation-isolation/`. Si una dependencia nueva añade
+  un provider, verify falla: no la amplíes sin decidir cómo aislarla.
 
 SIGUIENTE PASO
 Los ADR 0014 y 0015 y la opción A del ADR 0016 están implementados e
