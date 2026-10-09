@@ -66,6 +66,30 @@ try {
         }
     }
 
+    # ADR 0017: the instrumentation barrier activates in Instrumentation.onCreate, after Android has instantiated the
+    # Application, its component factory and the content providers of the app under test. None of them may be app
+    # code. The check reads the binary manifests packaged in the very APKs installed below (the merged result of the
+    # app, its dependencies and its variant), proves the test APK instruments that app with the isolating runner, and
+    # first proves with synthetic APKs that each route is rejected.
+    . (Join-Path $PSScriptRoot "InstrumentationIsolation.ps1")
+    $androidTestApk = Join-Path $repositoryRoot "android\app\build\outputs\apk\androidTest\debug\app-debug-androidTest.apk"
+    $isolationRunner = "org.bolusai.next.ProfileIsolationTestRunner"
+    $compileSdkMatch = Select-String -LiteralPath (Join-Path $repositoryRoot "android\app\build.gradle.kts") -Pattern '^\s*compileSdk\s*=\s*(\d+)\s*$' |
+        Select-Object -First 1
+    if ($null -eq $compileSdkMatch) {
+        throw "Could not read compileSdk for the instrumentation isolation self-test"
+    }
+    $aapt2 = Get-InstrumentationAapt2 -AndroidHome $env:ANDROID_HOME
+    $androidJar = Get-InstrumentationAndroidJar -AndroidHome $env:ANDROID_HOME -CompileSdk ([int]$compileSdkMatch.Matches[0].Groups[1].Value)
+    Invoke-InstrumentationIsolationSelfTest -Aapt2 $aapt2 -AndroidJar $androidJar -Runner $isolationRunner `
+        -FixtureDirectory (Join-Path $PSScriptRoot "fixtures\instrumentation-isolation") |
+        ForEach-Object { Write-Output "Instrumentation isolation self-test: $_" }
+    $instrumentationIsolation = Assert-InstrumentationIsolation -Aapt2 $aapt2 -AppApk $debugApk -TestApk $androidTestApk -Runner $isolationRunner
+    Write-Output ("Instrumentation isolation: {0} ({1}) instrumented by {2} with {3}; component factory {4}; app SHA-256 {5}; test SHA-256 {6}" -f
+        $instrumentationIsolation.AppPackage, $instrumentationIsolation.AppApk, $instrumentationIsolation.TestApk,
+        $instrumentationIsolation.Runner, $instrumentationIsolation.ComponentFactory, $instrumentationIsolation.AppSha256,
+        $instrumentationIsolation.TestSha256)
+
     # ADR 0012: the clinical profile is capture only. The engine and the Bolo overview must not depend on it.
     $engineReferences = @(Get-ChildItem -LiteralPath (Join-Path $repositoryRoot "shared\bolus-engine") -Recurse -File |
         Where-Object { $_.FullName -notmatch '\\build\\' } |
@@ -81,22 +105,82 @@ try {
     if ($profileReferences.Count -gt 0) {
         throw "The clinical profile must not depend on the contract or its translator: $($profileReferences.Path -join ', ')"
     }
-    # ADR 0016, option A: only the profile screen (its model, its pure block, the screen and their tests) may use the
-    # translator. Bolo, ReadOverview, the engine and any other Android source stay without it.
+    # ADR 0016, option A, and ADR 0017: only the profile screen and the blocking details of Bolo and Diagnostico (their
+    # model, their pure blocks, the screen and their tests) may use the translator. ReadOverview, ScreenRenderer, the
+    # engine and any other Android source stay without it.
     $allowedTranslatorConsumers = @(
         "android\app\build.gradle.kts",
         "android\app\src\main\java\org\bolusai\next\ui\ProfileUnavailabilityBlock.kt",
+        "android\app\src\main\java\org\bolusai\next\ui\BlockingDetails.kt",
         "android\app\src\main\java\org\bolusai\next\ui\ClinicalProfileModel.kt",
         "android\app\src\main\java\org\bolusai\next\ui\ClinicalProfileScreen.kt",
         "android\app\src\test\java\org\bolusai\next\ProfileUnavailabilityBlockTest.kt",
-        "android\app\src\androidTest\java\org\bolusai\next\ClinicalProfileUnavailabilityDeviceTest.kt"
+        "android\app\src\test\java\org\bolusai\next\BlockingDetailsTest.kt",
+        "android\app\src\androidTest\java\org\bolusai\next\ClinicalProfileUnavailabilityDeviceTest.kt",
+        "android\app\src\androidTest\java\org\bolusai\next\BolusProfileDetailsDeviceTest.kt"
     ) | ForEach-Object { Join-Path $repositoryRoot $_ }
     $translatorConsumers = @(Get-ChildItem -LiteralPath (Join-Path $repositoryRoot "android"), (Join-Path $repositoryRoot "shared\meal-drafts") -Recurse -File |
         Where-Object { $_.FullName -notmatch '\\build\\' -and $_.Extension -in @(".kt", ".kts", ".java", ".xml") } |
         Where-Object { $allowedTranslatorConsumers -notcontains $_.FullName } |
         Select-String -Pattern 'profile-unavailability|org\.bolusai\.profileunavailability|ProfileUnavailability' -List)
     if ($translatorConsumers.Count -gt 0) {
-        throw "Only the profile screen may use the profile unavailability translator (ADR 0016): $($translatorConsumers.Path -join ', ')"
+        throw "Only the profile screen and the blocking details may use the profile unavailability translator (ADR 0016, ADR 0017): $($translatorConsumers.Path -join ', ')"
+    }
+    # ADR 0017, section 14: only Ajustes -> Calculo and the destinations that show the profile report start profile
+    # reads, through ensureLoaded(). Nothing outside the profile screen retries, and the destination list is closed.
+    $mainSources = Join-Path $repositoryRoot "android\app\src\main"
+    $allowedEnsureLoaded = @("ClinicalProfileModel.kt", "ClinicalProfileScreen.kt", "MainActivity.kt")
+    $ensureLoadedCallers = @(Get-ChildItem -LiteralPath $mainSources -Recurse -File -Include *.kt, *.java |
+        Where-Object { $allowedEnsureLoaded -notcontains $_.Name } |
+        Select-String -Pattern 'ensureLoaded' -List)
+    if ($ensureLoadedCallers.Count -gt 0) {
+        throw "Only the profile screen and the blocking details may start profile reads (ADR 0017): $($ensureLoadedCallers.Path -join ', ')"
+    }
+    $mainActivityEnsureLoaded = @(Select-String -LiteralPath (Join-Path $mainSources "java\org\bolusai\next\MainActivity.kt") -Pattern 'ensureLoaded\(')
+    if ($mainActivityEnsureLoaded.Count -ne 1) {
+        throw "MainActivity must start profile reads only for the blocking details (ADR 0017)"
+    }
+    # The profile model is reachable only from its own screen and the activity, and the activity never retries.
+    $profileModelUsers = @(Get-ChildItem -LiteralPath $mainSources -Recurse -File -Include *.kt, *.java |
+        Where-Object { $allowedEnsureLoaded -notcontains $_.Name } |
+        Select-String -Pattern 'ClinicalProfileModel' -List)
+    if ($profileModelUsers.Count -gt 0) {
+        throw "Only the profile screen and MainActivity may use the profile model (ADR 0017): $($profileModelUsers.Path -join ', ')"
+    }
+    if (Select-String -LiteralPath (Join-Path $mainSources "java\org\bolusai\next\MainActivity.kt") -Pattern 'profile\.retry\(' -Quiet) {
+        throw "Bolo and Diagnostico never retry profile reads (ADR 0017, B6)"
+    }
+    # Every instrumentation class that launches the activity injects a synthetic profile repository: Bolo and
+    # Diagnostico read the profile, and tests never open the app's own clinical-profile.db.
+    $unisolatedLaunches = @(Get-ChildItem -LiteralPath (Join-Path $repositoryRoot "android\app\src\androidTest") -Recurse -File -Include *.kt |
+        Where-Object { (Select-String -LiteralPath $_.FullName -Pattern 'ActivityScenario\.launch\(MainActivity' -Quiet) -and
+            -not (Select-String -LiteralPath $_.FullName -Pattern 'profileRepositoryFactory\s*=\s*\{' -Quiet) })
+    if ($unisolatedLaunches.Count -gt 0) {
+        throw "Instrumentation launching MainActivity must inject a synthetic profile repository (ADR 0017): $($unisolatedLaunches.FullName -join ', ')"
+    }
+    # The runtime barrier is the real protection: the app tests run with the runner that activates it in
+    # Instrumentation.onCreate, before Application.onCreate and any activity. The authoritative check of what runs
+    # earlier reads the packaged APK manifests (above). This early check of the main source manifest only gives a
+    # clearer message at the source. These static checks only keep it wired.
+    [xml]$appManifest = Get-Content -LiteralPath (Join-Path $repositoryRoot "android\app\src\main\AndroidManifest.xml") -Raw
+    $androidNamespace = "http://schemas.android.com/apk/res/android"
+    $appApplication = $appManifest.SelectSingleNode("/manifest/application")
+    if ($null -eq $appApplication -or $appApplication.HasAttribute("name", $androidNamespace) -or
+            $appManifest.SelectNodes("//provider").Count -gt 0) {
+        throw "The app must declare no Application class or content provider: they run before the instrumentation barrier (ADR 0017)"
+    }
+    if (-not (Select-String -LiteralPath (Join-Path $repositoryRoot "android\app\build.gradle.kts") -SimpleMatch -Quiet `
+            -Pattern 'testInstrumentationRunner = "org.bolusai.next.ProfileIsolationTestRunner"')) {
+        throw "App instrumentation must run with ProfileIsolationTestRunner (ADR 0017)"
+    }
+    if (-not (Select-String -LiteralPath (Join-Path $mainSources "java\org\bolusai\next\profile\SqliteClinicalProfileRepository.kt") -SimpleMatch -Quiet `
+            -Pattern 'init { ProfileStorageGuard.checkDatabase(context.applicationContext, name) }')) {
+        throw "The profile repository must check the instrumentation barrier before opening its file (ADR 0017)"
+    }
+    $blockingDetailsSource = Join-Path $mainSources "java\org\bolusai\next\ui\BlockingDetails.kt"
+    $expectedDestinations = 'setOf(Destination.BOLUS, Destination.MANUAL, Destination.OFFLINE_BOLUS, Destination.DIAGNOSTICS)'
+    if (-not (Select-String -LiteralPath $blockingDetailsSource -SimpleMatch -Pattern $expectedDestinations -Quiet)) {
+        throw "The blocking details destinations must stay Bolo and Diagnostico only (ADR 0017, B10)"
     }
     $mainActivitySource = Join-Path $repositoryRoot "android\app\src\main\java\org\bolusai\next\MainActivity.kt"
     if (Select-String -LiteralPath $mainActivitySource -Pattern 'InputUnavailability|UnavailabilityReasonV2' -Quiet) {
@@ -106,10 +190,11 @@ try {
     if (Select-String -LiteralPath $overviewSource -Pattern 'org\.bolusai\.profile|ClinicalProfile|ProfileGate|InputUnavailability|UnavailabilityReasonV2' -Quiet) {
         throw "The Bolo overview must keep reporting the profile as unavailable (ADR 0012)"
     }
-    # ADR 0014: Bolo renders a fixed profile line and never reads the profile or its confirmations.
+    # ADR 0014 and ADR 0017: the renderer receives composed lines only and never reads the profile, its confirmations
+    # or contract v2 types.
     $rendererSource = Join-Path $repositoryRoot "android\app\src\main\java\org\bolusai\next\ui\ScreenRenderer.kt"
     if (Select-String -LiteralPath $rendererSource -Pattern 'org\.bolusai\.profile|ClinicalProfile|ProfileGate|Confirmation|InputUnavailability|UnavailabilityReasonV2' -Quiet) {
-        throw "Bolo must not read the clinical profile or its confirmations (ADR 0014)"
+        throw "ScreenRenderer must not read the clinical profile, its confirmations or contract v2 types (ADR 0014, ADR 0017)"
     }
 
     $workflowDirectory = Join-Path $repositoryRoot ".github\workflows"
@@ -199,23 +284,28 @@ jobs:
                 throw "Disposable test package already exists; refusing to overwrite or remove it: $package"
             }
         }
+        # The files about to be installed must be the ones whose manifests passed the isolation check (ADR 0017).
+        if ((Get-FileHash -LiteralPath $debugApk -Algorithm SHA256).Hash -ne $instrumentationIsolation.AppSha256 -or
+            (Get-FileHash -LiteralPath $androidTestApk -Algorithm SHA256).Hash -ne $instrumentationIsolation.TestSha256) {
+            throw "The APKs changed after the instrumentation isolation check; refusing to install them (ADR 0017)"
+        }
         $installedTestPackages = [System.Collections.Generic.List[string]]::new()
         try {
             adb install -r $debugApk
             if ($LASTEXITCODE -ne 0) { throw "Next APK installation failed" }
             $testApks = @(
-                @{ Package = $fixturePackage; Path = "android\sender-fixture\build\outputs\apk\debug\sender-fixture-debug.apk" },
-                @{ Package = $testPackage; Path = "android\app\build\outputs\apk\androidTest\debug\app-debug-androidTest.apk" }
+                @{ Package = $fixturePackage; Path = Join-Path $repositoryRoot "android\sender-fixture\build\outputs\apk\debug\sender-fixture-debug.apk" },
+                @{ Package = $testPackage; Path = $androidTestApk }
             )
             foreach ($testApk in $testApks) {
-                adb install -t (Join-Path $repositoryRoot $testApk.Path)
+                adb install -t $testApk.Path
                 if ($LASTEXITCODE -ne 0) { throw "Synthetic test APK installation failed" }
                 $installedTestPackages.Add($testApk.Package)
             }
             # Direct instrumentation avoids collecting unrelated device logcat or clinical data.
             $instrumentation = @(adb shell am instrument -w -r `
-                -e class org.bolusai.next.glucose.dexcom.AndroidDexcomSenderEvidenceTest,org.bolusai.next.NavigationDeviceTest,org.bolusai.next.MealDraftDeviceTest,org.bolusai.next.MealHistoryDeviceTest,org.bolusai.next.MealRestoreDeviceTest,org.bolusai.next.meals.SqliteMealRepositoryDeviceTest,org.bolusai.next.DarkThemeDeviceTest,org.bolusai.next.profile.SqliteClinicalProfileRepositoryDeviceTest,org.bolusai.next.profile.ClinicalProfileConfirmationDeviceTest,org.bolusai.next.ClinicalProfileDeviceTest,org.bolusai.next.ClinicalProfileConfirmationUiDeviceTest,org.bolusai.next.ClinicalProfileUnavailabilityDeviceTest `
-                org.bolusai.next.test/androidx.test.runner.AndroidJUnitRunner)
+                -e class org.bolusai.next.glucose.dexcom.AndroidDexcomSenderEvidenceTest,org.bolusai.next.NavigationDeviceTest,org.bolusai.next.MealDraftDeviceTest,org.bolusai.next.MealHistoryDeviceTest,org.bolusai.next.MealRestoreDeviceTest,org.bolusai.next.meals.SqliteMealRepositoryDeviceTest,org.bolusai.next.DarkThemeDeviceTest,org.bolusai.next.profile.SqliteClinicalProfileRepositoryDeviceTest,org.bolusai.next.profile.ClinicalProfileConfirmationDeviceTest,org.bolusai.next.ClinicalProfileDeviceTest,org.bolusai.next.ClinicalProfileConfirmationUiDeviceTest,org.bolusai.next.ClinicalProfileUnavailabilityDeviceTest,org.bolusai.next.BolusProfileDetailsDeviceTest,org.bolusai.next.ProfileStorageGuardDeviceTest `
+                "$testPackage/$isolationRunner")
             $instrumentationExit = $LASTEXITCODE
             $instrumentation | Write-Output
             $instrumentationText = $instrumentation -join "`n"

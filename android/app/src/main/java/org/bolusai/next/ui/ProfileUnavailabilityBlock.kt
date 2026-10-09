@@ -1,5 +1,6 @@
 package org.bolusai.next.ui
 
+import org.bolusai.engine.InputUnavailability
 import org.bolusai.engine.InputUnavailabilityReport
 import org.bolusai.profile.ProfileGateState
 import org.bolusai.profileunavailability.ProfileUnavailability
@@ -16,9 +17,7 @@ internal sealed interface ProfileUnavailabilityBlock {
 
     data class Report(val report: InputUnavailabilityReport) : ProfileUnavailabilityBlock {
         override val lines: List<String>
-            get() = report.entries.map { cause ->
-                if (cause.details.isEmpty()) cause.code else "${cause.code} [${cause.details.joinToString(", ")}]"
-            }
+            get() = report.entries.map { cause -> ProfileUnavailabilityBlock.line(cause) }
     }
 
     /**
@@ -30,6 +29,10 @@ internal sealed interface ProfileUnavailabilityBlock {
     }
 
     companion object {
+        /** One contract cause as a line: its `code` alone, or followed by its details in brackets (A5). */
+        fun line(cause: InputUnavailability): String =
+            if (cause.details.isEmpty()) cause.code else "${cause.code} [${cause.details.joinToString(", ")}]"
+
         /**
          * A gate state not proven yet (`null`) is the pending read the screen already shows as E1. Only the known
          * rejection of the translator is caught; any other exception propagates unchanged.

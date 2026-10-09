@@ -25,7 +25,8 @@ import java.util.concurrent.TimeUnit
 /**
  * ADR 0016, option A: the technical block of Ajustes → Cálculo shows the contract v2 report of the state the screen
  * already presents. Synthetic, isolated database files only; the app's own clinical-profile.db is never opened,
- * nothing touches the network, Bolo keeps its static profile code and calculation stays blocked in every state.
+ * nothing touches the network and calculation stays blocked in every state. Bolo and Diagnóstico are covered by
+ * BolusProfileDetailsDeviceTest (ADR 0017).
  */
 @RunWith(AndroidJUnit4::class)
 class ClinicalProfileUnavailabilityDeviceTest {
@@ -270,24 +271,4 @@ class ClinicalProfileUnavailabilityDeviceTest {
             }
         }
     }
-
-    @Test fun bolusKeepsItsStaticProfileCodeAndNeverShowsTheProfileReport() {
-        save(0, content())
-        confirm()
-        launch().use { scenario ->
-            scenario.onActivity { it.findViewById<View>(R.id.bottom_navigation).findViewWithTag<View>("tab:/bolus").performClick() }
-            click(scenario, "details")
-            scenario.onActivity { activity ->
-                val codes = activity.findViewById<View>(R.id.app_shell).findViewWithTag<TextView>("blocking_codes").text.toString()
-                assertTrue(codes.contains("input.profile.policy_not_approved"))
-                assertFalse(codes.contains("profile.not_approved_for_calculation"))
-                assertFalse(codes.contains("input.profile.unconfirmed"))
-                assertNull(viewOrNull(activity, "profile:unavailability"))
-                assertFalse(activity.findViewWithTagEnabled("blocked:calculate"))
-            }
-        }
-    }
-
-    private fun MainActivity.findViewWithTagEnabled(tag: String): Boolean =
-        findViewById<View>(R.id.app_shell).findViewWithTag<View>(tag).isEnabled
 }

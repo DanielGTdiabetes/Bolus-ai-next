@@ -20,10 +20,13 @@ import org.bolusai.meals.ReadMealHistory
 import org.bolusai.meals.ReviewMealSelection
 import org.bolusai.next.ui.MealSelectionScreen
 import org.bolusai.next.application.ReadOverview
+import org.bolusai.next.application.UnavailableOverview
 import org.bolusai.next.glucose.PendingDexcomSource
 import org.bolusai.next.glucose.ReadLocalGlucoseStatus
 import org.bolusai.next.navigation.AppNavigation
 import org.bolusai.next.navigation.Destination
+import org.bolusai.next.ui.BlockingDetails
+import org.bolusai.next.ui.BlockingView
 import org.bolusai.next.ui.ScreenRenderer
 import org.bolusai.next.ui.SettingsSection
 import org.bolusai.next.ui.MealDraftModel
@@ -35,6 +38,7 @@ import org.bolusai.next.ui.ClinicalProfileScreen
 import org.bolusai.next.profile.AndroidOperationIds
 import org.bolusai.next.profile.AndroidTimeZoneRules
 import org.bolusai.next.profile.ClosableProfileRepository
+import org.bolusai.next.profile.ProfileStorageGuard
 import org.bolusai.next.profile.SqliteClinicalProfileRepository
 import org.bolusai.profile.ClinicalProfiles
 import org.bolusai.profile.OperationIds
@@ -52,6 +56,12 @@ class MainActivity : ComponentActivity() {
     private var settingsSection = SettingsSection.NIGHTSCOUT
     /** Technical block of the profile screen; deliberately not saved, so it opens folded after recreation (ADR 0016, A3). */
     private var profileDetailsOpen = false
+    /**
+     * «Detalles del bloqueo» of Bolo and Diagnóstico stays open while the same destination repaints, for example when a
+     * profile read finishes, and folds on another destination and after recreation, because it is not saved (B7).
+     */
+    private var blockingDetailsOpen = false
+    private var blockingDetailsDestination: Destination? = null
     private val overview = ReadOverview(ReadLocalGlucoseStatus(PendingDexcomSource))
     private val backCallback = object : OnBackPressedCallback(false) {
         override fun handleOnBackPressed() = goBack()
@@ -82,8 +92,7 @@ class MainActivity : ComponentActivity() {
         profile = ViewModelProvider(this, object : ViewModelProvider.Factory {
             @Suppress("UNCHECKED_CAST")
             override fun <T : ViewModel> create(modelClass: Class<T>): T {
-                val repository = profileRepositoryFactory?.invoke(applicationContext)
-                    ?: SqliteClinicalProfileRepository(applicationContext)
+                val repository = profileRepository(applicationContext)
                 val clock = profileClock ?: ProfileClock { System.currentTimeMillis() }
                 val zones = profileTimeZoneRules ?: AndroidTimeZoneRules
                 return ClinicalProfileModel(ClinicalProfiles(repository, clock, writer(), zones),
@@ -94,7 +103,13 @@ class MainActivity : ComponentActivity() {
             { settingsSection = it; profileDetailsOpen = false; render() }, ::renderMeals, ::renderSelection, ::renderProfile)
         meals.changed = { render() }
         // Keep the reading position while the profile section rebuilds after a model change.
-        profile.changed = { if (navigation.current == Destination.SETTINGS) { rememberScroll(); render() } }
+        // Bolo and Diagnóstico repaint too, so a finished read replaces the pending one in their details (B7).
+        profile.changed = {
+            if (navigation.current == Destination.SETTINGS || navigation.current in BlockingDetails.destinations) {
+                rememberScroll()
+                render()
+            }
+        }
         meals.selectionChanged = { if (isReviewDestination(navigation.current)) render() }
         findViewById<Button>(R.id.back_button).setOnClickListener { goBack() }
         onBackPressedDispatcher.addCallback(this, backCallback)
@@ -190,6 +205,19 @@ class MainActivity : ComponentActivity() {
         }.render()
     }
 
+    /**
+     * Only the destinations that show the profile report may start a profile read (ADR 0017, section 14). The read, or
+     * the read-only resolution of a kept pending operation, goes through `ensureLoaded`; nothing here retries,
+     * saves, confirms or revokes.
+     */
+    private fun blockingView(destination: Destination, state: UnavailableOverview): BlockingView? {
+        if (destination !in BlockingDetails.destinations) return null
+        profile.ensureLoaded()
+        return BlockingView(BlockingDetails.lines(state, profile.unavailability), blockingDetailsOpen) {
+            blockingDetailsOpen = it
+        }
+    }
+
     /** Audit metadata only: application build, no device identifier or personal data. */
     private fun writer(): String {
         val info = packageManager.getPackageInfo(packageName, 0)
@@ -221,7 +249,12 @@ class MainActivity : ComponentActivity() {
             if (Build.VERSION.SDK_INT >= 28) isAccessibilityHeading = true
         }
         findViewById<Button>(R.id.back_button).visibility = if (canGoBack) View.VISIBLE else View.GONE
-        renderer.render(destination, overview.execute(), settingsSection)
+        if (destination != blockingDetailsDestination) {
+            blockingDetailsOpen = false
+            blockingDetailsDestination = destination
+        }
+        val state = overview.execute()
+        renderer.render(destination, state, settingsSection, blockingView(destination, state))
         val bar = findViewById<LinearLayout>(R.id.bottom_navigation)
         bar.removeAllViews()
         Destination.primary.forEach { tab ->
@@ -242,6 +275,16 @@ class MainActivity : ComponentActivity() {
         var mealRepositoryFactory: ((Context) -> SqliteMealRepository)? = null
         /** Process-local test seams for the clinical profile; production always uses the app database and clock. */
         var profileRepositoryFactory: ((Context) -> ClosableProfileRepository)? = null
+
+        /**
+         * The repository the activity uses. During instrumentation a missing synthetic factory fails explicitly, and a
+         * factory that targets the app's own database fails when the repository is built, before the file is opened.
+         */
+        internal fun profileRepository(context: Context): ClosableProfileRepository {
+            val factory = profileRepositoryFactory
+            ProfileStorageGuard.checkFactory(factory)
+            return factory?.invoke(context) ?: SqliteClinicalProfileRepository(context)
+        }
         var profileClock: ProfileClock? = null
         var profileTimeZoneRules: TimeZoneRules? = null
         var profileOperationIds: OperationIds? = null

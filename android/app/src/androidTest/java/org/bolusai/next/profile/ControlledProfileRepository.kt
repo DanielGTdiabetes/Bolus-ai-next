@@ -22,6 +22,8 @@ internal class ControlledProfileRepository(private val delegate: SqliteClinicalP
     @Volatile var readStarted = CountDownLatch(1)
     val requests = CopyOnWriteArrayList<ConfirmationRequest>()
     val reads = AtomicInteger()
+    /** Version writes attempted through this repository; confirmation writes are counted in [requests]. */
+    val saves = AtomicInteger()
 
     override fun readVersions(): ProfileRead {
         reads.incrementAndGet()
@@ -36,8 +38,10 @@ internal class ControlledProfileRepository(private val delegate: SqliteClinicalP
         }
         return readFailure?.let { ProfileRecordRead.Failed(it) } ?: delegate.readRecord()
     }
-    override fun save(write: ProfileWrite, createdAtEpochMs: Long, writer: String): ProfileSave =
-        delegate.save(write, createdAtEpochMs, writer)
+    override fun save(write: ProfileWrite, createdAtEpochMs: Long, writer: String): ProfileSave {
+        saves.incrementAndGet()
+        return delegate.save(write, createdAtEpochMs, writer)
+    }
 
     override fun appendConfirmation(request: ConfirmationRequest, recordedAtEpochMs: Long, writer: String,
                                     zones: TimeZoneRules): ConfirmationWrite {

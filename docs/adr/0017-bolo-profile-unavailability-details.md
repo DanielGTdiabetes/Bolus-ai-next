@@ -3,7 +3,9 @@
 - Estado: **aceptado** el 2026-10-04 con B2 a B10 según su recomendación,
   incluida expresamente la ampliación a Diagnóstico (B10), y con las
   precisiones de la sección 14. La implementación queda autorizada con ese
-  alcance y con cálculo y tratamiento bloqueados.
+  alcance y con cálculo y tratamiento bloqueados. Implementada en la rama
+  `claude/bolo-profile-details`, pendiente de revisión e integración
+  (sección 15).
 - Fecha: 2026-10-04.
 - Fase y criterio de aceptación: fases 2 y 6. Desarrolla la opción B que el
   [ADR 0016](0016-profile-unavailability-consumer.md) aprobó solo como
@@ -41,8 +43,11 @@ Invariantes que ninguna opción modifica:
 - Bolo muestra causas ya determinadas. No decide, no las ordena por
   importancia, no cambia colores, textos visibles ni acciones según el estado
   del perfil y no las convierte en un permiso.
-- Bolo no escribe nada en el perfil: no guarda, no confirma, no retira y no
-  reintenta operaciones.
+- Bolo no modifica el perfil: no guarda, no confirma, no retira y no
+  reintenta operaciones. No cambia versiones, franjas ni eventos de
+  confirmación. La apertura de SQLite que acompaña a la primera lectura sí
+  puede escribir en el fichero: crearlo con su esquema o migrarlo de v1 a v2
+  (precisión de la sección 14).
 - Sin cambios de SQLite, huellas, serialización, confirmaciones ni contrato v2.
 
 ## 1. Problema
@@ -186,7 +191,8 @@ Los tres códigos v1 y debajo el informe v2 del perfil.
   nueva. El bloque vuelve plegado.
 - Muerte del proceso: el modelo nuevo empieza sin `gate`. Bolo muestra E1 y
   `ensureLoaded()` lee o, si `snapshot()` conservó una operación pendiente, la
-  resuelve antes (solo lectura, sin escrituras). El aviso resultante se ve
+  resuelve antes (solo lectura del perfil, sin cambiar versiones, franjas ni
+  eventos). El aviso resultante se ve
   después en Ajustes, como si se hubiera abierto allí primero.
 - Un resultado tardío de una lectura superada no pinta nada (`stateToken`).
 - `onSaveInstanceState` no cambia.
@@ -254,7 +260,7 @@ límites, vigencia, DIA, IOB o P4 y P6 del ADR 0012.
   - una sola lectura al alternar Bolo y Ajustes, contada en el repositorio.
   - recreación: bloque plegado y sin lectura nueva.
   - operación pendiente conservada y apertura directa en Bolo: se resuelve
-    sin escrituras, contadas en el repositorio.
+    sin guardar versiones ni añadir eventos, contados en el repositorio.
   - bloque abierto que sobrevive al repintado por fin de lectura.
   - Diagnóstico con las mismas líneas solo si se aprueba B10. Si no, prueba
     de que Diagnóstico conserva los cuatro códigos v1.
@@ -268,7 +274,7 @@ límites, vigencia, DIA, IOB o P4 y P6 del ADR 0012.
 - Bolo y Ajustes describen el perfil con el mismo informe.
 - Se retira, acotada, la garantía «Bolo no lee el perfil». Lo que queda
   garantizado y comprobado: el motor, `ReadOverview` y `ScreenRenderer` no
-  leen el perfil, y Bolo no escribe en él.
+  leen el perfil, y Bolo no modifica sus versiones, franjas ni eventos.
 - Riesgo: que un usuario lea la desaparición de causas (perfil confirmado)
   como un paso hacia un bolo. Mitigación: bloque técnico plegado,
   `policy_not_approved` siempre presente, tarjeta visible y acciones sin
@@ -317,13 +323,43 @@ Precisión de B4 y B6:
 
 Pruebas añadidas a la sección 11 a petición del propietario:
 
-- Cero escrituras al abrir Bolo y Diagnóstico, contadas en el repositorio de
-  prueba (versiones guardadas y eventos de confirmación) y en filas de la base
-  sintética, sin operaciones pendientes y con una operación pendiente
-  conservada.
+- Cero escrituras del perfil al abrir Bolo y Diagnóstico, contadas en el
+  repositorio de prueba (versiones guardadas y eventos de confirmación) y en
+  filas de la base sintética, sin operaciones pendientes y con una operación
+  pendiente conservada.
 - Un modelo nuevo creado desde el estado guardado (muerte del proceso) pasa
   por E1 (`input.profile.unknown` [`profile.read.pending`]) antes de mostrar
   el resultado, también cuando conserva una operación pendiente, y sin
-  escrituras.
+  escrituras del perfil.
 - Abrir destinos sin el bloque (Inicio, Más, Escanear) no inicia lecturas del
   perfil.
+
+Precisión del 2026-10-09 sobre «escrituras». Lo que esta decisión garantiza y
+prueba es que abrir Bolo o Diagnóstico no modifica versiones, franjas ni
+eventos de confirmación. No garantiza que el fichero quede intacto: la
+primera lectura de la sesión abre `clinical-profile.db` con
+`SQLiteOpenHelper`, en modo lectura y escritura. Si el fichero no existe, lo
+crea con el esquema v2. Si está en v1, lo migra a v2 (ADR 0014, sección 8.4).
+La lectura usa además una transacción exclusiva. Es la misma apertura que ya
+hacía Ajustes → Cálculo. Este ADR no cambia ese comportamiento: solo puede
+adelantarlo al abrir Bolo o Diagnóstico antes que Ajustes.
+
+## 15. Estado de implementación (2026-10-04)
+
+Base: `6f101fa2f3c03d21b957b9f6029badfa93759011` (PR #41 integrada).
+Pendiente de revisión del propietario. No integrada.
+
+| Elemento | Implementación |
+|---|---|
+| B2 | `MainActivity` llama a `profile.ensureLoaded()` al pintar los destinos de `BlockingDetails.destinations`. `gate` nulo se muestra como E1 |
+| B3 | `BlockingDetails.lines`: un único `InputUnavailabilityReport` con glucosa, IOB y comida elevadas y las causas del traductor. Formato `ProfileUnavailabilityBlock.line` (A5) |
+| B4 | solo `ClinicalProfileModel`, `ClinicalProfileScreen` y `MainActivity` usan el modelo y `ensureLoaded`. `ScreenRenderer` recibe líneas ya compuestas (`BlockingView`) |
+| B5 | `Rejected`: líneas elevadas y el identificador. Nada se captura |
+| B6 | sin `retry()` fuera de Ajustes. `verify.ps1` lo comprueba en `MainActivity` |
+| B7 | `profile.changed` repinta los destinos con el bloque. `blockingDetailsOpen` sin guardar |
+| B8 | sin cambios en `onSaveInstanceState` |
+| B9 | sin textos nuevos. `R.string.technical_codes` eliminado |
+| B10 | Diagnóstico usa el mismo bloque |
+| Aislamiento | `ProfileIsolationTestRunner` activa `ProfileStorageGuard` en `Instrumentation.onCreate`. `verify.ps1` lee el manifiesto empaquetado de `app-debug.apk` y del APK de pruebas (resultado fusionado de la app, sus dependencias y su variante). Rechaza una `Application` propia, una factoría de componentes distinta de `androidx.core.app.CoreComponentFactory` y cualquier provider, porque Android los crea antes de esa llamada. Exige que el APK de pruebas instrumente esa app con ese runner y no instala si los APK cambian después de la comprobación |
+
+Evidencia: [validación](../validation/bolo-profile-details-2026-10-04.md).

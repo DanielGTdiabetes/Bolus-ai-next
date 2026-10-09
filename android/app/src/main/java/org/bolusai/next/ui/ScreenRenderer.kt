@@ -7,7 +7,6 @@ import android.graphics.drawable.GradientDrawable
 import android.graphics.drawable.RippleDrawable
 import android.os.Build
 import android.view.Gravity
-import android.view.View
 import android.widget.Button
 import android.widget.HorizontalScrollView
 import android.widget.LinearLayout
@@ -19,6 +18,12 @@ import org.bolusai.next.R
 import org.bolusai.next.application.UnavailableOverview
 import org.bolusai.next.navigation.Destination
 import org.bolusai.meals.MealKind
+
+/**
+ * «Detalles del bloqueo» as the renderer receives it: lines already composed elsewhere (ADR 0017) and whether the
+ * block is open. The renderer never reads the profile and never builds contract reports.
+ */
+internal class BlockingView(val lines: List<String>, val open: Boolean, val toggled: (Boolean) -> Unit)
 
 /** Renders status and navigation only; has no calculation, persistence or integration port. */
 internal class ScreenRenderer(
@@ -134,13 +139,14 @@ internal class ScreenRenderer(
         }
     }
 
-    fun render(destination: Destination, state: UnavailableOverview, settings: SettingsSection) {
+    fun render(destination: Destination, state: UnavailableOverview, settings: SettingsSection,
+               blocking: BlockingView? = null) {
         check(!state.allowsCalculation && !state.allowsTreatment)
         content.removeAllViews()
         when (destination) {
             Destination.HOME -> home(state)
             Destination.MORE -> menu()
-            Destination.BOLUS, Destination.MANUAL, Destination.OFFLINE_BOLUS -> bolus(state, destination)
+            Destination.BOLUS, Destination.MANUAL, Destination.OFFLINE_BOLUS -> bolus(state, destination, blocking)
             Destination.COMPANION -> {
                 info(R.string.alerts_title, R.string.alerts_detail)
                 link(Destination.FORECAST)
@@ -201,7 +207,7 @@ internal class ScreenRenderer(
             Destination.DIAGNOSTICS -> {
                 glucose(state)
                 info(R.string.diagnostics, R.string.sync_detail)
-                details(state)
+                details(blocking)
             }
             Destination.MOBILE_SETTINGS -> {
                 info(R.string.dexcom, R.string.external_detail)
@@ -285,7 +291,7 @@ internal class ScreenRenderer(
         }
     }
 
-    private fun bolus(state: UnavailableOverview, destination: Destination) {
+    private fun bolus(state: UnavailableOverview, destination: Destination, blocking: BlockingView?) {
         info(R.string.calculation_blocked,
             if (destination == Destination.BOLUS) R.string.calculation_detail else R.string.manual_detail,
             R.color.non_authoritative_background)
@@ -304,7 +310,7 @@ internal class ScreenRenderer(
         link(Destination.FAVORITES)
         link(Destination.FOODS)
         disabled(R.string.confirm_disabled, "confirm")
-        details(state)
+        details(blocking)
     }
 
     private fun settings(state: UnavailableOverview, selected: SettingsSection) {
@@ -348,14 +354,17 @@ internal class ScreenRenderer(
         }
     }
 
-    private fun details(state: UnavailableOverview) {
-        val codes = text(content, context.getString(R.string.technical_codes, state.glucose.code,
-            state.profile.code, state.iob.code, state.meal.code), 12f, ink = R.color.secondary_text)
-        codes.visibility = View.GONE
+    /** One code per line (ADR 0017, A5 of ADR 0016). Folded unless the activity kept it open on this screen (B7). */
+    private fun details(blocking: BlockingView?) {
+        val view = requireNotNull(blocking) { "blocking_details.missing" }
+        check(view.lines.isNotEmpty()) { "blocking_details.empty" }
+        val codes = text(content, view.lines.joinToString("\n"), 12f, ink = R.color.secondary_text)
+        codes.isVisible = view.open
         codes.tag = "blocking_codes"
         codes.setTextIsSelectable(true)
         button(content, R.string.technical_details, "details") {
             codes.isVisible = !codes.isVisible
+            view.toggled(codes.isVisible)
         }
     }
 
