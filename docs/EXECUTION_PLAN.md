@@ -739,6 +739,11 @@ este ajuste. No queda pendiente de fusión; comprobar el CI del SHA integrado.
    exportación y refinamientos visuales quedan fuera de la ruta inmediata salvo
    que sean necesarios para un riesgo concreto o los priorice el propietario.
 
+La propuesta única pedida en el punto 1 es el
+[ADR 0023](adr/0023-dexcom-g7-real-reception-and-presentation.md), en estado
+propuesto: prerrequisitos P1 a P3 del productor y decisiones A1 a D2. La
+implementación empieza cuando el propietario responda.
+
 La recepción y presentación con Dexcom real conservan las puertas de los ADR
 vigentes. No aprobar por inferencia unidad, timestamps, vigencia ni uso clínico.
 La validación offline debe preservar la recepción del sensor: según la decisión

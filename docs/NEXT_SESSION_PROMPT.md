@@ -13,6 +13,13 @@ recepción local Dexcom y presentación offline con cálculo bloqueado, reuniend
 las decisiones pendientes en una sola propuesta. No encadenar nuevas PR de
 diagnóstico o endurecimiento sin un hallazgo o riesgo concreto.
 
+La propuesta única está en docs/adr/0023-dexcom-g7-real-reception-and-presentation.md
+(propuesta, 2026-10-11): prerrequisitos P1 a P3 del productor (release
+reproducible, opt-in de identidad, anclas) y decisiones A1 a D2 con
+recomendación. B4 y C5 son clínicas. Siguiente paso: recoger las respuestas
+del propietario, marcar el ADR como aceptado e implementar su plan en una sola
+entrega. Sin respuesta, no implementar presentación de valores.
+
 El detalle que sigue conserva antecedentes de entregas; el estado de integración
 se comprueba en GitHub y origin/main, no se deduce de esos antecedentes.
 
