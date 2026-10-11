@@ -317,14 +317,22 @@ añade la orden `TRIGGER_G7`. `verify.ps1` exige la forma exacta del receiver
 en los manifiestos, ningún valor `com.dexcom.` salvo la acción, política
 `Pending` y ninguna subclase, ancla aprobada ni observador en producción. JVM
 10 pruebas nuevas; `DexcomG7ReceiverDeviceTest` (8) en la lista de
-instrumentación, **sin ejecutar en el Pixel**. Véase
+instrumentación. Véase
 docs/validation/dexcom-g7-receiver-disabled-2026-10-11.md.
+R10: `DexcomG7Intake.record` convierte las excepciones al abrir, escribir o
+cerrar el almacén en `DexcomReceipt.StorageFailed` (glucosa
+`persistence_failed`) en lugar de cerrar el proceso. Superó en el Pixel, sobre
+`a0698d1`, `DexcomG7ReceiverDeviceTest` 10/10,
+`AndroidDexcomSenderEvidenceTest` 8/8 y `DexcomLogDiagnosticsDeviceTest` 3/3,
+con la instrumentación completa en `OK (164 tests)`. Véase
+docs/validation/dexcom-g7-receiver-storage-failure-2026-10-11.md.
 Toda prueba que active el receiver debe restaurar
 `COMPONENT_ENABLED_STATE_DEFAULT` y toda subclase de prueba debe abrir una base
 sintética: `DexcomStorageGuard` rechaza la real.
 
 PENDIENTE DEL PROPIETARIO (ADR 0018 a 0022)
-- Ejecutar `.\scripts\verify.ps1 -DeviceTests` para el ADR 0022.
+- Decidir si Diagnóstico muestra un contador duradero de fallos de
+  almacenamiento del receiver (R10).
 - Revisar las decisiones técnicas T1 a T6 (ADR 0019), E5 a E9 (ADR 0020), F3
   a F5 (ADR 0021) y R4 a R9 (ADR 0022).
 - Para el receiver productivo: archivar release reproducible de la app Dexcom

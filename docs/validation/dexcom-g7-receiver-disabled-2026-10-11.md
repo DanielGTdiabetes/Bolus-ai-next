@@ -15,9 +15,14 @@ anclas aprobadas y el permiso del productor.
 |---|---|---|
 | `DexcomG7IntakeTest` (JVM Android) | 11 | ejecutada, 0 fallos |
 | `DexcomLogBlockTest` (JVM Android) | 3 | actualizada con las líneas del receiver, ejecutada, 0 fallos |
-| `DexcomG7ReceiverDeviceTest` (dispositivo) | 8 | compilada, en la lista de `verify.ps1`; **sin ejecutar**: no hay dispositivo en la sesión |
-| `AndroidDexcomSenderEvidenceTest` (dispositivo) | 8 | una prueba actualizada: el único receiver es el de Dexcom, desactivado; **sin ejecutar** |
-| `DexcomLogDiagnosticsDeviceTest` (dispositivo) | 3 | dos pruebas actualizadas con las líneas del receiver; **sin ejecutar** |
+| `DexcomG7ReceiverDeviceTest` (dispositivo) | 8 | en la lista de `verify.ps1`; 8 ejecutadas en el Pixel sobre `a0698d1`, 0 fallos |
+| `AndroidDexcomSenderEvidenceTest` (dispositivo) | 8 | una prueba actualizada: el único receiver es el de Dexcom, desactivado; 8 ejecutadas en el Pixel, 0 fallos |
+| `DexcomLogDiagnosticsDeviceTest` (dispositivo) | 3 | dos pruebas actualizadas con las líneas del receiver; 3 ejecutadas en el Pixel, 0 fallos |
+
+Las clases de dispositivo se ejecutaron después de integrar la PR, sobre
+`a0698d1` (rama `claude/loving-maxwell-qu9me8`), que contiene esta PR más R10.
+Detalle en
+[la validación de R10](dexcom-g7-receiver-storage-failure-2026-10-11.md#ejecución-en-dispositivo-2026-10-11).
 
 `DexcomG7ReceiverDeviceTest` usa la APK sintética `org.bolusai.next.senderfixture`
 con la orden nueva `TRIGGER_G7`, que reenvía a Next un payload definido por la
@@ -66,7 +71,6 @@ mensaje del ADR 0022. Política distinta de `Pending`, subclase del receiver y
 
 ## Pendiente
 
-- Ejecutar `.\scripts\verify.ps1 -DeviceTests` en el Pixel (propietario).
 - Revisar R4 a R9 (propietario).
 - Para la validación real: release reproducible, opt-in de identidad, anclas
   aprobadas y permiso del productor, con su propio ADR.

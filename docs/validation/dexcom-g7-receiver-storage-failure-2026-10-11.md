@@ -48,7 +48,7 @@ queda como decisión pendiente del propietario.
 |---|---|---|
 | `DexcomG7IntakeTest` (JVM Android) | 15 | 4 nuevas y 1 sustituida (`store defects propagate unchanged` contradecía R10), ejecutada, 0 fallos |
 | Resto de `org.bolusai.next.glucose.dexcom.*` y `DexcomLogBlockTest` (JVM Android) | 42 | ejecutadas, 0 fallos |
-| `DexcomG7ReceiverDeviceTest` (dispositivo) | 10 | 2 nuevas, compilada. **Sin ejecutar**: no hay dispositivo en la sesión |
+| `DexcomG7ReceiverDeviceTest` (dispositivo) | 10 | 2 nuevas, 10 ejecutadas en el Pixel, 0 fallos |
 
 Pruebas nuevas en JVM:
 
@@ -88,11 +88,23 @@ local, fuera del repositorio, que usa el espejo de Google de Maven Central.
 ADR 0022 no necesitan una comprobación nueva, porque las pruebas JVM, que
 `verify.ps1` ya ejecuta, fijan R10.
 
+## Ejecución en dispositivo (2026-10-11)
+
+- SHA probado: `a0698d113ac7b24b6941a9de359230aaae5f6373` (rama
+  `claude/loving-maxwell-qu9me8`; solo documentación cambia después).
+- Dispositivo: Pixel 10 Pro Fold (`rango`), Android 17, API 37, build
+  `CP3A.260905.009`, único dispositivo autorizado en `adb`.
+- Comando: `.\scripts\verify.ps1 -DeviceTests` en Windows, código de salida 0.
+  Compilación, pruebas JVM, lint y aislamiento de instrumentación en verde.
+- Instrumentación completa: `OK (164 tests)`, sin fallos.
+- `DexcomG7ReceiverDeviceTest` 10/10 (las 8 de la PR #51 y las 2 de R10),
+  `AndroidDexcomSenderEvidenceTest` 8/8 y `DexcomLogDiagnosticsDeviceTest`
+  3/3. Así quedan ejecutadas también las clases pendientes de la PR #51.
+- Las APK sintéticas `org.bolusai.next.senderfixture` y
+  `org.bolusai.next.test` se desinstalaron al terminar.
+
 ## Pendiente
 
-- Ejecutar `.\scripts\verify.ps1 -DeviceTests` en el Pixel (propietario):
-  `DexcomG7ReceiverDeviceTest`, `AndroidDexcomSenderEvidenceTest` y
-  `DexcomLogDiagnosticsDeviceTest` siguen sin ejecutarse desde la PR #51.
 - Decidir si Diagnóstico muestra un contador duradero de fallos de
   almacenamiento.
 - `DexcomG7Intake.accept` corre en el hilo principal y deja propagar defectos
