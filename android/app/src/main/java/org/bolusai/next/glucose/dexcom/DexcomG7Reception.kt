@@ -19,15 +19,26 @@ internal sealed interface DexcomG7ReceptionOutcome {
         override val glucose: UnavailableInput get() = UnavailableInput(InputKind.GLUCOSE, authentication.unavailabilityReason)
     }
 
-    data object PayloadUnreadable : DexcomG7ReceptionOutcome {
+    /** Authenticated variants keep the proven sender so storage can record provenance (ADR 0020, E9). */
+    sealed interface Authenticated : DexcomG7ReceptionOutcome {
+        val sender: DexcomSenderAuthenticationResult.Authenticated
+    }
+
+    data class PayloadUnreadable(override val sender: DexcomSenderAuthenticationResult.Authenticated) : Authenticated {
         override val glucose: UnavailableInput get() = UnavailableInput(InputKind.GLUCOSE, UnavailabilityReason.PARSE_FAILED)
     }
 
-    data class PayloadRejected(val rejection: DexcomG7PayloadRejection) : DexcomG7ReceptionOutcome {
+    data class PayloadRejected(
+        override val sender: DexcomSenderAuthenticationResult.Authenticated,
+        val rejection: DexcomG7PayloadRejection,
+    ) : Authenticated {
         override val glucose: UnavailableInput get() = UnavailableInput(InputKind.GLUCOSE, UnavailabilityReason.PARSE_FAILED)
     }
 
-    data class Observed(val message: ObservedDexcomG7Message) : DexcomG7ReceptionOutcome {
+    data class Observed(
+        override val sender: DexcomSenderAuthenticationResult.Authenticated,
+        val message: ObservedDexcomG7Message,
+    ) : Authenticated {
         override val glucose: UnavailableInput get() = UnavailableInput(InputKind.GLUCOSE, UnavailabilityReason.POLICY_NOT_APPROVED)
     }
 }
@@ -50,10 +61,10 @@ internal class DexcomG7Reception(policy: DexcomSenderTrustPolicy) {
         sender: DexcomSenderAuthenticationResult.Authenticated,
         readPayload: () -> DexcomExtrasRead,
     ): DexcomG7ReceptionOutcome = when (val read = readPayload()) {
-        DexcomExtrasRead.Unreadable -> DexcomG7ReceptionOutcome.PayloadUnreadable
+        DexcomExtrasRead.Unreadable -> DexcomG7ReceptionOutcome.PayloadUnreadable(sender)
         is DexcomExtrasRead.Read -> when (val parsed = DexcomG7PayloadParser.parse(read.payload, sender.packageName)) {
-            is DexcomG7ParseResult.Rejected -> DexcomG7ReceptionOutcome.PayloadRejected(parsed.rejection)
-            is DexcomG7ParseResult.Parsed -> DexcomG7ReceptionOutcome.Observed(parsed.message)
+            is DexcomG7ParseResult.Rejected -> DexcomG7ReceptionOutcome.PayloadRejected(sender, parsed.rejection)
+            is DexcomG7ParseResult.Parsed -> DexcomG7ReceptionOutcome.Observed(sender, parsed.message)
         }
     }
 }

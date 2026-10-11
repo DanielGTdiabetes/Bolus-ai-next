@@ -250,13 +250,29 @@ composición. JVM 12 pruebas nuevas; `DexcomBundleExtrasDeviceTest` (3) en la
 lista de instrumentación, pendiente de ejecutar en el Pixel. Véase
 docs/validation/dexcom-g7-reception-composition-2026-10-11.md.
 
-Los ADR 0014, 0015, 0017, 0018 y 0019 y la opción A del ADR 0016 están
+ADR 0020 — REGISTRO LOCAL DE OBSERVACIONES DEXCOM G7 (implementado)
+docs/adr/0020-dexcom-g7-observation-log.md, aceptado el 2026-10-11 con E1
+(lecturas y rechazos sin contenido), E2 (conflicto enlazado, nunca
+sobrescribir), E3 (huella SHA-256 del transmisor) y E4 (sin borrado; retención
+pendiente). E5 a E9 técnicas: rechazos del emisor no se guardan, duplicado =
+contenido idéntico a cualquier observación de la clave, prefijo de dominio en
+la huella, reloj inyectado solo para sellar, emisor autenticado (paquete,
+versión, firmantes) guardado con cada mensaje. `ObservationLog.kt` (común) y
+`glucose/dexcom/storage/` (Android, `dexcom-observations.db` v1 con triggers
+append-only, índice único parcial y trigger de conflicto). JVM 18 pruebas
+nuevas; `SqliteDexcomObservationStoreDeviceTest` (8) pendiente de ejecutar en
+el Pixel. Véase docs/validation/dexcom-g7-observation-log-2026-10-11.md.
+
+SIGUIENTE PASO
+Los ADR 0014, 0015, 0017, 0018, 0019 y 0020 y la opción A del ADR 0016 están
 implementados. No hay ningún incremento funcional ni clínico autorizado. El
-ADR 0019 ya compone autenticación, extras y parser sin receiver. Lo siguiente
-de la fase 5 es la persistencia local de mensajes observados (ADR propio:
-esquema, identidad, duplicados entre mensajes, retención) y, cuando el
-propietario archive la release reproducible, active el opt-in de identidad y
-apruebe las anclas, el receiver productivo.
+ADR 0019 y 0020 componen autenticación, extras, parser y registro local sin
+receiver. Antes del receiver productivo, el propietario debe ejecutar
+`verify.ps1 -DeviceTests` (pruebas de `Bundle` y SQLite pendientes), archivar
+la release reproducible, activar el opt-in de identidad y aprobar las anclas.
+Sin esas puertas, lo siguiente seguro es un ADR de presentación en solo
+lectura del registro en Diagnóstico, siempre marcado como no utilizable, o el
+ADR de retención (E4).
 Cualquier capacidad nueva necesita antes un ADR que defina su alcance y sus
 decisiones pendientes, y la aprobación explícita del propietario. Conectar el traductor con `ReadOverview`, el motor u
 otro consumidor exige su propio ADR. Siguen

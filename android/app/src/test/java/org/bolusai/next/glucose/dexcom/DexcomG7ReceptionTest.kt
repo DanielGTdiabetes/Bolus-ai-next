@@ -49,6 +49,7 @@ class DexcomG7ReceptionTest {
         assertEquals(1, reads)
         val observed = outcome as DexcomG7ReceptionOutcome.Observed
         assertEquals(PACKAGE, observed.message.authenticatedPackage)
+        assertEquals(authenticated(), observed.sender)
         assertEquals(1, observed.message.readings.size)
         assertEquals("input.glucose.policy_not_approved", outcome.glucose.code)
     }
@@ -60,6 +61,7 @@ class DexcomG7ReceptionTest {
         }
         assertEquals(
             DexcomG7ReceptionOutcome.PayloadRejected(
+                authenticated(),
                 DexcomG7PayloadRejection(DexcomG7RejectionCode.PACKAGE_CLAIM_MISMATCH, ObservedDexcomG7Contract.PACKAGE_NAME),
             ),
             outcome,
@@ -70,14 +72,14 @@ class DexcomG7ReceptionTest {
     @Test
     fun `unreadable and rejected payloads both block as parse failed`() {
         val unreadable = DexcomG7Reception(policy()).receive(Source()) { DexcomExtrasRead.Unreadable }
-        assertSame(DexcomG7ReceptionOutcome.PayloadUnreadable, unreadable)
+        assertEquals(DexcomG7ReceptionOutcome.PayloadUnreadable(authenticated()), unreadable)
         assertEquals(UnavailabilityReason.PARSE_FAILED, unreadable.glucose.reason)
 
         val rejected = DexcomG7Reception(policy()).receive(Source()) {
             DexcomExtrasRead.Read(DexcomG7Payload("synthetic.OTHER", emptyMap()))
         }
         assertEquals(
-            DexcomG7ReceptionOutcome.PayloadRejected(DexcomG7PayloadRejection(DexcomG7RejectionCode.WRONG_ACTION)),
+            DexcomG7ReceptionOutcome.PayloadRejected(authenticated(), DexcomG7PayloadRejection(DexcomG7RejectionCode.WRONG_ACTION)),
             rejected,
         )
         assertEquals(UnavailabilityReason.PARSE_FAILED, rejected.glucose.reason)
@@ -158,6 +160,7 @@ class DexcomG7ReceptionTest {
         const val UID = 12345
         val DIGEST = "a".repeat(64)
         fun policy() = DexcomSenderTrustPolicy.Approved(PACKAGE, listOf(DexcomSenderReleaseAnchor(42, setOf(DIGEST))))
+        fun authenticated() = DexcomSenderAuthenticationResult.Authenticated(PACKAGE, UID, 42, setOf(DIGEST))
         fun resolved(uid: Int = UID, version: Long = 42, digest: String = DIGEST) =
             SenderPackageResolution.Resolved(ResolvedAndroidPackageIdentity(PACKAGE, uid, version, setOf(digest)))
     }
