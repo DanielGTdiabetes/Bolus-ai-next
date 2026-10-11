@@ -3,7 +3,8 @@
 - ADR: [0023](../adr/0023-dexcom-existing-transport-trust.md), prerrequisito L1
 - Autorización: propietario, 2026-10-11. Solo lectura: sin cambiar permisos,
   instalaciones ni ajustes, y sin interrumpir Dexcom ni el sensor
-- Ejecución: Claude Code en el PC del propietario, con el Pixel por USB
+- Ejecución: Codex en el PC del propietario, con el Pixel por USB; evidencia
+  incorporada a este documento por Claude
 - Inicio UTC: 2026-10-11T17:15:01.9221054Z
 - Fin UTC: 2026-10-11T17:19:32.0037172Z
 - Ficheros locales, no versionados: `%LOCALAPPDATA%\BolusAiNext\dexcom-inventory\20261011T171501Z`
@@ -12,6 +13,16 @@
 
 Este documento registra lo observado. No aprueba anclas, conjunto, riesgos ni
 uso clínico.
+
+## Aclaración posterior del propietario — 2026-10-11
+
+`com.wtachtsugar` es su app del reloj para ver la glucosa de Dexcom G7. El
+propietario indica que también permite conectar directamente el sensor sin
+la app Dexcom y que está previsto que retransmita glucosa hacia Next. Esto
+aclara su función y la necesidad de conservar su permiso; no es una capacidad
+probada en este inventario ni aprueba anclas, riesgos o recepción de sus
+futuros mensajes. Esa integración requiere contrato y validación propios y
+no bloquea el hito actual de recepción con la Dexcom instalada.
 
 ## Alcance y comandos
 

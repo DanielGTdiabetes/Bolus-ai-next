@@ -146,11 +146,28 @@ declarante, otro propietario u otro nivel de protección bloquea.
 solicita el permiso (R2 del ADR 0022); al concedérselo (I-6) pasaría a ser el
 cuarto titular.
 
+**Función de `com.wtachtsugar`, confirmada por el propietario — 2026-10-11.**
+Es la app del reloj que utiliza para ver la glucosa de Dexcom G7. Según el
+propietario, también permite conectar el sensor directamente sin la app
+Dexcom, y está previsto que retransmita glucosa hacia Next. Su identidad y la
+necesidad de conservar el permiso quedan aclaradas; no tratarla como una app
+desconocida ni proponer retirarle el permiso para completar este hito.
+Estas capacidades proceden de la declaración del propietario, no de una
+prueba funcional del inventario. Incluirla en el conjunto propuesto no acepta
+los riesgos I-4 ni aprueba todavía L2 o la política.
+
+La futura retransmisión desde el reloj es una integración prevista, pendiente
+de contrato de payload, procedencia y validación. No atribuir sus mensajes a
+Dexcom por tener el permiso, ni asumir que implementa el transporte Dexcom
+observado. Puede existir un origen directo del sensor mediante la app del
+reloj; Next debe conservar esa distinción. Este trabajo futuro no bloquea el
+hito actual con la Dexcom instalada ni autoriza modificar la app del reloj.
+
 | Miembro propuesto | Paquete | UID | `versionCode` | SHA-256 del firmante | Ancla propuesta |
 |---|---|---|---|---|---|
 | Dexcom (productor) | `com.dexcom.g7` | 10451 | 4537 | `d30e0d3f08b70cedbc0804c96f2ec4599f243b5e149ef73a601757ad94c74145` | paquete, UID, versión y firmante exactos. Además declara el permiso |
 | Legacy | `org.bolusai.companion` | 10450 | 13 | `1d1f25bf2aadfd82956610084f3acbf06bb69225b0c4fb031df8eae24f4f6a8d` | paquete, UID, versión y firmante exactos |
-| `com.wtachtsugar` | `com.wtachtsugar` | 10350 | 3 | `1d1f25bf2aadfd82956610084f3acbf06bb69225b0c4fb031df8eae24f4f6a8d` | solo si el propietario confirma qué es y que debe tener el permiso (I-1) |
+| App del reloj | `com.wtachtsugar` | 10350 | 3 | `1d1f25bf2aadfd82956610084f3acbf06bb69225b0c4fb031df8eae24f4f6a8d` | identidad y necesidad del permiso confirmadas por el propietario; inclusión y anclas propuestas, pendientes de aprobar la política |
 | Next (receptor) | `org.bolusai.next` | el propio (`Process.myUid()`) | sin ancla | se registra, no se ancla | Next se identifica a sí mismo. Anclar su versión bloquearía cada actualización de Next sin aportar defensa: si otra app ocupara ese paquete, sería ella quien ejecuta la comprobación |
 
 El UID se ancla para detectar una desinstalación y reinstalación aunque
@@ -163,7 +180,7 @@ Recomendación en negrita. Ninguna se aplica sin respuesta.
 
 | ID | Pregunta | Opciones | Recomendación y motivo |
 |---|---|---|---|
-| I-1 | Conjunto aprobado de titulares | (a) Dexcom, Legacy, `com.wtachtsugar` y Next; (b) sin `com.wtachtsugar`, que el propietario le retire el permiso antes de activar la recepción y que Next bloquee mientras lo tenga; (c) no aprobar la política | **(a) si el propietario confirma que `com.wtachtsugar` es suyo y necesita el permiso; si no, (b)**. Dexcom sí es titular efectivo (L1), así que la política es aplicable. Retirar el permiso es una acción del propietario en su teléfono, nunca de Next ni del agente |
+| I-1 | Conjunto aprobado de titulares | (a) Dexcom, Legacy, app del reloj `com.wtachtsugar` y Next; (b) otro conjunto autorizado expresamente por el propietario; (c) no aprobar la política | **(a)**. El propietario ya ha identificado la app del reloj y su necesidad del permiso; no volver a pedir esa identificación ni proponer su retirada. La inclusión en la política sigue propuesta, pendiente de aprobación, y no acepta I-4 |
 | I-2 | Anclas y reglas de actualización | (a) los valores de la tabla anterior: toda actualización o reinstalación de Dexcom, Legacy o `com.wtachtsugar` bloquea hasta aprobar; Next sin ancla de versión; (b) para Legacy y `com.wtachtsugar`, aceptar versiones nuevas con el mismo firmante | **(a)**. La clave compartida hace que (b) deje pasar sin revisión cualquier app de ese firmante que reutilice un paquete aprobado. La fricción no tiene coste clínico: Next no calcula |
 | I-3 | Visibilidad de paquetes | (a) `QUERY_ALL_PACKAGES` si la prueba en el Pixel demuestra que sin él la enumeración es parcial; (b) solo `<queries>` | **Decidir tras la prueba**. Con (b) la comparación debe fallar cerrada si no puede demostrar cobertura |
 | I-4 | Riesgos residuales de la tabla anterior | Aceptarlos todos, aceptar algunos o rechazar la política | **Decisión exclusiva del propietario**. El agente no recomienda aceptar riesgos |

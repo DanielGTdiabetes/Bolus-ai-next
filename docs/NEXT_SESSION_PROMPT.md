@@ -35,6 +35,13 @@ L1 hecho el 2026-10-11 (docs/validation/dexcom-installed-inventory-2026-10-11.md
 Dexcom tiene el permiso concedido; titulares actuales Dexcom, Legacy y
 `com.wtachtsugar`; Legacy, Next y `com.wtachtsugar` comparten firmante. El ADR
 propone conjunto y anclas con esos valores; L2, I-1 e I-2 siguen sin aprobar.
+El propietario ya identificó `com.wtachtsugar`: es su app del reloj para ver
+glucosa Dexcom G7; también permite conexión directa al sensor sin Dexcom y
+está previsto que retransmita hacia Next. Conservar su permiso y proponerla
+como miembro del conjunto; no volver a pedir qué app es. La retransmisión
+futura requiere contrato y validación propios, sin bloquear el hito Dexcom
+actual ni atribuir al productor Dexcom los mensajes de la app del reloj.
+Esta aclaración no aprueba L2, I-4, uso clínico ni cambios en esa app.
 Siguiente paso: recoger respuestas, marcar el ADR como aceptado e implementar
 su plan en una sola entrega. Sin respuesta, no implementar ni presentar valores.
 
