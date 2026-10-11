@@ -284,4 +284,7 @@ public interface DexcomObservationStore {
     public fun record(input: ObservationInput): ObservationWrite
 
     public fun read(): ObservationRead
+
+    /** Aggregates in storage, without loading the history; must equal [ObservationSummary.of] over [read]. */
+    public fun summary(): ObservationSummaryRead
 }

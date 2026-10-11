@@ -630,6 +630,15 @@ duplicados contados, conflictos enlazados a la primera observación y fallo de
 escritura como `persistence_failed`. Sin receiver ni consumidor. Véase la
 [validación](validation/dexcom-g7-observation-log-2026-10-11.md).
 
+### Entrega de la vista del registro Dexcom en Diagnóstico — 2026-10-11
+
+Fase 5 (estado del trabajo 5) según el
+[ADR 0021](adr/0021-dexcom-log-diagnostics-view.md), con F1 y F2 del
+propietario: Diagnóstico lee el registro del ADR 0020 en cada entrada y
+muestra, plegados, solo recuentos, rechazos por código, última recepción y
+emisor. Nunca valores de glucosa. Leer no crea el fichero. Véase la
+[validación](validation/dexcom-log-diagnostics-2026-10-11.md).
+
 ### Secuencia de capacidades
 
 No intentar construir toda una fase en un solo cambio. Secuencia inicial:

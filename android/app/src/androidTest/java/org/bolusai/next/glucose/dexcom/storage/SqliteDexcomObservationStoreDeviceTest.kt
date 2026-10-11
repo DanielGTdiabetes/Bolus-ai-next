@@ -11,6 +11,8 @@ import org.bolusai.dexcomg7.ObservationFailure
 import org.bolusai.dexcomg7.ObservationIds
 import org.bolusai.dexcomg7.ObservationInput
 import org.bolusai.dexcomg7.ObservationRead
+import org.bolusai.dexcomg7.ObservationSummary
+import org.bolusai.dexcomg7.ObservationSummaryRead
 import org.bolusai.dexcomg7.ObservationWrite
 import org.bolusai.dexcomg7.ObservedDexcomG7Message
 import org.bolusai.dexcomg7.ObservedDexcomG7Reading
@@ -66,6 +68,22 @@ class SqliteDexcomObservationStoreDeviceTest {
             assertEquals(listOf("newField"), read.messages.first().unknownReadingFields)
             assertEquals(AndroidTransmitterHasher.fingerprint("SYNTH-TX"), read.readings.first().transmitter)
             assertEquals(listOf(sender, sender), read.messages.map { it.sender })
+        }
+    }
+
+    @Test fun storageSummaryEqualsTheReferenceWithoutLoadingTheHistory() {
+        // Codex review on PR #47: Diagnóstico aggregates in SQL; the result must equal ObservationSummary.of(read()).
+        store().use { s ->
+            assertEquals(ObservationSummaryRead.Loaded(ObservationSummary.of(loaded(s))), s.summary())
+            s.record(observed(reading(0, 10), reading(1, 20)))
+            s.record(observed(reading(0, 10), reading(1, 20, value = 99)))
+            s.record(ObservationInput.PayloadRejected(7, sender, DexcomG7PayloadRejection(DexcomG7RejectionCode.WRONG_TYPE)))
+            s.record(ObservationInput.PayloadUnreadable(8, sender))
+            val summary = (s.summary() as ObservationSummaryRead.Loaded).summary
+            assertEquals(ObservationSummary.of(loaded(s)), summary)
+            assertEquals(4, summary.messages)
+            assertEquals(1, summary.conflicts)
+            assertEquals(mapOf("dexcom_g7.payload.wrong_type" to 1), summary.rejectedByCode)
         }
     }
 
@@ -146,7 +164,10 @@ class SqliteDexcomObservationStoreDeviceTest {
                 "VALUES ('raw', 1, 'payload_rejected', " +
                 "'modified-dexcom-g7-broadcast-observed-v1', 'dexcom_g7.payload.invented', 0, 0, 0, 0, '', '', 0, 'example.sender', 42, '" + "a".repeat(64) + "')")
         }
-        store().use { s -> assertEquals(ObservationRead.Failed(ObservationFailure.CORRUPT_STORAGE), s.read()) }
+        store().use { s ->
+            assertEquals(ObservationRead.Failed(ObservationFailure.CORRUPT_STORAGE), s.read())
+            assertEquals(ObservationSummaryRead.Failed(ObservationFailure.CORRUPT_STORAGE), s.summary())
+        }
     }
 
     @Test fun anAlteredSchemaIsRejectedWithoutTouchingTheFile() {
