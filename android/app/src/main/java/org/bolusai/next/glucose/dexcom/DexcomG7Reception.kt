@@ -1,6 +1,7 @@
 package org.bolusai.next.glucose.dexcom
 
 import org.bolusai.dexcomg7.DexcomG7ParseResult
+import org.bolusai.dexcomg7.DexcomG7Payload
 import org.bolusai.dexcomg7.DexcomG7PayloadParser
 import org.bolusai.dexcomg7.DexcomG7PayloadRejection
 import org.bolusai.dexcomg7.ObservedDexcomG7Message
@@ -46,9 +47,13 @@ internal sealed interface DexcomG7ReceptionOutcome {
 /**
  * Authenticate → read extras → parse, in that order and synchronously inside onReceive (ADR 0019). [readPayload]
  * runs at most once and only after the sender is authenticated; the parser receives the authenticated package.
- * Nothing is stored, shown or sent. Unexpected defects propagate unchanged.
+ * Nothing is stored, shown or sent. Unexpected defects propagate unchanged. [parse] is the structural parser; the
+ * receiver intake wraps it so that its defects are reported as the parser stage (ADR 0022, R11).
  */
-internal class DexcomG7Reception(policy: DexcomSenderTrustPolicy) {
+internal class DexcomG7Reception(
+    policy: DexcomSenderTrustPolicy,
+    private val parse: (DexcomG7Payload, String) -> DexcomG7ParseResult = DexcomG7PayloadParser::parse,
+) {
     private val ingress = DexcomAuthenticatedIngress(policy)
 
     fun receive(source: DexcomSenderEvidenceSource, readPayload: () -> DexcomExtrasRead): DexcomG7ReceptionOutcome =
@@ -62,7 +67,7 @@ internal class DexcomG7Reception(policy: DexcomSenderTrustPolicy) {
         readPayload: () -> DexcomExtrasRead,
     ): DexcomG7ReceptionOutcome = when (val read = readPayload()) {
         DexcomExtrasRead.Unreadable -> DexcomG7ReceptionOutcome.PayloadUnreadable(sender)
-        is DexcomExtrasRead.Read -> when (val parsed = DexcomG7PayloadParser.parse(read.payload, sender.packageName)) {
+        is DexcomExtrasRead.Read -> when (val parsed = parse(read.payload, sender.packageName)) {
             is DexcomG7ParseResult.Rejected -> DexcomG7ReceptionOutcome.PayloadRejected(sender, parsed.rejection)
             is DexcomG7ParseResult.Parsed -> DexcomG7ReceptionOutcome.Observed(sender, parsed.message)
         }

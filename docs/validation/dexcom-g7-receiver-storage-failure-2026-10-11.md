@@ -109,4 +109,5 @@ ADR 0022 no necesitan una comprobación nueva, porque las pruebas JVM, que
   almacenamiento.
 - `DexcomG7Intake.accept` corre en el hilo principal y deja propagar defectos
   inesperados de autenticación o parser (ADR 0019). No forma parte de este
-  cambio.
+  cambio. Lo resuelve R11: véase
+  [dexcom-g7-receiver-intake-failure-2026-10-11.md](dexcom-g7-receiver-intake-failure-2026-10-11.md).
