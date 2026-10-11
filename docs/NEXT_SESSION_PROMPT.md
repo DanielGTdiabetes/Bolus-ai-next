@@ -23,6 +23,11 @@ protegido por permiso, conjunto exacto de titulares y anclas de la APK instalada
 Es un borrador para decisión del propietario: visibilidad completa, ventana
 temporal, apps aprobadas que falsifiquen y emisores privilegiados limitan la
 garantía. No atribuye mensajes a Dexcom ni autoriza implementar o calcular.
+Es la propuesta única del hito: parte I, recepción técnica (L1 y L2 de solo
+lectura, I-1 a I-8; I-4 es la aceptación de riesgos), y parte II, presentación
+y validez clínica (B1 a B5, C1 a C7, D1, D2; B4, C5 y D1 son del propietario).
+Siguiente paso: recoger respuestas, marcar el ADR como aceptado e implementar
+su plan en una sola entrega. Sin respuesta, no implementar ni presentar valores.
 
 La PR #53 (ADR 0022 R11) ya está integrada en `origin/main` mediante
 `740af25`; no reabrir su trabajo como un paso pendiente. Comprobar el CI del
@@ -30,13 +35,6 @@ SHA integrado al continuar. Priorizar ahora una entrega completa de
 recepción local Dexcom y presentación offline con cálculo bloqueado, reuniendo
 las decisiones pendientes en una sola propuesta. No encadenar nuevas PR de
 diagnóstico o endurecimiento sin un hallazgo o riesgo concreto.
-
-La propuesta única está en docs/adr/0023-dexcom-g7-real-reception-and-presentation.md
-(propuesta, 2026-10-11): prerrequisitos P1 a P3 del productor (release
-reproducible, opt-in de identidad, anclas) y decisiones A1 a D2 con
-recomendación. B4 y C5 son clínicas. Siguiente paso: recoger las respuestas
-del propietario, marcar el ADR como aceptado e implementar su plan en una sola
-entrega. Sin respuesta, no implementar presentación de valores.
 
 El detalle que sigue conserva antecedentes de entregas; el estado de integración
 se comprueba en GitHub y origin/main, no se deduce de esos antecedentes.

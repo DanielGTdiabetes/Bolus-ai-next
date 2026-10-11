@@ -755,10 +755,10 @@ este ajuste. No queda pendiente de fusión; comprobar el CI del SHA integrado.
    exportación y refinamientos visuales quedan fuera de la ruta inmediata salvo
    que sean necesarios para un riesgo concreto o los priorice el propietario.
 
-La propuesta única pedida en el punto 1 es el
-[ADR 0023](adr/0023-dexcom-g7-real-reception-and-presentation.md), en estado
-propuesto: prerrequisitos P1 a P3 del productor y decisiones A1 a D2. La
-implementación empieza cuando el propietario responda.
+El ADR 0023 es la propuesta única del hito, en estado propuesto: parte I
+(recepción técnica por permiso y conjunto aprobado: L1, L2 e I-1 a I-8) y
+parte II (presentación y validez clínica: B1 a D2). La implementación empieza
+cuando el propietario responda.
 
 La recepción y presentación con Dexcom real conservan las puertas de los ADR
 vigentes que no contradigan el alcance Dexcom confirmado arriba. Revisar la
@@ -768,6 +768,9 @@ timestamps, vigencia ni uso clínico.
 La validación offline debe preservar la recepción del sensor: según la decisión
 registrada en el ADR 0022, no activar el modo avión que corta su Bluetooth;
 documentar y probar la ausencia de dependencia de Internet sin interrumpirlo.
+La decisión D1 del ADR 0023 propone al propietario elegir entre modo avión con
+Bluetooth reactivado (AGENTS.md §9) y red desactivada con Bluetooth intacto;
+hasta que decida, rige la regla anterior.
 
 ## 7. Comandos iniciales para Codex
 

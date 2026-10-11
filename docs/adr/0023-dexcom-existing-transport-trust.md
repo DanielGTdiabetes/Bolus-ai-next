@@ -1,11 +1,26 @@
-# ADR 0023: recepción Dexcom por permiso y conjunto aprobado de aplicaciones
+# ADR 0023: recepción Dexcom por permiso y conjunto aprobado, y presentación local de la última lectura
 
-- Estado: propuesto; pendiente de decisión y aceptación de riesgos del propietario
+- Estado: propuesto. Propuesta única del primer hito Android (Fase 5). Nada de
+  este documento está aprobado ni aceptado: ni la política de recepción, ni sus
+  riesgos residuales, ni las decisiones de presentación
 - Fecha: 2026-10-11
-- Fase: 5, recepción local compatible con el productor instalado
+- Fase: 5, recepción local compatible con el productor instalado y presentación
+  sin cálculo
 - Responsable de decisión: propietario
-- Evidencia clínica: no aplica a la propuesta técnica; no habilita cálculo
-- Alcance de esta entrega: documentación, sin cambios de código ni del teléfono
+- Evidencia clínica: la parte I no aplica (no habilita cálculo). La parte II
+  muestra por primera vez un valor de glucosa al usuario y contiene decisiones
+  clínicas pendientes (B4 y C5)
+- Alcance de esta entrega: documentación, sin cambios de código, del teléfono,
+  de Dexcom ni de Legacy
+
+Este ADR unifica dos borradores del 2026-10-11: la evaluación de recepción por
+permiso de la PR #55 y la propuesta de presentación de la rama
+`claude/bold-cannon-yy4lvm`. Separa dos preguntas que no se aprueban juntas:
+
+- **Parte I — recepción técnica:** qué mensajes deja entrar Next al registro
+  local y qué garantía real ofrece esa barrera.
+- **Parte II — presentación y validez clínica:** cómo se interpreta y se muestra
+  lo registrado. Aceptar la parte I no aprueba nada de la parte II.
 
 ## Contexto
 
@@ -17,12 +32,28 @@ ADR; los detalles del productor remiten al
 [contrato observado](../contracts/modified-dexcom-g7-broadcast-observed-v1.md).
 
 La política implementada en Next exige identidad compartida por Android, que
-el envío observado no proporciona. El propietario pide evaluar conjuntamente
-permiso obligatorio para el emisor, conjunto exacto de titulares aprobado y
-anclas de versión/firmantes de la Dexcom instalada. No ha aceptado todavía los
-riesgos ni autorizado implementar esta política.
+el envío observado no proporciona. Por eso **no existe ninguna obligación de
+activar `setShareIdentityEnabled(true)`, ni de recompilar, archivar como
+release reproducible o reinstalar Dexcom**. La ruta estricta implementada
+(ADR 0005, 0006, 0019 y 0022) se conserva como está, con `Pending`, y sus
+pruebas siguen vigentes; esta propuesta añade una política distinta y no la
+presenta como autenticación por mensaje.
 
-## Propuesta y garantías exactas
+Desde los ADR 0018 a 0022, Next ya parsea el payload observado y guarda
+observaciones en `dexcom-observations.db`, con el receiver desactivado (R1),
+sin permiso del productor (R2) y con política `Pending`. Ninguna pantalla
+presenta glucosa y `ReadOverview` devuelve `input.glucose.policy_not_approved`.
+
+## Prerrequisitos del propietario (solo lectura)
+
+| ID | Acción | Bloquea |
+|---|---|---|
+| L1 | Autorizar una lectura de solo lectura en el teléfono (`dumpsys package`, `pm list packages`, `apksigner verify --print-certs` sobre una copia de la APK) para obtener paquete, `versionCode`, firmantes y titulares efectivos de `com.dexcom.cgm.EXTERNAL_PERMISSION`, y el propietario y nivel del permiso. Sin cambiar permisos, instalaciones ni ajustes | anclas (I-2) y conjunto (I-1) |
+| L2 | Revisar los valores obtenidos y aprobarlos como anclas de la instalación actual. El hash histórico del contrato (`6746ac78…`) no se importa como ancla aprobada | política `Approved` de la parte I |
+
+## Parte I — Recepción técnica
+
+### Propuesta y garantías exactas
 
 1. Declarar en el receiver de Next
    `android:permission="com.dexcom.cgm.EXTERNAL_PERMISSION"`. Para emisores
@@ -37,8 +68,7 @@ riesgos ni autorizado implementar esta política.
    esta combinación no permite recibir del productor y se debe revisar en Next.
 3. Comprobar en esa lectura `com.dexcom.g7`, su `versionCode` exacto y el conjunto
    completo de firmantes actuales contra las anclas aprobadas. Verificar también
-   propietario y definición del permiso. No importar el hash histórico del
-   contrato como una ancla aprobada de la instalación actual.
+   propietario y definición del permiso.
 4. El conjunto candidato es Dexcom, Legacy y Next según sus concesiones reales;
    no es aún una lista aprobada. Fijar sus identidades, no solo nombres de
    paquete: se recomienda anclar también firmantes de Legacy y Next y declarar
@@ -83,7 +113,7 @@ puede detectar cambios, sin convertir la operación en atómica. Comprobar tambi
 al iniciar y al abrir Diagnóstico permite mostrar cambios sin mensajes nuevos;
 no se promete detección instantánea de cada concesión o revocación.
 
-## Riesgos residuales para decisión del propietario
+### Riesgos residuales para decisión del propietario
 
 | Riesgo | Garantía que no ofrece esta combinación |
 |---|---|
@@ -94,27 +124,112 @@ no se promete detección instantánea de cada concesión o revocación.
 | Enumeración incompleta o UID/perfil ambiguo | Un resultado parcial no demuestra cierre del conjunto; bloquear, no aceptarlo como una lista completa |
 | Cambio detectado sin un mensaje nuevo | El estado visible se actualiza al ejecutar comprobaciones; no hay garantía de vigilancia continua ni de aviso de mensajes que Android descarta antes de invocar Next |
 
-Ninguno de estos riesgos queda aceptado por este borrador. Aceptar recepción
-técnica tampoco aprueba unidad, timestamps, vigencia, tendencia, datos para
-calcular, registro de tratamiento ni autoridad de Next.
+Ninguno de estos riesgos queda aceptado por este borrador.
 
-## Implementación posterior y pruebas de aceptación
+### Decisiones solicitadas de la parte I
 
-Si el propietario aprueba la política, implementar y probar el recorrido como
-una entrega funcional. Usar un tipo de evidencia distinto al `Authenticated`
-por identidad del emisor: no fabricar UID/paquete ni pasar Dexcom configurado
-como `authenticatedPackage` para satisfacer el parser actual. Mantener la
-afirmación de paquete del payload como no verificada. Adaptar parser, composición
-y procedencia persistida para conservar esa diferencia, con migración si el
-esquema la necesita; no reetiquetar mensajes históricos. Las lecturas siguen
-`NOT_APPROVED_FOR_USE` y cálculo/tratamiento permanecen bloqueados.
+Recomendación en negrita. Ninguna se aplica sin respuesta.
 
-Pruebas requeridas para esa implementación, todavía no ejecutadas:
+| ID | Pregunta | Opciones | Recomendación y motivo |
+|---|---|---|---|
+| I-1 | Conjunto aprobado de titulares | Dexcom, Legacy y Next según L1; otro conjunto | **El que muestre L1**, revisado miembro a miembro. Si Dexcom no aparece como titular efectivo, la política no sirve y se vuelve a este ADR |
+| I-2 | Anclas y reglas de actualización | (a) paquete, `versionCode` y firmantes de Dexcom, Legacy y Next; toda actualización de cualquiera genera bloqueo durable hasta aprobar; (b) anclar solo firmantes de Legacy y Next y aceptar sus versiones nuevas | **(a)**. Más fricción al actualizar, pero ningún cambio entra sin revisión. (b) es aceptable para Next si el propietario lo prefiere |
+| I-3 | Visibilidad de paquetes | (a) `QUERY_ALL_PACKAGES` si la prueba en el Pixel demuestra que sin él la enumeración es parcial; (b) solo `<queries>` | **Decidir tras la prueba**. Con (b) la comparación debe fallar cerrada si no puede demostrar cobertura |
+| I-4 | Riesgos residuales de la tabla anterior | Aceptarlos todos, aceptar algunos o rechazar la política | **Decisión exclusiva del propietario**. El agente no recomienda aceptar riesgos |
+| I-5 | Dónde viven las anclas aprobadas | (a) constante en código de producción revisada por PR y comprobada por `verify.ps1` contra una tabla del contrato; (b) propiedad de Gradle local | **(a)**. Paquetes, versiones y digests no son secretos y quedan trazados por commit |
+| I-6 | Concesión del permiso a Next (nivel `dangerous`) | (a) solicitud en tiempo de ejecución con un botón explícito y estado visible; (b) `adb shell pm grant` solo durante la validación | **(b) durante la validación y (a) al cerrar el hito**. Sin permiso, la UI muestra la causa y nunca «sin lecturas» |
+| I-7 | Interruptor del receiver (R1 del ADR 0022) | (a) mantener activación por `adb` hasta terminar la validación real; (b) activado por defecto en cuanto haya política aprobada | **(a)**. El paso a (b) se propone en el informe de validación |
+| I-8 | Convivencia con Legacy | Next solo recibe y registra en local, sin sync ni tratamientos; Legacy conserva la autoridad | **Confirmar**. No requiere código ni cambia nada en Legacy (AGENTS.md §2 y §7) |
+
+## Parte II — Presentación y validez clínica (pendiente de aprobación)
+
+Estas decisiones solo se aplican a mensajes que superen la parte I. Ninguna
+habilita cálculo, IOB, tratamiento ni sync, y aceptar la parte I no las
+aprueba. Mientras no se respondan, Next no presenta valores de glucosa.
+
+### Interpretación del dato
+
+| ID | Pregunta | Opciones | Recomendación y motivo |
+|---|---|---|---|
+| B1 | Semántica de `timestamp` | (a) epoch UTC en segundos (el productor divide un valor interno entre 1000), aceptada solo tras comprobar en la validación real que la diferencia con la recepción es coherente; (b) no interpretarlo y mostrar solo la hora de recepción | **(a) con verificación**. Hasta superar la validación se presenta la hora de recepción, etiquetada como tal, y la hora de medida como «no verificada». El informe registra diferencias observadas, sin fijar umbrales clínicos |
+| B2 | `egvTxTime` | (a) conservar sin interpretar; (b) investigar semántica | **(a)**. No se presenta ni se usa |
+| B3 | Unidad de `glucoseValue` | (a) mg/dL como afirmación versionada del productor (especificación `06f25370…`); (b) unidad desconocida y no mostrar valor | **(a)**, mostrando siempre «mg/dL». **Sin conversión** a mmol/L aunque el perfil esté en mmol/L: convertir es una regla pendiente |
+| B4 | **Clínica** — valores extremos (D4 del ADR 0018 no aplica rango) | (a) mostrar el entero recibido con el estado «no aprobada para uso»; (b) no mostrar valores fuera de `1..400` y presentar «valor fuera del intervalo emitido por el productor» | **Decisión del propietario**. (b) usa un literal observado del productor como filtro de presentación, no como rango clínico; (a) no inventa nada pero puede enseñar un número sin sentido |
+| B5 | Tendencia `trendArrow` | (a) no mostrarla en la vista principal y conservar el nombre literal en detalles; (b) traducirla a flechas | **(a)**. Su significado no está contratado |
+
+### Qué se presenta y dónde
+
+| ID | Pregunta | Opciones | Recomendación y motivo |
+|---|---|---|---|
+| C1 | Pantallas | (a) Inicio y Bolo, solo lectura; (b) solo Inicio | **(a)**. Bolo sigue con el cálculo bloqueado. Diagnóstico mantiene F1 (solo recuentos) |
+| C2 | Lectura a mostrar | (a) la de mayor `timestamp` del productor entre todas las observaciones; (b) la última recibida | **(a)**, porque el backfill puede llegar después. Si ese `timestamp` tiene un conflicto registrado (E2), se muestra «conflicto» sin valor |
+| C3 | Cambio de transmisor | (a) C2 abarca todos los transmisores y la huella abreviada aparece en detalles; (b) solo el último transmisor visto | **(a)**. No hay contrato de estabilidad de `transmitterId` |
+| C4 | Timestamp futuro | (a) cualquier `timestamp` posterior al instante de recepción del mismo mensaje es anomalía `future_timestamp`, sin valor ni antigüedad; (b) tolerancia de segundos | **(a)**. Emisor y receptor comparten reloj y el productor trunca a segundos. Se compara en segundos sin redondear a favor |
+| C5 | **Clínica** — vigencia | (a) mostrar la antigüedad («hace N min», reloj inyectado) con el estado «vigencia sin política aprobada»; nunca «actual»; (b) aprobar un umbral (la auditoría documentada de Legacy en `f5417721…`, no revalidada aquí, observa 10 min al resolver la fuente y 15 min para marcar histórico) | **(a)** en este hito. Con (a) el criterio de la fase se cumpliría como «lectura local presentada con metadatos correctos y vigencia explícitamente no aprobada» |
+| C6 | Estados sin lectura | Receiver desactivado, permiso de Next ausente, política pendiente, bloqueo por cambio del conjunto o de anclas (parte I, punto 5), ninguna lectura registrada, registro ilegible, último mensaje rechazado | **Adoptar** esos siete estados con códigos estables `dexcom_presentation.*`. Nunca un valor anterior presentado como nuevo |
+| C7 | Contador duradero de fallos del receiver (pendiente de R10/R11) | (a) no ahora; (b) añadirlo | **(a)**. No es necesario para el hito |
+
+La procedencia mostrada dice «recibida mediante permiso de un emisor del
+conjunto aprobado», nunca «enviada por Dexcom».
+
+### Validación
+
+| ID | Pregunta | Opciones | Recomendación |
+|---|---|---|---|
+| D1 | Prueba sin red | (a) modo avión con Bluetooth reactivado manualmente, comprobando antes que el sensor sigue entregando lecturas; (b) Wi-Fi y datos apagados con Bluetooth intacto, comprobando con `dumpsys connectivity` que no hay red validada | **Decisión del propietario**. AGENTS.md §9 pide prueba en modo avión y la revisión de Codex en la PR #55 señala que Android permite reactivar el Bluetooth en ese modo. El ADR 0022 descartó el modo avión porque corta el sensor. (a) cumple la letra de AGENTS.md si la reconexión no interrumpe la recepción; (b) evita ese riesgo. En ambos casos se repite tras reiniciar el teléfono |
+| D2 | Datos en la evidencia | Recuentos, diferencias de tiempo y códigos; nunca valores de glucosa ni `transmitterId` en claro | **Adoptar** |
+
+## Documentos afectados al aceptar
+
+Estas puertas siguen vigentes hasta que el propietario acepte este ADR. Al
+aceptarlo, la entrega las actualiza para distinguir la ruta estricta (que se
+conserva) de la política por permiso:
+
+- `README.md` (estado: «hasta fijar una release reproducible, autenticar el emisor»);
+- `docs/contracts/android-local-glucose-boundary-v1.md` y
+  `docs/adr/0003-android-local-glucose-boundary.md` (puertas de identidad);
+- `docs/adr/0019-dexcom-g7-reception-composition.md` (pendientes de release y opt-in);
+- `docs/safety/INITIAL_RISK_REGISTER.md`, R-010 (pasa a describir la
+  garantía condicionada y los riesgos aceptados o rechazados en I-4);
+- `docs/contracts/modified-dexcom-g7-broadcast-observed-v1.md` (lista de
+  pruebas de la ruta estricta frente a las de la política por permiso).
+
+## Plan de implementación tras aprobar
+
+Una entrega funcional, con sus pruebas en cada paso:
+
+1. **Evidencia por permiso.** Un tipo distinto de `Authenticated`: no fabricar
+   UID/paquete ni pasar Dexcom configurado como `authenticatedPackage` para
+   satisfacer el parser. La afirmación de paquete del payload queda como no
+   verificada. Adaptar parser, composición y procedencia persistida, con
+   migración de `dexcom-observations.db` si el esquema la necesita; no
+   reetiquetar mensajes históricos.
+2. **Comprobación del conjunto y bloqueo durable** (parte I, puntos 2 a 5).
+3. **Manifiesto:** permiso del receiver, `uses-permission` y, si I-3 lo exige,
+   visibilidad. Actualizar las comprobaciones de `verify.ps1` que fijan el
+   manifiesto y `Pending`, sin rebajar ninguna otra.
+4. **Contrato del transporte v2** con B1 a B5.
+5. **Caso de uso común puro** `PresentLatestDexcomReading(log, clock)` con C2 a
+   C6, lectura de solo lectura del registro y modelo Android fuera del hilo
+   principal.
+6. **UI** en Inicio y Bolo. `ReadOverview`, el motor y
+   `LocalGlucoseSourceResult` siguen sin glucosa disponible: `verify.ps1`
+   seguirá exigiendo que no dependan del registro ni de la presentación.
+7. **Validación real** según D1 y D2.
+
+Rollback: receiver desactivado y política pendiente, sin borrar observaciones.
+iOS no consume este broadcast: conserva el puerto compartido y requiere otra
+integración de origen.
+
+## Pruebas de aceptación (propuestas, no ejecutadas)
+
+Recepción por permiso:
 
 - Fixture sin permiso: Android no entrega, incluso con acción/extras copiados;
   fixture con permiso: entrega sin identity sharing.
-- Conjunto exacto y anclas coincidentes; titular adicional, ausente, firma o
-  versión cambiada y definición/propietario de permiso incorrectos: bloqueo.
+- Conjunto exacto y anclas coincidentes: se acepta. Titular adicional, ausente,
+  firma o versión cambiada y definición/propietario de permiso incorrectos:
+  bloqueo antes de leer extras.
 - App sintética oculta que adquiere el permiso, usuario/perfil y UID compartido:
   demostrar cobertura o bloqueo por imposibilidad de comprobarla.
 - Cambio entre comprobaciones y concesión/envío/revocación transitorios:
@@ -126,23 +241,36 @@ Pruebas requeridas para esa implementación, todavía no ejecutadas:
   rechazado; estado visible con causa específica.
 - Ruta `adb`/shell en entorno aislado y permiso empaquetado del receiver;
   no obtener root ni modificar permisos de Dexcom/Legacy para probarlos.
-- Procedencia sin identidad atribuida, duplicados, conflictos y persistencia
-  offline; ausencia de uso clínico en todos los estados. No cortar Bluetooth.
+- Las pruebas de la ruta estricta existente siguen pasando sin cambios.
 
-La implementación debe actualizar las comprobaciones específicas de
-`verify.ps1` que fijan el manifiesto y `Pending`, manteniendo protecciones y
-pruebas; este borrador no modifica ni desactiva ninguna. Rollback: receiver
-desactivado y política pendiente, sin borrar observaciones. iOS no consume este
-broadcast: conserva el puerto compartido y requiere otra integración de origen.
+Presentación:
+
+- Sin lecturas, conflicto, timestamp futuro, reordenación y backfill, varios
+  transmisores, duplicados, antigüedad con reloj inyectado y registro ilegible.
+- Cada estado de C6 visible con su causa; ningún valor antiguo presentado como
+  nuevo.
+- Ausencia de uso clínico en todos los estados: el motor y `ReadOverview` no
+  reciben glucosa.
+- Recepción y presentación offline tras reinicio según D1, sin cortar la
+  recepción del sensor.
+
+## Alternativas consideradas
+
+- **Pedir identity sharing al productor.** Descartada por el propietario:
+  Dexcom no se modifica, recompila ni reinstala.
+- **Confiar en el extra `packageName`.** Descartada: es controlable por
+  cualquier emisor.
+- **Implementar la presentación con supuestos y aprobar después.** Descartada:
+  unidad, timestamp y vigencia son lo que AGENTS.md §3 prohíbe suponer.
+- **Dexcom Web API mientras tanto.** Fuera de alcance: contingencia con
+  retraso, no cumple el hito local.
 
 ## Decisiones pendientes
 
-El propietario debe decidir conjuntamente el conjunto real y sus anclas/reglas
-de actualización, el ámbito y mecanismo de visibilidad y la aceptación explícita
-de los riesgos anteriores. La evidencia en dispositivo de concesiones y versión
-queda pendiente de lectura autorizada. No se sustituye ninguna de estas
-decisiones por una suposición. Hasta aprobar e implementar la entrega, continúa
-el receiver desactivado, política `Pending` y ningún tratamiento desde Next.
+Parte I: L1, L2 e I-1 a I-8, con I-4 como aceptación explícita de riesgos.
+Parte II: B1 a B5, C1 a C7, D1 y D2, con B4, C5 y D1 reservadas al propietario.
+Hasta aprobar e implementar la entrega, el receiver sigue desactivado, la
+política en `Pending` y no hay tratamiento ni cálculo desde Next.
 
 ## Fuentes y condiciones para revisar
 
@@ -156,5 +284,6 @@ de la compilación del teléfono:
 - [S5: AOSP, excepciones de checkComponentPermission](https://android.googlesource.com/platform/frameworks/base/+/f8754ac2127f8adf40bd4731f39b16340acdb2f7/core/java/android/app/ActivityManager.java).
 
 Revisar ante cambio de Android/OEM, usuario/perfil, permiso, miembros o anclas,
-transporte, garantía observada en pruebas o propuesta de uso clínico. Resolver
-hallazgos en este ADR y su entrega; no convertirlos en cambios de Dexcom.
+transporte, garantía observada en pruebas, evidencia de la validación real que
+contradiga B1, B3 o C4, o propuesta de uso clínico. Resolver hallazgos en este
+ADR y su entrega; no convertirlos en cambios de Dexcom.
