@@ -310,7 +310,9 @@ sin Internet.
    futuro e invalidez/caducidad según política aprobada.
 5. Mostrar valor, unidad, origen, hora, antigüedad y estado; no insinuar vigencia
    cuando no pueda determinarse.
-6. Ejecutar pruebas en modo avión y tras reinicio.
+6. Ejecutar pruebas sin Internet y tras reinicio con Wi-Fi y datos móviles
+   apagados y Bluetooth activo, sin activar modo avión (decisión D1 del
+   propietario en ADR 0023), preservando la conexión del sensor G7.
 
 **Criterios de aceptación:**
 
@@ -768,9 +770,10 @@ timestamps, vigencia ni uso clínico.
 La validación offline debe preservar la recepción del sensor: según la decisión
 registrada en el ADR 0022, no activar el modo avión que corta su Bluetooth;
 documentar y probar la ausencia de dependencia de Internet sin interrumpirlo.
-La decisión D1 del ADR 0023 propone al propietario elegir entre modo avión con
-Bluetooth reactivado (AGENTS.md §9) y red desactivada con Bluetooth intacto;
-hasta que decida, rige la regla anterior.
+La decisión D1 del ADR 0023 queda resuelta por el propietario el 2026-10-11:
+Wi-Fi y datos móviles apagados, Bluetooth activo y sin activar modo avión.
+Comprobar ausencia de red validada y continuidad de recepción del sensor,
+también tras reinicio. Esta decisión no acepta el resto del ADR.
 
 ## 7. Comandos iniciales para Codex
 

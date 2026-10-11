@@ -25,7 +25,12 @@ temporal, apps aprobadas que falsifiquen y emisores privilegiados limitan la
 garantía. No atribuye mensajes a Dexcom ni autoriza implementar o calcular.
 Es la propuesta única del hito: parte I, recepción técnica (L1 y L2 de solo
 lectura, I-1 a I-8; I-4 es la aceptación de riesgos), y parte II, presentación
-y validez clínica (B1 a B5, C1 a C7, D1, D2; B4, C5 y D1 son del propietario).
+y validez clínica (B1 a B5, C1 a C7, D2; B4 y C5 son del propietario).
+D1 ya está decidida por el propietario el 2026-10-11: prueba sin Internet con
+Wi-Fi y datos móviles apagados, Bluetooth activo y sin activar modo avión,
+para no desconectar el sensor G7. Comprobar continuidad de recepción y ausencia
+de red validada, también tras reinicio. No volver a pedir esta decisión;
+no implica aceptación de riesgos ni aprobación del resto del ADR.
 Siguiente paso: recoger respuestas, marcar el ADR como aceptado e implementar
 su plan en una sola entrega. Sin respuesta, no implementar ni presentar valores.
 

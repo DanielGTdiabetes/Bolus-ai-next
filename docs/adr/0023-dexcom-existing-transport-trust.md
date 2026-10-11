@@ -1,8 +1,8 @@
 # ADR 0023: recepción Dexcom por permiso y conjunto aprobado, y presentación local de la última lectura
 
-- Estado: propuesto. Propuesta única del primer hito Android (Fase 5). Nada de
-  este documento está aprobado ni aceptado: ni la política de recepción, ni sus
-  riesgos residuales, ni las decisiones de presentación
+- Estado: propuesto. Propuesta única del primer hito Android (Fase 5). Solo D1
+  está decidida por el propietario (2026-10-11). Siguen pendientes la política
+  de recepción, sus riesgos residuales y las decisiones de presentación
 - Fecha: 2026-10-11
 - Fase: 5, recepción local compatible con el productor instalado y presentación
   sin cálculo
@@ -176,7 +176,7 @@ conjunto aprobado», nunca «enviada por Dexcom».
 
 | ID | Pregunta | Opciones | Recomendación |
 |---|---|---|---|
-| D1 | Prueba sin red | (a) modo avión con Bluetooth reactivado manualmente, comprobando antes que el sensor sigue entregando lecturas; (b) Wi-Fi y datos apagados con Bluetooth intacto, comprobando con `dumpsys connectivity` que no hay red validada | **Decisión del propietario**. AGENTS.md §9 pide prueba en modo avión y la revisión de Codex en la PR #55 señala que Android permite reactivar el Bluetooth en ese modo. El ADR 0022 descartó el modo avión porque corta el sensor. (a) cumple la letra de AGENTS.md si la reconexión no interrumpe la recepción; (b) evita ese riesgo. En ambos casos se repite tras reiniciar el teléfono |
+| D1 | Prueba sin red | Wi-Fi y datos móviles apagados, Bluetooth activo y sin activar modo avión; comprobar con `dumpsys connectivity` que no hay red validada y que el sensor sigue entregando lecturas. Repetir tras reiniciar y comprobar de nuevo esos estados | **Decidida por el propietario — 2026-10-11**. Indica que activar modo avión desconecta Bluetooth y el sensor G7 de Dexcom. No interrumpir esa conexión para realizar la prueba. Se registra la excepción específica en AGENTS.md §9; se mantiene la validación offline |
 | D2 | Datos en la evidencia | Recuentos, diferencias de tiempo y códigos; nunca valores de glucosa ni `transmitterId` en claro | **Adoptar** |
 
 ## Documentos afectados al aceptar
@@ -274,7 +274,9 @@ Presentación:
 ## Decisiones pendientes
 
 Parte I: L1, L2 e I-1 a I-8, con I-4 como aceptación explícita de riesgos.
-Parte II: B1 a B5, C1 a C7, D1 y D2, con B4, C5 y D1 reservadas al propietario.
+Parte II: B1 a B5, C1 a C7 y D2, con B4 y C5 reservadas al propietario.
+D1 ya está decidida: prueba sin Internet con Bluetooth activo y sin modo avión.
+Esta decisión no acepta riesgos ni aprueba otras partes de la propuesta.
 Hasta aprobar e implementar la entrega, el receiver sigue desactivado, la
 política en `Pending` y no hay tratamiento ni cálculo desde Next.
 

@@ -246,6 +246,10 @@ Cobertura mínima por tipo de cambio:
   conflicto, reinicio y ejecución offline;
 - Dexcom/integraciones: contratos con fixtures saneados, permisos/errores y prueba
   en modo avión; ninguna prueba automatizada escribe en producción;
+  para la recepción con el sensor Dexcom G7 real, el propietario ha decidido
+  el 2026-10-11 probar sin Internet con Wi-Fi y datos móviles apagados,
+  manteniendo Bluetooth activo y sin activar modo avión, para no desconectar
+  el sensor (ADR 0023, D1). Esta excepción no elimina la prueba offline;
 - sombra: paridad por componente, clasificación de discrepancias y ausencia de
   efectos laterales;
 - UI crítica: estado de antigüedad/origen, bloqueos visibles y confirmación

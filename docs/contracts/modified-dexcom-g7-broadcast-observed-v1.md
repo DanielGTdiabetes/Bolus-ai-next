@@ -133,10 +133,11 @@ Antes de añadir `LocalGlucoseSourceResult.Available` deben aprobarse y probarse
 - permiso denegado, fuente ausente, emisor inválido, parseo e invalidez como
   estados distintos;
 - prueba Android real sin red y con datos minimizados, preservando la
-  recepción del sensor. El modo de la prueba (modo avión con Bluetooth
-  reactivado o red desactivada con Bluetooth intacto) es la decisión D1 del
-  [ADR 0023](../adr/0023-dexcom-existing-transport-trust.md); hasta que el
-  propietario decida, rige la regla del ADR 0022.
+  recepción del sensor: Wi-Fi y datos móviles apagados, Bluetooth activo y sin
+  activar modo avión, según D1 del
+  [ADR 0023](../adr/0023-dexcom-existing-transport-trust.md), decidida por el
+  propietario el 2026-10-11. Comprobar ausencia de red validada y continuidad de
+  recepción, también tras reinicio.
 
 Las pruebas de la ruta estricta implementada deben conservar estas garantías;
 no demuestran compatibilidad con el productor instalado. Las pruebas de
