@@ -44,6 +44,8 @@ dependencies {
     implementation(project(":shared:clinical-profile"))
     // ADR 0016: only the profile screen model uses the translator; verify.ps1 limits it to those files.
     implementation(project(":shared:profile-unavailability"))
+    // ADR 0019: only the Dexcom reception composition and its tests use the parser; verify.ps1 limits it to those files.
+    implementation(project(":shared:dexcom-g7-payload"))
 
     testImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test:runner:1.7.0")

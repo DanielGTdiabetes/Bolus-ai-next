@@ -133,6 +133,11 @@ quedan siempre como no aprobadas para uso y todavía no lo usa la app: no hay
 receiver ni recepción de glucosa real. Véanse el
 [ADR 0018](docs/adr/0018-dexcom-g7-payload-parser.md) y la
 [validación](docs/validation/dexcom-g7-payload-parser-2026-10-11.md).
+Android ya compone autenticación del emisor, lectura de extras y parser, y
+traduce cada resultado a un bloqueo de glucosa explícito. Sigue sin receiver
+registrado ni lectura disponible. Véanse el
+[ADR 0019](docs/adr/0019-dexcom-g7-reception-composition.md) y la
+[validación](docs/validation/dexcom-g7-reception-composition-2026-10-11.md).
 Se ha verificado el flujo en la pantalla interior del Pixel 10 Pro Fold, además
 de layouts anchos vertical/horizontal con texto ampliado. Pausar y reanudar los
 editores conserva sus campos, foco y posición de desplazamiento.

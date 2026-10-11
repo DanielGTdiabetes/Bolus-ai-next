@@ -137,7 +137,10 @@ estructural de esta forma existe desde el
 `shared/dexcom-g7-payload`, sin consumidor: rechaza el mensaje completo ante
 cualquier lectura mal formada, lista campos desconocidos por nombre, colapsa
 duplicados idénticos, rechaza los conflictivos, no aplica rango al valor y
-marca toda lectura como `NOT_APPROVED_FOR_USE`.
+marca toda lectura como `NOT_APPROVED_FOR_USE`. El
+[ADR 0019](../adr/0019-dexcom-g7-reception-composition.md) compone
+autenticación, lectura de extras y parser sin receiver: todo resultado sigue
+bloqueando la glucosa.
 
 Next dispone de un [verificador preparatorio de identidad](android-dexcom-sender-authentication-v1.md)
 que modela estos rechazos sin anclas reales ni acceso a payloads. Todavía falta

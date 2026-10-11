@@ -610,6 +610,16 @@ conflictivos. El valor no tiene rango y toda lectura queda
 `PendingDexcomSource` y la APK no cambian. Véase la
 [validación](validation/dexcom-g7-payload-parser-2026-10-11.md).
 
+### Entrega de la composición de recepción Dexcom G7 — 2026-10-11
+
+Continuación de la fase 5 (trabajo 2 y estados del trabajo 4) según el
+[ADR 0019](adr/0019-dexcom-g7-reception-composition.md): Android autentica al
+emisor, solo después copia el `Bundle` sin convertir tipos, llama al parser
+con el paquete autenticado y traduce el resultado a `authentication_failed`,
+`parse_failed` o `policy_not_approved`. Sin receiver, permisos, persistencia
+ni UI. Véase la
+[validación](validation/dexcom-g7-reception-composition-2026-10-11.md).
+
 ### Secuencia de capacidades
 
 No intentar construir toda una fase en un solo cambio. Secuencia inicial:
