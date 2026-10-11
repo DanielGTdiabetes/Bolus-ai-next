@@ -4,6 +4,9 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import org.bolusai.dexcomg7.DexcomObservationStore
+import org.bolusai.engine.InputKind
+import org.bolusai.engine.UnavailabilityReason
+import org.bolusai.engine.UnavailableInput
 import org.bolusai.next.glucose.dexcom.storage.AndroidObservationIds
 import org.bolusai.next.glucose.dexcom.storage.AndroidTransmitterHasher
 import org.bolusai.next.glucose.dexcom.storage.DexcomG7Recorder
@@ -31,6 +34,22 @@ internal sealed interface DexcomReceipt {
     data class SenderRejected(val outcome: DexcomG7ReceptionOutcome.SenderRejected, val payloadReads: Int) : DexcomReceipt
 
     data class Recorded(val recording: DexcomG7Recording, val payloadReads: Int) : DexcomReceipt
+
+    /**
+     * Opening, recording or closing the store threw (R10). Only the stage is kept: never the exception text nor the
+     * payload. Nothing is retried. After [DexcomStorageFailure.CLOSE_FAILED] the append may have committed; the log
+     * decides, not this receipt. Glucose stays blocked as persistence_failed.
+     */
+    data class StorageFailed(val failure: DexcomStorageFailure, val payloadReads: Int) : DexcomReceipt {
+        val glucose: UnavailableInput get() = UnavailableInput(InputKind.GLUCOSE, UnavailabilityReason.PERSISTENCE_FAILED)
+    }
+}
+
+/** Stable code of the stage that threw while storing one authenticated message (ADR 0022, R10). */
+internal enum class DexcomStorageFailure(val code: String) {
+    OPEN_FAILED("dexcom_receiver.store_open_failed"),
+    RECORD_FAILED("dexcom_receiver.store_record_failed"),
+    CLOSE_FAILED("dexcom_receiver.store_close_failed"),
 }
 
 /**
@@ -66,12 +85,36 @@ internal class DexcomG7Intake(private val action: String, policy: DexcomSenderTr
     }
 
     /**
-     * Opens the store only now, after authentication (R5), and closes it even if recording fails. The message is
+     * Opens the store only now, after authentication (R5), and closes it whatever recording did. The message is
      * stamped with the instant captured by [accept], never with the time the queued write happens to run.
+     *
+     * Runs on the receiver's writer thread, where an escaping exception would kill the process (R10): any [Exception]
+     * thrown while opening, recording or closing becomes [DexcomReceipt.StorageFailed] with the first stage that
+     * failed. JVM [Error]s are not caught.
      */
-    fun <S> record(step: Step.Record, openStore: () -> S): DexcomReceipt.Recorded
-        where S : DexcomObservationStore, S : Closeable = openStore().use { store ->
-        DexcomReceipt.Recorded(DexcomG7Recorder(store) { step.receivedAtEpochMs }.record(step.outcome), step.payloadReads)
+    fun <S> record(step: Step.Record, openStore: () -> S): DexcomReceipt
+        where S : DexcomObservationStore, S : Closeable {
+        val store = try {
+            openStore()
+        } catch (_: Exception) {
+            return DexcomReceipt.StorageFailed(DexcomStorageFailure.OPEN_FAILED, step.payloadReads)
+        }
+        val recording = try {
+            DexcomG7Recorder(store) { step.receivedAtEpochMs }.record(step.outcome)
+        } catch (_: Exception) {
+            null
+        }
+        val closed = try {
+            store.close()
+            true
+        } catch (_: Exception) {
+            false
+        }
+        return when {
+            recording == null -> DexcomReceipt.StorageFailed(DexcomStorageFailure.RECORD_FAILED, step.payloadReads)
+            !closed -> DexcomReceipt.StorageFailed(DexcomStorageFailure.CLOSE_FAILED, step.payloadReads)
+            else -> DexcomReceipt.Recorded(recording, step.payloadReads)
+        }
     }
 }
 
@@ -100,6 +143,7 @@ open class DexcomG7Receiver : BroadcastReceiver() {
                 val pending = goAsync()
                 val application = context.applicationContext
                 writer.execute {
+                    // record() turns storage exceptions into StorageFailed (R10); finish() runs regardless.
                     try {
                         deliver(intake.record(step) { openStore(application) })
                     } finally {

@@ -45,11 +45,16 @@ class DexcomG7ReceiverDeviceTest {
     private val ids = ObservationIds { "receiver-test-${++n}" }
 
     /** Same receiver code; only the policy and the store are synthetic. */
-    private inner class ProbeReceiver(private val policy: DexcomSenderTrustPolicy) : DexcomG7Receiver() {
+    private inner class ProbeReceiver(
+        private val policy: DexcomSenderTrustPolicy,
+        private val open: (Context) -> SqliteDexcomObservationStore = {
+            SqliteDexcomObservationStore(it, SYNTHETIC_DB, ids, AndroidTransmitterHasher)
+        },
+    ) : DexcomG7Receiver() {
         override fun trustPolicy(): DexcomSenderTrustPolicy = policy
         override fun openStore(context: Context): SqliteDexcomObservationStore {
             opens.incrementAndGet()
-            return SqliteDexcomObservationStore(context, SYNTHETIC_DB, ids, AndroidTransmitterHasher)
+            return open(context)
         }
     }
 
@@ -160,8 +165,36 @@ class DexcomG7ReceiverDeviceTest {
         assertTrue(log.readings.isEmpty())
     }
 
-    private fun probe(policy: DexcomSenderTrustPolicy, shareIdentity: Boolean, payload: Bundle): DexcomReceipt {
-        val receiver = ProbeReceiver(policy)
+    @Test
+    fun aStoreThatFailsToOpenIsDeliveredAsStorageFailedAndTheProcessSurvives() {
+        val failing = ProbeReceiver(policy()) { error("synthetic open failure") }
+        val receipt = probe(failing, shareIdentity = true, payload(FIXTURE_PACKAGE))
+        assertEquals(DexcomReceipt.StorageFailed(DexcomStorageFailure.OPEN_FAILED, 1), receipt)
+        assertEquals("input.glucose.persistence_failed", (receipt as DexcomReceipt.StorageFailed).glucose.code)
+        assertFalse(context.getDatabasePath(SYNTHETIC_DB).exists())
+        // Same process, same serial writer: had the failure escaped, the instrumentation would have died with it.
+        val next = probe(policy(), shareIdentity = true, payload(FIXTURE_PACKAGE)) as DexcomReceipt.Recorded
+        assertEquals("input.glucose.policy_not_approved", (next.recording as DexcomG7Recording.Recorded).glucose.code)
+        assertEquals(2, opens.get())
+    }
+
+    @Test
+    fun theBarrierDenyingTheRealLogIsAStorageFailureAndTheRealLogIsUntouched() {
+        val existedBefore = realLog().exists()
+        val real = ProbeReceiver(policy()) {
+            SqliteDexcomObservationStore(it, SqliteDexcomObservationStore.DATABASE_NAME, ids, AndroidTransmitterHasher)
+        }
+        assertEquals(
+            DexcomReceipt.StorageFailed(DexcomStorageFailure.OPEN_FAILED, 1),
+            probe(real, shareIdentity = true, payload(FIXTURE_PACKAGE)),
+        )
+        assertEquals(existedBefore, realLog().exists())
+    }
+
+    private fun probe(policy: DexcomSenderTrustPolicy, shareIdentity: Boolean, payload: Bundle): DexcomReceipt =
+        probe(ProbeReceiver(policy), shareIdentity, payload)
+
+    private fun probe(receiver: ProbeReceiver, shareIdentity: Boolean, payload: Bundle): DexcomReceipt {
         context.registerReceiver(receiver, IntentFilter(DexcomReceiverConfiguration.ACTION), Context.RECEIVER_EXPORTED)
         try {
             fixture(shareIdentity, payload)
