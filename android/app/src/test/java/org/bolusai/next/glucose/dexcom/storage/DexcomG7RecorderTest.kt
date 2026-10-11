@@ -1,5 +1,6 @@
 package org.bolusai.next.glucose.dexcom.storage
 
+import org.bolusai.dexcomg7.AuthenticatedSender
 import org.bolusai.dexcomg7.DexcomG7PayloadRejection
 import org.bolusai.dexcomg7.DexcomG7RejectionCode
 import org.bolusai.dexcomg7.DexcomObservationStore
@@ -14,6 +15,7 @@ import org.bolusai.dexcomg7.StoredMessageOutcome
 import org.bolusai.engine.UnavailabilityReason
 import org.bolusai.next.glucose.dexcom.DexcomG7ReceptionOutcome
 import org.bolusai.next.glucose.dexcom.DexcomSenderAuthenticationFailure
+import org.bolusai.next.glucose.dexcom.DexcomSenderAuthenticationResult
 import org.bolusai.next.glucose.dexcom.rejected
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertSame
@@ -35,7 +37,7 @@ class DexcomG7RecorderTest {
             }
             val rejection = (input as? ObservationInput.PayloadRejected)?.rejection
             return ObservationWrite.Recorded(
-                StoredMessage("m", input.receivedAtEpochMs, outcome, rejection, 0, 0, 0, 0, emptyList(), emptyList(), 0),
+                StoredMessage("m", input.receivedAtEpochMs, input.sender, outcome, rejection, 0, 0, 0, 0, emptyList(), emptyList(), 0),
                 emptyList(),
             )
         }
@@ -43,7 +45,10 @@ class DexcomG7RecorderTest {
     }
 
     private val clock = EpochClock { 42L }
+    private val authenticated = DexcomSenderAuthenticationResult.Authenticated("example.sender", 7, 9, setOf("c".repeat(64)))
+    private val sender = AuthenticatedSender("example.sender", 9, setOf("c".repeat(64)))
     private val observed = DexcomG7ReceptionOutcome.Observed(
+        authenticated,
         ObservedDexcomG7Message("example.sender", listOf(ObservedDexcomG7Reading(0, 1, 2, "T", "SYNTH-TX", 3)), 0,
             emptyList(), emptyList(), 0),
     )
@@ -63,15 +68,15 @@ class DexcomG7RecorderTest {
         val rejection = DexcomG7PayloadRejection(DexcomG7RejectionCode.EMPTY_BATCH, "glucoseValues")
         val outcomes = listOf(
             observed,
-            DexcomG7ReceptionOutcome.PayloadRejected(rejection),
-            DexcomG7ReceptionOutcome.PayloadUnreadable,
+            DexcomG7ReceptionOutcome.PayloadRejected(authenticated, rejection),
+            DexcomG7ReceptionOutcome.PayloadUnreadable(authenticated),
         )
         val recordings = outcomes.map { DexcomG7Recorder(store, clock).record(it) }
         assertEquals(
             listOf(
-                ObservationInput.Observed(42, observed.message),
-                ObservationInput.PayloadRejected(42, rejection),
-                ObservationInput.PayloadUnreadable(42),
+                ObservationInput.Observed(42, sender, observed.message),
+                ObservationInput.PayloadRejected(42, sender, rejection),
+                ObservationInput.PayloadUnreadable(42, sender),
             ),
             store.inputs,
         )

@@ -8,6 +8,7 @@ import android.database.sqlite.SQLiteDatabase
 import android.database.sqlite.SQLiteDatabaseCorruptException
 import android.database.sqlite.SQLiteOpenHelper
 import androidx.core.database.sqlite.transaction
+import org.bolusai.dexcomg7.AuthenticatedSender
 import org.bolusai.dexcomg7.DexcomG7PayloadRejection
 import org.bolusai.dexcomg7.DexcomG7RejectionCode
 import org.bolusai.dexcomg7.DexcomObservationStore
@@ -106,6 +107,9 @@ internal class SqliteDexcomObservationStore(
         val values = ContentValues().apply {
             put("message_id", message.messageId)
             put("received_at_ms", message.receivedAtEpochMs)
+            put("sender_package", message.sender.packageName)
+            put("sender_version_code", message.sender.versionCode)
+            put("sender_signers_sha256", message.sender.signerCertificateSha256.joinToString(","))
             put("outcome", message.outcome.code)
             put("contract", message.contract)
             put("rejection_code", message.rejection?.code?.code)
@@ -160,6 +164,10 @@ internal class SqliteDexcomObservationStore(
         StoredMessage(
             messageId = c.text("message_id"),
             receivedAtEpochMs = c.long("received_at_ms"),
+            sender = AuthenticatedSender(c.text("sender_package"), c.long("sender_version_code"),
+                c.text("sender_signers_sha256").split(",").toSet().also {
+                    if (it.joinToString(",") != c.text("sender_signers_sha256")) throw CorruptRow()
+                }),
             outcome = outcome,
             rejection = rejection,
             newReadings = c.int("new_readings"),

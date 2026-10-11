@@ -1,5 +1,6 @@
 package org.bolusai.next.glucose.dexcom.storage
 
+import org.bolusai.dexcomg7.AuthenticatedSender
 import org.bolusai.dexcomg7.DexcomObservationStore
 import org.bolusai.dexcomg7.ObservationInput
 import org.bolusai.dexcomg7.ObservationWrite
@@ -36,12 +37,18 @@ internal sealed interface DexcomG7Recording {
  */
 internal class DexcomG7Recorder(private val store: DexcomObservationStore, private val clock: EpochClock) {
     fun record(outcome: DexcomG7ReceptionOutcome): DexcomG7Recording {
-        val input = when (outcome) {
+        val authenticated = when (outcome) {
             is DexcomG7ReceptionOutcome.SenderRejected -> return DexcomG7Recording.NotRecorded(outcome.glucose)
-            DexcomG7ReceptionOutcome.PayloadUnreadable -> ObservationInput.PayloadUnreadable(clock.nowEpochMs())
+            is DexcomG7ReceptionOutcome.Authenticated -> outcome
+        }
+        val sender = AuthenticatedSender(authenticated.sender.packageName, authenticated.sender.versionCode,
+            authenticated.sender.signerCertificateSha256Digests)
+        val input = when (authenticated) {
+            is DexcomG7ReceptionOutcome.PayloadUnreadable -> ObservationInput.PayloadUnreadable(clock.nowEpochMs(), sender)
             is DexcomG7ReceptionOutcome.PayloadRejected ->
-                ObservationInput.PayloadRejected(clock.nowEpochMs(), outcome.rejection)
-            is DexcomG7ReceptionOutcome.Observed -> ObservationInput.Observed(clock.nowEpochMs(), outcome.message)
+                ObservationInput.PayloadRejected(clock.nowEpochMs(), sender, authenticated.rejection)
+            is DexcomG7ReceptionOutcome.Observed ->
+                ObservationInput.Observed(clock.nowEpochMs(), sender, authenticated.message)
         }
         return when (val write = store.record(input)) {
             is ObservationWrite.Recorded -> DexcomG7Recording.Recorded(outcome.glucose, write)

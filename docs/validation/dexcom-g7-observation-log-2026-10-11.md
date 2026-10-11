@@ -3,7 +3,7 @@
 Base Next: `ec6ea6cd8add390e9937d308cc91f5c3af23feac` (PR #45, ADR 0019). Rama
 `claude/brave-pascal-ki8rt0`. Implementa el
 [ADR 0020](../adr/0020-dexcom-g7-observation-log.md) con E1 a E4 del
-propietario y E5 a E8 técnicas. Legacy no se consulta ni se modifica.
+propietario y E5 a E9 técnicas. Legacy no se consulta ni se modifica.
 
 ## Qué existe tras esta entrega
 
@@ -21,7 +21,7 @@ sigue devolviendo `policy_not_approved`.
 
 | Clase | Pruebas | Resultado |
 |---|---|---|
-| `ObservationPolicyTest` (JVM común) | 11 | ejecutada, 0 fallos |
+| `ObservationPolicyTest` (JVM común) | 13 | ejecutada, 0 fallos |
 | `DexcomG7RecorderTest` (JVM Android) | 5 | ejecutada, 0 fallos |
 | `SqliteDexcomObservationStoreDeviceTest` (dispositivo) | 8 | compilada; **pendiente de ejecutar** en el Pixel |
 

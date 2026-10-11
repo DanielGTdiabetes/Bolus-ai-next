@@ -1,7 +1,7 @@
 # ADR 0020: registro local de observaciones Dexcom G7
 
 - Estado: aceptado (decisiones E1 a E4 del propietario, 2026-10-11). E5 a E8
-  son decisiones técnicas del agente, revisables en la PR
+  y E9 son decisiones técnicas del agente, revisables en la PR
 - Fecha: 2026-10-11
 - Fase y criterio de aceptación: Fase 5, trabajo 3 («normalizar y persistir»)
   en la parte de persistencia y trabajo 4 en duplicados y orden; no cumple
@@ -41,11 +41,12 @@ nada y la glucosa sigue bloqueada.
 | E6 | Duplicado entre mensajes: lectura idéntica (transmisor, `timestamp`, valor, tendencia y `egvTxTime`) a cualquier observación guardada con su clave. No se vuelve a guardar y se cuenta en el mensaje. Repetir un conflicto ya guardado también es duplicado. Un conflicto siempre apunta a la primera observación de su clave |
 | E7 | Huella = SHA-256 de `bolusai.dexcom.transmitter.v1\0` + identificador UTF-8. El prefijo separa este uso de cualquier otro. Minimiza, no anonimiza: un identificador corto se puede probar por fuerza bruta |
 | E8 | `received_at_ms` es el reloj de pared del dispositivo, inyectado. Solo sella la recepción: no se deriva vigencia ni orden de él |
+| E9 | Cada mensaje guardado, también rechazado o ilegible, lleva el emisor que probó la autenticación: paquete, `versionCode` exacto y huellas SHA-256 de los firmantes actuales, ordenadas. Así la procedencia sobrevive a cambios posteriores de la política de confianza. No se guarda el UID: no es estable entre reinstalaciones. Las variantes autenticadas de `DexcomG7ReceptionOutcome` (ADR 0019) pasan a llevar ese emisor (revisión de Codex en la PR #46) |
 
 ### Componentes
 
 - `shared/dexcom-g7-payload`, `ObservationLog.kt`: `TransmitterFingerprint`,
-  `TransmitterHasher`, `ObservationIds`, `ObservationInput`, `StoredMessage`,
+  `TransmitterHasher`, `ObservationIds`, `AuthenticatedSender`, `ObservationInput`, `StoredMessage`,
   `StoredReading` (siempre `NOT_APPROVED_FOR_USE`), `ObservationPolicy.plan`
   (decisión pura de qué añadir), `ObservationWrite`, `ObservationRead` y el
   puerto `DexcomObservationStore`.
@@ -94,11 +95,12 @@ igual. Nadie fuera de la lista cerrada de `verify.ps1` usa el registro.
 
 ## Seguridad y pruebas
 
-- `ObservationPolicyTest` (JVM común, 11): lecturas nuevas sin identificador en
+- `ObservationPolicyTest` (JVM común, 13): lecturas nuevas sin identificador en
   claro, duplicado entre mensajes, conflicto enlazado a la primera para cada
   campo, repetición de un conflicto, otro transmisor con el mismo timestamp,
   rechazos sin contenido, diagnósticos del parser conservados, defectos del
-  almacén y formas inconsistentes.
+  almacén, formas inconsistentes y emisor autenticado completo en cada
+  mensaje (E9).
 - `DexcomG7RecorderTest` (JVM Android, 5): emisor rechazado sin guardar ni leer
   el reloj, resultados autenticados guardados con el reloj inyectado y
   bloqueados, fallo de escritura como `persistence_failed`, defectos

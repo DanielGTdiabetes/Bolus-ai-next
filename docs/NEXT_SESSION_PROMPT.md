@@ -254,11 +254,12 @@ ADR 0020 — REGISTRO LOCAL DE OBSERVACIONES DEXCOM G7 (implementado)
 docs/adr/0020-dexcom-g7-observation-log.md, aceptado el 2026-10-11 con E1
 (lecturas y rechazos sin contenido), E2 (conflicto enlazado, nunca
 sobrescribir), E3 (huella SHA-256 del transmisor) y E4 (sin borrado; retención
-pendiente). E5 a E8 técnicas: rechazos del emisor no se guardan, duplicado =
+pendiente). E5 a E9 técnicas: rechazos del emisor no se guardan, duplicado =
 contenido idéntico a cualquier observación de la clave, prefijo de dominio en
-la huella, reloj inyectado solo para sellar. `ObservationLog.kt` (común) y
+la huella, reloj inyectado solo para sellar, emisor autenticado (paquete,
+versión, firmantes) guardado con cada mensaje. `ObservationLog.kt` (común) y
 `glucose/dexcom/storage/` (Android, `dexcom-observations.db` v1 con triggers
-append-only, índice único parcial y trigger de conflicto). JVM 16 pruebas
+append-only, índice único parcial y trigger de conflicto). JVM 18 pruebas
 nuevas; `SqliteDexcomObservationStoreDeviceTest` (8) pendiente de ejecutar en
 el Pixel. Véase docs/validation/dexcom-g7-observation-log-2026-10-11.md.
 

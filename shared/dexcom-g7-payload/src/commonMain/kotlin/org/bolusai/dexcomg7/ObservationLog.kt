@@ -31,16 +31,66 @@ public fun interface ObservationIds {
     public fun next(): String
 }
 
+/**
+ * The sender identity that authentication proved for one message (ADR 0020, E9): package, exact version code and the
+ * SHA-256 digests of the current APK signers. Stored with every message so its provenance survives later changes of
+ * the trust policy. The UID is not kept: it is not stable across reinstalls.
+ */
+public class AuthenticatedSender(
+    public val packageName: String,
+    public val versionCode: Long,
+    signerCertificateSha256: Set<String>,
+) {
+    public val signerCertificateSha256: List<String> = signerCertificateSha256.sorted()
+
+    init {
+        require(packageName.isNotBlank() && packageName == packageName.trim() && ',' !in packageName) {
+            "dexcom_observation.invalid_sender_package"
+        }
+        require(versionCode > 0) { "dexcom_observation.invalid_sender_version" }
+        require(this.signerCertificateSha256.isNotEmpty() && this.signerCertificateSha256.all { SHA256_HEX.matches(it) }) {
+            "dexcom_observation.invalid_sender_signers"
+        }
+    }
+
+    override fun equals(other: Any?): Boolean = other is AuthenticatedSender && other.packageName == packageName &&
+        other.versionCode == versionCode && other.signerCertificateSha256 == signerCertificateSha256
+
+    override fun hashCode(): Int = (packageName.hashCode() * 31 + versionCode.hashCode()) * 31 +
+        signerCertificateSha256.hashCode()
+
+    override fun toString(): String = "AuthenticatedSender($packageName, $versionCode, signers=${signerCertificateSha256.size})"
+
+    private companion object {
+        val SHA256_HEX = Regex("[0-9a-f]{64}")
+    }
+}
+
 /** What one authenticated broadcast produced. Sender rejections are never recorded (ADR 0020, E5). */
 public sealed interface ObservationInput {
     public val receivedAtEpochMs: Long
+    public val sender: AuthenticatedSender
 
-    public data class Observed(override val receivedAtEpochMs: Long, val message: ObservedDexcomG7Message) : ObservationInput
+    public data class Observed(
+        override val receivedAtEpochMs: Long,
+        override val sender: AuthenticatedSender,
+        val message: ObservedDexcomG7Message,
+    ) : ObservationInput {
+        init {
+            require(message.authenticatedPackage == sender.packageName) { "dexcom_observation.sender_mismatch" }
+        }
+    }
 
-    public data class PayloadRejected(override val receivedAtEpochMs: Long, val rejection: DexcomG7PayloadRejection) :
-        ObservationInput
+    public data class PayloadRejected(
+        override val receivedAtEpochMs: Long,
+        override val sender: AuthenticatedSender,
+        val rejection: DexcomG7PayloadRejection,
+    ) : ObservationInput
 
-    public data class PayloadUnreadable(override val receivedAtEpochMs: Long) : ObservationInput
+    public data class PayloadUnreadable(
+        override val receivedAtEpochMs: Long,
+        override val sender: AuthenticatedSender,
+    ) : ObservationInput
 }
 
 public enum class StoredMessageOutcome(public val code: String) {
@@ -56,6 +106,7 @@ public enum class StoredMessageOutcome(public val code: String) {
 public data class StoredMessage(
     val messageId: String,
     val receivedAtEpochMs: Long,
+    val sender: AuthenticatedSender,
     val outcome: StoredMessageOutcome,
     val rejection: DexcomG7PayloadRejection?,
     val newReadings: Int,
@@ -134,10 +185,9 @@ public object ObservationPolicy {
         val messageId = ids.next()
         return when (input) {
             is ObservationInput.PayloadUnreadable -> ObservationPlan(
-                empty(messageId, input.receivedAtEpochMs, StoredMessageOutcome.PAYLOAD_UNREADABLE, null), emptyList())
+                empty(messageId, input, StoredMessageOutcome.PAYLOAD_UNREADABLE, null), emptyList())
             is ObservationInput.PayloadRejected -> ObservationPlan(
-                empty(messageId, input.receivedAtEpochMs, StoredMessageOutcome.PAYLOAD_REJECTED, input.rejection),
-                emptyList())
+                empty(messageId, input, StoredMessageOutcome.PAYLOAD_REJECTED, input.rejection), emptyList())
             is ObservationInput.Observed -> observed(messageId, input, ids, hasher, existing)
         }
     }
@@ -185,6 +235,7 @@ public object ObservationPolicy {
             StoredMessage(
                 messageId = messageId,
                 receivedAtEpochMs = input.receivedAtEpochMs,
+                sender = input.sender,
                 outcome = StoredMessageOutcome.OBSERVED,
                 rejection = null,
                 newReadings = stored.size - conflicts,
@@ -201,10 +252,11 @@ public object ObservationPolicy {
 
     private fun empty(
         messageId: String,
-        receivedAtEpochMs: Long,
+        input: ObservationInput,
         outcome: StoredMessageOutcome,
         rejection: DexcomG7PayloadRejection?,
-    ) = StoredMessage(messageId, receivedAtEpochMs, outcome, rejection, 0, 0, 0, 0, emptyList(), emptyList(), 0)
+    ) = StoredMessage(messageId, input.receivedAtEpochMs, input.sender, outcome, rejection, 0, 0, 0, 0, emptyList(),
+        emptyList(), 0)
 }
 
 public enum class ObservationFailure(public val code: String) {

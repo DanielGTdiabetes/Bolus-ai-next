@@ -4,6 +4,7 @@ import android.content.Context
 import android.database.sqlite.SQLiteDatabase
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import org.bolusai.dexcomg7.AuthenticatedSender
 import org.bolusai.dexcomg7.DexcomG7PayloadRejection
 import org.bolusai.dexcomg7.DexcomG7RejectionCode
 import org.bolusai.dexcomg7.ObservationFailure
@@ -38,8 +39,10 @@ class SqliteDexcomObservationStoreDeviceTest {
     private fun store(hasher: TransmitterHasher = AndroidTransmitterHasher) =
         SqliteDexcomObservationStore(context, name, ids, hasher)
 
+    private val sender = AuthenticatedSender("example.sender", 42, setOf("b".repeat(64), "a".repeat(64)))
+
     private fun observed(vararg readings: ObservedDexcomG7Reading, at: Long = 1_000) = ObservationInput.Observed(
-        at, ObservedDexcomG7Message("example.sender", readings.toList(), 0, emptyList(), listOf("newField"), 1))
+        at, sender, ObservedDexcomG7Message("example.sender", readings.toList(), 0, emptyList(), listOf("newField"), 1))
 
     private fun reading(index: Int, timestamp: Long, value: Int = 120) =
         ObservedDexcomG7Reading(index, value, timestamp, "SYNTHETIC_TREND", "SYNTH-TX", 5)
@@ -62,18 +65,20 @@ class SqliteDexcomObservationStoreDeviceTest {
                 conflict.conflictOf)
             assertEquals(listOf("newField"), read.messages.first().unknownReadingFields)
             assertEquals(AndroidTransmitterHasher.fingerprint("SYNTH-TX"), read.readings.first().transmitter)
+            assertEquals(listOf(sender, sender), read.messages.map { it.sender })
         }
     }
 
     @Test fun rejectionsAreStoredWithoutContent() {
         store().use { s ->
             val rejection = DexcomG7PayloadRejection(DexcomG7RejectionCode.WRONG_TYPE, "glucoseValue", 3)
-            s.record(ObservationInput.PayloadRejected(5, rejection))
-            s.record(ObservationInput.PayloadUnreadable(6))
+            s.record(ObservationInput.PayloadRejected(5, sender, rejection))
+            s.record(ObservationInput.PayloadUnreadable(6, sender))
             val read = loaded(s)
             assertEquals(listOf(StoredMessageOutcome.PAYLOAD_REJECTED, StoredMessageOutcome.PAYLOAD_UNREADABLE),
                 read.messages.map { it.outcome })
             assertEquals(rejection, read.messages.first().rejection)
+            assertEquals(sender, read.messages.last().sender)
             assertTrue(read.readings.isEmpty())
         }
     }
@@ -133,24 +138,25 @@ class SqliteDexcomObservationStoreDeviceTest {
     }
 
     @Test fun anUnknownStoredCodeIsCorruptionNotADefault() {
-        store().use { s -> s.record(ObservationInput.PayloadUnreadable(1)) }
+        store().use { s -> s.record(ObservationInput.PayloadUnreadable(1, sender)) }
         SQLiteDatabase.openDatabase(context.getDatabasePath(name).path, null, SQLiteDatabase.OPEN_READWRITE).use { db ->
             db.execSQL("INSERT INTO dexcom_messages (message_id, received_at_ms, outcome, contract, rejection_code, " +
                 "new_readings, duplicate_readings, conflicting_readings, collapsed_in_message, unknown_top_level, " +
-                "unknown_reading, unreportable_unknown) VALUES ('raw', 1, 'payload_rejected', " +
-                "'modified-dexcom-g7-broadcast-observed-v1', 'dexcom_g7.payload.invented', 0, 0, 0, 0, '', '', 0)")
+                "unknown_reading, unreportable_unknown, sender_package, sender_version_code, sender_signers_sha256) " +
+                "VALUES ('raw', 1, 'payload_rejected', " +
+                "'modified-dexcom-g7-broadcast-observed-v1', 'dexcom_g7.payload.invented', 0, 0, 0, 0, '', '', 0, 'example.sender', 42, '" + "a".repeat(64) + "')")
         }
         store().use { s -> assertEquals(ObservationRead.Failed(ObservationFailure.CORRUPT_STORAGE), s.read()) }
     }
 
     @Test fun anAlteredSchemaIsRejectedWithoutTouchingTheFile() {
-        store().use { s -> s.record(ObservationInput.PayloadUnreadable(1)) }
+        store().use { s -> s.record(ObservationInput.PayloadUnreadable(1, sender)) }
         SQLiteDatabase.openDatabase(context.getDatabasePath(name).path, null, SQLiteDatabase.OPEN_READWRITE).use { db ->
             db.execSQL("CREATE TABLE synthetic_extra (x INTEGER)")
         }
         store().use { s ->
             assertEquals(ObservationRead.Failed(ObservationFailure.UNSUPPORTED_SCHEMA), s.read())
-            assertEquals(ObservationWrite.Failed(ObservationFailure.UNSUPPORTED_SCHEMA), s.record(ObservationInput.PayloadUnreadable(2)))
+            assertEquals(ObservationWrite.Failed(ObservationFailure.UNSUPPORTED_SCHEMA), s.record(ObservationInput.PayloadUnreadable(2, sender)))
         }
     }
 }

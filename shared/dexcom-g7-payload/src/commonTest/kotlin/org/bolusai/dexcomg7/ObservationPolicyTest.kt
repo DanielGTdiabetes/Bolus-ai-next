@@ -38,8 +38,11 @@ class ObservationPolicyTest {
     private fun reading(index: Int, timestamp: Long, value: Int = 120, trend: String = "T", tx: String = "SYNTH-A", egv: Long = 5) =
         ObservedDexcomG7Reading(index, value, timestamp, trend, tx, egv)
 
+    private val sender = AuthenticatedSender("example.sender", 42, setOf("b".repeat(64), "a".repeat(64)))
+
     private fun observed(vararg readings: ObservedDexcomG7Reading, at: Long = 1_000) = ObservationInput.Observed(
         at,
+        sender,
         ObservedDexcomG7Message("example.sender", readings.toList(), 0, emptyList(), emptyList(), 0),
     )
 
@@ -105,8 +108,8 @@ class ObservationPolicyTest {
     @Test fun rejectionsKeepOnlyCodeFieldAndIndex() {
         val store = MemoryStore(Counter(), hasher)
         val rejection = DexcomG7PayloadRejection(DexcomG7RejectionCode.WRONG_TYPE, "glucoseValue", 2)
-        val rejected = store.record(ObservationInput.PayloadRejected(5, rejection))
-        val unreadable = store.record(ObservationInput.PayloadUnreadable(6))
+        val rejected = store.record(ObservationInput.PayloadRejected(5, sender, rejection))
+        val unreadable = store.record(ObservationInput.PayloadUnreadable(6, sender))
 
         assertEquals(StoredMessageOutcome.PAYLOAD_REJECTED, rejected.message.outcome)
         assertEquals(rejection, rejected.message.rejection)
@@ -119,6 +122,7 @@ class ObservationPolicyTest {
     @Test fun messageKeepsTheParserDiagnostics() {
         val input = ObservationInput.Observed(
             7,
+            sender,
             ObservedDexcomG7Message("example.sender", listOf(reading(0, 1)), 2, listOf("a"), listOf("b"), 3),
         )
         val message = MemoryStore(Counter(), hasher).record(input).message
@@ -147,15 +151,36 @@ class ObservationPolicyTest {
         assertFailsWith<IllegalArgumentException> { TransmitterFingerprint("ABC") }
         assertFailsWith<IllegalArgumentException> { TransmitterFingerprint("A".repeat(64)) }
         assertFailsWith<IllegalArgumentException> {
-            StoredMessage("m", 1, StoredMessageOutcome.PAYLOAD_REJECTED, null, 0, 0, 0, 0, emptyList(), emptyList(), 0)
+            StoredMessage("m", 1, sender, StoredMessageOutcome.PAYLOAD_REJECTED, null, 0, 0, 0, 0, emptyList(), emptyList(), 0)
         }
         assertFailsWith<IllegalArgumentException> {
-            StoredMessage("m", 1, StoredMessageOutcome.PAYLOAD_UNREADABLE, null, 1, 0, 0, 0, emptyList(), emptyList(), 0)
+            StoredMessage("m", 1, sender, StoredMessageOutcome.PAYLOAD_UNREADABLE, null, 1, 0, 0, 0, emptyList(), emptyList(), 0)
         }
         assertFailsWith<IllegalArgumentException> {
             StoredReading("o", "m", 0, hasher.fingerprint("x"), 1, 1, "T", 1, "o")
         }
         assertEquals("TransmitterFingerprint(53594e54…)", hasher.fingerprint("SYNTH").toString())
+    }
+
+    @Test fun everyRecordKeepsTheAuthenticatedSender() {
+        // Codex review on PR #46: provenance must survive later changes of the trust policy.
+        val store = MemoryStore(Counter(), hasher)
+        store.record(observed(reading(0, 10)))
+        store.record(ObservationInput.PayloadUnreadable(2, sender))
+        store.record(ObservationInput.PayloadRejected(3, sender, DexcomG7PayloadRejection(DexcomG7RejectionCode.EMPTY_BATCH)))
+        assertTrue(store.messages.all { it.sender == sender })
+        assertEquals(listOf("a".repeat(64), "b".repeat(64)), sender.signerCertificateSha256)
+    }
+
+    @Test fun senderMustBeCompleteAndMatchTheParsedMessage() {
+        assertFailsWith<IllegalArgumentException> { AuthenticatedSender(" ", 1, setOf("a".repeat(64))) }
+        assertFailsWith<IllegalArgumentException> { AuthenticatedSender("p", 0, setOf("a".repeat(64))) }
+        assertFailsWith<IllegalArgumentException> { AuthenticatedSender("p", 1, emptySet()) }
+        assertFailsWith<IllegalArgumentException> { AuthenticatedSender("p", 1, setOf("A".repeat(64))) }
+        assertFailsWith<IllegalArgumentException> {
+            ObservationInput.Observed(1, AuthenticatedSender("other.sender", 42, setOf("a".repeat(64))),
+                ObservedDexcomG7Message("example.sender", listOf(reading(0, 1)), 0, emptyList(), emptyList(), 0))
+        }
     }
 
     @Test fun storedCodesAreStable() {
