@@ -90,6 +90,22 @@ try {
         $instrumentationIsolation.Runner, $instrumentationIsolation.ComponentFactory, $instrumentationIsolation.AppSha256,
         $instrumentationIsolation.TestSha256)
 
+    # ADR 0018: the observed Dexcom G7 payload parser is pure and has no consumer yet. It must not depend on the
+    # engine, the profile, the meals or Android, and nothing outside its module may use it until a later ADR connects it.
+    $dexcomParserRoot = Join-Path $repositoryRoot "shared\dexcom-g7-payload"
+    $dexcomParserDependencies = @(Get-ChildItem -LiteralPath $dexcomParserRoot -Recurse -File |
+        Where-Object { $_.FullName -notmatch '\\build\\' } |
+        Select-String -Pattern 'org\.bolusai\.(engine|profile|meals|next)|import\s+(android|java)\.|project\(' -List)
+    if ($dexcomParserDependencies.Count -gt 0) {
+        throw "The Dexcom G7 payload parser must stay pure and dependency-free: $($dexcomParserDependencies.Path -join ', ')"
+    }
+    $dexcomParserConsumers = @(Get-ChildItem -LiteralPath (Join-Path $repositoryRoot "android"), (Join-Path $repositoryRoot "shared") -Recurse -File |
+        Where-Object { $_.FullName -notmatch '\\build\\' -and -not $_.FullName.StartsWith($dexcomParserRoot + [IO.Path]::DirectorySeparatorChar) } |
+        Select-String -Pattern 'dexcom-g7-payload|org\.bolusai\.dexcomg7' -List)
+    if ($dexcomParserConsumers.Count -gt 0) {
+        throw "No consumer may use the Dexcom G7 payload parser before its ADR (ADR 0018): $($dexcomParserConsumers.Path -join ', ')"
+    }
+
     # ADR 0012: the clinical profile is capture only. The engine and the Bolo overview must not depend on it.
     $engineReferences = @(Get-ChildItem -LiteralPath (Join-Path $repositoryRoot "shared\bolus-engine") -Recurse -File |
         Where-Object { $_.FullName -notmatch '\\build\\' } |

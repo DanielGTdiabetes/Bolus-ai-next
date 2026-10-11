@@ -224,9 +224,27 @@ docs/validation/bolo-profile-details-2026-10-04.md:
   `scripts/fixtures/instrumentation-isolation/`. Si una dependencia nueva añade
   un provider, verify falla: no la amplíes sin decidir cómo aislarla.
 
+ADR 0018 — PARSER ESTRUCTURAL DEL PAYLOAD DEXCOM G7 (implementado)
+docs/adr/0018-dexcom-g7-payload-parser.md, aceptado el 2026-10-11 con D1
+(rechazar el lote entero), D2 (campos desconocidos listados por nombre, no
+bloquean), D3 (duplicado idéntico se colapsa, mismo timestamp con otro
+contenido es conflicto) y D4 (valor solo estructural, sin rango; el 1..400 del
+productor no se copia). Módulo KMP `shared/dexcom-g7-payload`, solo objetivo
+JVM: `DexcomG7Payload`/`PayloadValue` (copia tipada sin `Bundle`),
+`DexcomG7PayloadParser.parse(payload, authenticatedPackage)`, lecturas siempre
+`NOT_APPROVED_FOR_USE` y códigos `dexcom_g7.payload.*`. `verify.ps1` impide
+que dependa de motor, perfil, comidas, Android o Java y que nadie fuera del
+módulo lo use. 20 pruebas JVM. Véase
+docs/validation/dexcom-g7-payload-parser-2026-10-11.md.
+
 SIGUIENTE PASO
-Los ADR 0014, 0015 y 0017 y la opción A del ADR 0016 están implementados e
-integrados. No hay ningún incremento funcional ni clínico autorizado.
+Los ADR 0014, 0015, 0017 y 0018 y la opción A del ADR 0016 están
+implementados. No hay ningún incremento funcional ni clínico autorizado. El
+siguiente paso natural de la fase 5 es un ADR que conecte el parser: adaptador
+`Bundle` → `DexcomG7Payload` dentro de `DexcomAuthenticatedIngress`, traducción
+de rechazos a `input.glucose.*` y, por separado, persistencia de lecturas
+observadas. Sigue bloqueado por la release reproducible del productor, el
+opt-in de identidad y las anclas.
 Cualquier capacidad nueva necesita antes un ADR que defina su alcance y sus
 decisiones pendientes, y la aprobación explícita del propietario. Conectar el traductor con `ReadOverview`, el motor u
 otro consumidor exige su propio ADR. Siguen

@@ -598,6 +598,18 @@ instrumentación. Aprobada por el propietario e integrada mediante la PR #42
 (merge commit `929d5c1`, Verify 37901021591 en verde). Véase la
 [validación](validation/bolo-profile-details-2026-10-04.md).
 
+### Entrega del parser estructural Dexcom G7 — 2026-10-11
+
+Preparación de la fase 5 (trabajo 3, parte estructural) según el
+[ADR 0018](adr/0018-dexcom-g7-payload-parser.md), aceptado con D1 a D4:
+`shared/dexcom-g7-payload` lee una copia tipada del broadcast observado y el
+paquete autenticado, rechaza el mensaje completo ante cualquier defecto, lista
+campos desconocidos por nombre, colapsa duplicados idénticos y rechaza los
+conflictivos. El valor no tiene rango y toda lectura queda
+`NOT_APPROVED_FOR_USE`. Sin consumidor, receiver, permisos ni persistencia:
+`PendingDexcomSource` y la APK no cambian. Véase la
+[validación](validation/dexcom-g7-payload-parser-2026-10-11.md).
+
 ### Secuencia de capacidades
 
 No intentar construir toda una fase en un solo cambio. Secuencia inicial:
