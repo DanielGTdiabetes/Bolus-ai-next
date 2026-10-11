@@ -23,13 +23,12 @@ sigue devolviendo `policy_not_approved`.
 |---|---|---|
 | `ObservationPolicyTest` (JVM común) | 13 | ejecutada, 0 fallos |
 | `DexcomG7RecorderTest` (JVM Android) | 5 | ejecutada, 0 fallos |
-| `SqliteDexcomObservationStoreDeviceTest` (dispositivo) | 8 | compilada; **pendiente de ejecutar** en el Pixel |
+| `SqliteDexcomObservationStoreDeviceTest` (dispositivo) | 8 | ejecutadas en el Pixel junto con la novena, 0 fallos (ver «Ejecución en dispositivo») |
 
 Recuento posterior: la PR #47 (ADR 0021, commit `4557c7e`) añadió
 `storageSummaryEqualsTheReferenceWithoutLoadingTheHistory` a esta clase. Desde
 entonces existen 9 pruebas en `SqliteDexcomObservationStoreDeviceTest`. Las 8 de
-la tabla son las de esta entrega. Ninguna consta aún como ejecutada en
-dispositivo.
+la tabla son las de esta entrega.
 
 ## Comandos y resultados (contenedor Linux de la sesión)
 
@@ -45,10 +44,22 @@ pwsh check.ps1                               # bloque ADR 0018-0020 de verify.ps
 git diff --check                             # sin salida
 ```
 
+## Ejecución en dispositivo (2026-10-11)
+
+- SHA probado: `cacc8a905f0e3977d9d4fa44f35f7fdb0752dcd3` (merge de la PR #47,
+  igual a `origin/main` en ese momento).
+- Dispositivo: Pixel 10 Pro Fold (`rango`), Android 17, API 37, build
+  `CP3A.260905.009`. Era el único dispositivo en `adb devices`.
+- Comando: `.\scripts\verify.ps1 -DeviceTests` en Windows. Salida 0, con Gradle
+  `BUILD SUCCESSFUL` (205 tareas), comprobaciones de arquitectura y autoprueba
+  de aislamiento de instrumentación correctas e instrumentación `OK (146 tests)`.
+- `SqliteDexcomObservationStoreDeviceTest`: 9 existentes, 9 ejecutadas, 9
+  superadas. Son las 8 de esta entrega y
+  `storageSummaryEqualsTheReferenceWithoutLoadingTheHistory` (ADR 0021). Las
+  pruebas usan un fichero sintético y no abren `dexcom-observations.db` de la
+  app.
+
 ## Pendiente
 
-- `verify.ps1 -DeviceTests` en el Pixel para `SqliteDexcomObservationStoreDeviceTest`
-  y `DexcomBundleExtrasDeviceTest`. Las pruebas usan un fichero sintético y no
-  abren `dexcom-observations.db` de la app.
 - ADR de retención (E4), receiver productivo, anclas, release reproducible,
   vigencia y prueba en modo avión. R-010 y R-014 siguen abiertos.

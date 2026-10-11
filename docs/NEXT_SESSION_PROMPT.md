@@ -247,7 +247,7 @@ con el paquete autenticado; `SenderRejected` → motivo del autenticador,
 ilegible o rechazado → `parse_failed`, observado → `policy_not_approved`).
 `verify.ps1` fija la lista cerrada de ficheros que usan el parser o la
 composición. JVM 12 pruebas nuevas; `DexcomBundleExtrasDeviceTest` (3) en la
-lista de instrumentación, pendiente de ejecutar en el Pixel. Véase
+lista de instrumentación, 3/3 superadas en el Pixel el 2026-10-11. Véase
 docs/validation/dexcom-g7-reception-composition-2026-10-11.md.
 
 ADR 0020 — REGISTRO LOCAL DE OBSERVACIONES DEXCOM G7 (implementado)
@@ -261,8 +261,8 @@ versión, firmantes) guardado con cada mensaje. `ObservationLog.kt` (común) y
 `glucose/dexcom/storage/` (Android, `dexcom-observations.db` v1 con triggers
 append-only, índice único parcial y trigger de conflicto). JVM 18 pruebas
 nuevas; `SqliteDexcomObservationStoreDeviceTest` (8 en la entrega del ADR 0020;
-9 existentes desde la PR #47, que añadió una del ADR 0021) pendiente de
-ejecutar en el Pixel. Véase
+9 existentes desde la PR #47, que añadió una del ADR 0021), 9/9 superadas en el
+Pixel el 2026-10-11. Véase
 docs/validation/dexcom-g7-observation-log-2026-10-11.md.
 
 ADR 0021 — REGISTRO DEXCOM EN DIAGNÓSTICO (implementado)
@@ -275,16 +275,21 @@ fichero si no existe. `ObservationSummary` (común), `ui/DexcomLogBlock`,
 `ui/DexcomLogModel`, `DexcomLogReader` y la costura
 `MainActivity.dexcomLogReader`. `verify.ps1` impide que `ScreenRenderer`
 conozca el registro. JVM 6 pruebas nuevas; `DexcomLogDiagnosticsDeviceTest`
-(3) pendiente en el Pixel. Véase
+(3) superadas 3/3 en el Pixel el 2026-10-11. Véase
 docs/validation/dexcom-log-diagnostics-2026-10-11.md.
 
+EJECUCIÓN EN DISPOSITIVO DE LOS ADR 0019 A 0021 (2026-10-11)
+`.\scripts\verify.ps1 -DeviceTests` sobre
+`cacc8a905f0e3977d9d4fa44f35f7fdb0752dcd3` (merge de la PR #47) en el Pixel 10
+Pro Fold (`rango`, Android 17, API 37, build `CP3A.260905.009`), único en
+`adb devices`. Salida 0, Gradle `BUILD SUCCESSFUL` e instrumentación
+`OK (146 tests)`. Pruebas existentes, ejecutadas y superadas:
+`DexcomBundleExtrasDeviceTest` 3/3/3, `SqliteDexcomObservationStoreDeviceTest`
+9/9/9 (8 del ADR 0020 y 1 del ADR 0021) y `DexcomLogDiagnosticsDeviceTest`
+3/3/3. Sigue sin prueba en dispositivo la rama `BadParcelableException`
+(ADR 0019).
+
 PENDIENTE DEL PROPIETARIO (ADR 0018 a 0021)
-- `verify.ps1 -DeviceTests` en el Pixel: `DexcomBundleExtrasDeviceTest` (3),
-  `SqliteDexcomObservationStoreDeviceTest` (9 existentes: 8 del ADR 0020 y 1
-  del ADR 0021) y `DexcomLogDiagnosticsDeviceTest` (3) nunca se han ejecutado
-  en dispositivo. Los números son pruebas existentes en el código, no
-  ejecutadas.
-  Si alguna falla, corregir antes de cualquier otro incremento.
 - Revisar las decisiones técnicas T1 a T6 (ADR 0019), E5 a E9 (ADR 0020) y F3
   a F5 (ADR 0021).
 - Para el receiver productivo: archivar release reproducible de la app Dexcom
@@ -307,9 +312,10 @@ SIGUIENTE PASO
 Los ADR 0014, 0015, 0017, 0018, 0019, 0020 y 0021 y la opción A del ADR 0016 están
 implementados. No hay ningún incremento funcional ni clínico autorizado. El
 ADR 0019 y 0020 componen autenticación, extras, parser y registro local sin
-receiver. Antes del receiver productivo, el propietario debe ejecutar
-`verify.ps1 -DeviceTests` (pruebas de `Bundle` y SQLite pendientes), archivar
-la release reproducible, activar el opt-in de identidad y aprobar las anclas.
+receiver. Sus pruebas de `Bundle`, SQLite y Diagnóstico ya pasaron en el Pixel
+(`OK (146 tests)` sobre `cacc8a9`). Antes del receiver productivo, el
+propietario debe archivar la release reproducible, activar el opt-in de
+identidad y aprobar las anclas.
 Sin esas puertas, siguen abiertos sin bloqueo externo: el receiver productivo
 detrás de un interruptor desactivado por defecto (ADR propio; sin anclas
 aprobadas la política sigue `Pending` y todo se rechaza), el ADR de retención
