@@ -17,6 +17,8 @@ import org.bolusai.dexcomg7.ObservationIds
 import org.bolusai.dexcomg7.ObservationInput
 import org.bolusai.dexcomg7.ObservationPolicy
 import org.bolusai.dexcomg7.ObservationRead
+import org.bolusai.dexcomg7.ObservationSummary
+import org.bolusai.dexcomg7.ObservationSummaryRead
 import org.bolusai.dexcomg7.ObservationWrite
 import org.bolusai.dexcomg7.StoredMessage
 import org.bolusai.dexcomg7.StoredMessageOutcome
@@ -94,6 +96,56 @@ internal class SqliteDexcomObservationStore(
     } catch (failure: RuntimeException) {
         ObservationRead.Failed(reason(failure, ObservationFailure.READ_FAILED))
     }
+
+    /**
+     * Aggregates in SQL inside one read transaction (ADR 0021, F5): the history is never loaded. Only the last message
+     * is decoded, strictly. Unknown stored rejection codes are corruption, as in [read].
+     */
+    override fun summary(): ObservationSummaryRead = try {
+        val db = helper.readableDatabase
+        var result: ObservationSummaryRead = ObservationSummaryRead.Failed(ObservationFailure.READ_FAILED)
+        db.transaction {
+            val totals = db.rawQuery("SELECT COUNT(*), TOTAL(outcome = 'observed'), TOTAL(outcome = 'payload_unreadable'), " +
+                "TOTAL(duplicate_readings), TOTAL(collapsed_in_message) FROM dexcom_messages", null).use { c ->
+                check(c.moveToFirst())
+                List(5) { c.getLong(it) }
+            }
+            val rejected = db.rawQuery("SELECT rejection_code, COUNT(*) FROM dexcom_messages " +
+                "WHERE rejection_code IS NOT NULL GROUP BY rejection_code ORDER BY rejection_code", null).use { c ->
+                buildMap {
+                    while (c.moveToNext()) {
+                        val code = c.getString(0)
+                        if (DexcomG7RejectionCode.entries.none { it.code == code }) throw CorruptRow()
+                        put(code, c.getLong(1).toCount())
+                    }
+                }
+            }
+            val readings = db.rawQuery("SELECT COUNT(*), TOTAL(conflict_of IS NOT NULL) FROM dexcom_readings", null).use { c ->
+                check(c.moveToFirst())
+                List(2) { c.getLong(it) }
+            }
+            val last = db.query("dexcom_messages", null, null, null, null, null, "seq DESC", "1").use { c ->
+                if (c.moveToFirst()) decodeMessage(c) else null
+            }
+            result = ObservationSummaryRead.Loaded(ObservationSummary(
+                messages = totals[0].toCount(),
+                observed = totals[1].toCount(),
+                unreadable = totals[2].toCount(),
+                rejectedByCode = rejected,
+                storedReadings = readings[0].toCount(),
+                duplicates = totals[3].toCount(),
+                collapsedInMessage = totals[4].toCount(),
+                conflicts = readings[1].toCount(),
+                lastReceivedAtEpochMs = last?.receivedAtEpochMs,
+                lastSender = last?.sender,
+            ))
+        }
+        result
+    } catch (failure: RuntimeException) {
+        ObservationSummaryRead.Failed(reason(failure, ObservationFailure.READ_FAILED))
+    }
+
+    private fun Long.toCount(): Int = if (this < 0 || this > Int.MAX_VALUE) throw CorruptRow() else toInt()
 
     override fun close() = helper.close()
 

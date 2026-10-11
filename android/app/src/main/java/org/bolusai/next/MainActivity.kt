@@ -31,7 +31,7 @@ import org.bolusai.next.ui.DexcomLogBlock
 import org.bolusai.next.ui.DexcomLogModel
 import org.bolusai.next.ui.DexcomLogView
 import org.bolusai.next.glucose.dexcom.storage.readDexcomObservationLog
-import org.bolusai.dexcomg7.ObservationRead
+import org.bolusai.dexcomg7.ObservationSummaryRead
 import org.bolusai.next.ui.ScreenRenderer
 import org.bolusai.next.ui.SettingsSection
 import org.bolusai.next.ui.MealDraftModel
@@ -316,6 +316,6 @@ class MainActivity : ComponentActivity() {
         var profileTimeZoneRules: TimeZoneRules? = null
         var profileOperationIds: OperationIds? = null
         /** Process-local test seam for the Dexcom log of Diagnóstico (ADR 0021); production reads the app database. */
-        var dexcomLogReader: (() -> ObservationRead)? = null
+        var dexcomLogReader: (() -> ObservationSummaryRead)? = null
     }
 }

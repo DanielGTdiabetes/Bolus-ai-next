@@ -10,6 +10,8 @@ import androidx.test.platform.app.InstrumentationRegistry
 import org.bolusai.dexcomg7.AuthenticatedSender
 import org.bolusai.dexcomg7.ObservationFailure
 import org.bolusai.dexcomg7.ObservationRead
+import org.bolusai.dexcomg7.ObservationSummary
+import org.bolusai.dexcomg7.ObservationSummaryRead
 import org.bolusai.dexcomg7.StoredMessage
 import org.bolusai.dexcomg7.StoredMessageOutcome
 import org.bolusai.dexcomg7.StoredReading
@@ -34,14 +36,14 @@ import java.util.concurrent.atomic.AtomicInteger
 class DexcomLogDiagnosticsDeviceTest {
     private val context = InstrumentationRegistry.getInstrumentation().targetContext
     private val reads = AtomicInteger()
-    @Volatile private var answer: ObservationRead = ObservationRead.Loaded(emptyList(), emptyList())
+    @Volatile private var answer: ObservationSummaryRead = ObservationSummaryRead.Loaded(ObservationSummary.of(ObservationRead.Loaded(emptyList(), emptyList())))
 
     private val sender = AuthenticatedSender("example.sender", 42, setOf("a".repeat(64)))
-    private val loaded = ObservationRead.Loaded(
+    private val loaded = ObservationSummaryRead.Loaded(ObservationSummary.of(ObservationRead.Loaded(
         listOf(StoredMessage("m1", 1_790_000_000_000, sender, StoredMessageOutcome.OBSERVED, null, 1, 0, 0, 0,
             emptyList(), emptyList(), 0)),
         listOf(StoredReading("o1", "m1", 0, TransmitterFingerprint("c".repeat(64)), 10, 187, "SYNTHETIC_TREND", 5, null)),
-    )
+    )))
 
     @Before fun isolate() {
         MainActivity.mealRepositoryFactory = { SqliteMealRepository(it, null) }
@@ -103,7 +105,7 @@ class DexcomLogDiagnosticsDeviceTest {
     }
 
     @Test fun aFailedReadShowsItsCode() {
-        answer = ObservationRead.Failed(ObservationFailure.UNSUPPORTED_SCHEMA)
+        answer = ObservationSummaryRead.Failed(ObservationFailure.UNSUPPORTED_SCHEMA)
         ActivityScenario.launch(MainActivity::class.java).use { scenario ->
             openDiagnostics(scenario)
             await(scenario, "failed") { lines(it).text.toString() == "dexcom_observation.unsupported_schema" }

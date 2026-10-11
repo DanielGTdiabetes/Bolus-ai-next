@@ -1,5 +1,12 @@
 package org.bolusai.dexcomg7
 
+/** Result of summarising the log. Stores aggregate instead of loading the whole history (ADR 0021, F5). */
+public sealed interface ObservationSummaryRead {
+    public data class Loaded(val summary: ObservationSummary) : ObservationSummaryRead
+
+    public data class Failed(val reason: ObservationFailure) : ObservationSummaryRead
+}
+
 /**
  * Counts and status of the observation log for diagnostics (ADR 0021, F1). It deliberately carries no glucose value,
  * trend, producer timestamp or transmitter fingerprint, so nothing in it can be read as a current reading.
@@ -11,6 +18,7 @@ public data class ObservationSummary(
     val rejectedByCode: Map<String, Int>,
     val storedReadings: Int,
     val duplicates: Int,
+    val collapsedInMessage: Int,
     val conflicts: Int,
     val lastReceivedAtEpochMs: Long?,
     val lastSender: AuthenticatedSender?,
@@ -18,7 +26,10 @@ public data class ObservationSummary(
     public val status: ObservedReadingStatus get() = ObservedReadingStatus.NOT_APPROVED_FOR_USE
 
     public companion object {
-        /** Summarises a loaded log. Message order is storage order; the last message is the last one recorded. */
+        /**
+         * Reference definition over a loaded log; storage aggregates must equal it. Message order is storage order:
+         * the last message is the last one recorded.
+         */
         public fun of(read: ObservationRead.Loaded): ObservationSummary {
             val messages = read.messages
             val last = messages.lastOrNull()
@@ -30,6 +41,7 @@ public data class ObservationSummary(
                     .toSortedMap().toMap(),
                 storedReadings = read.readings.size,
                 duplicates = messages.sumOf { it.duplicateReadings },
+                collapsedInMessage = messages.sumOf { it.collapsedInMessage },
                 conflicts = read.readings.count { it.conflictOf != null },
                 lastReceivedAtEpochMs = last?.receivedAtEpochMs,
                 lastSender = last?.sender,

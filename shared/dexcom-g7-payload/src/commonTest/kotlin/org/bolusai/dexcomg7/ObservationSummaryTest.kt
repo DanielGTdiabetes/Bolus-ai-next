@@ -12,8 +12,8 @@ class ObservationSummaryTest {
     private val fingerprint = TransmitterFingerprint("c".repeat(64))
 
     private fun message(id: String, at: Long, outcome: StoredMessageOutcome, code: DexcomG7RejectionCode? = null,
-                        duplicates: Int = 0, from: AuthenticatedSender = sender) =
-        StoredMessage(id, at, from, outcome, code?.let { DexcomG7PayloadRejection(it) }, 0, duplicates, 0, 0,
+                        duplicates: Int = 0, collapsed: Int = 0, from: AuthenticatedSender = sender) =
+        StoredMessage(id, at, from, outcome, code?.let { DexcomG7PayloadRejection(it) }, 0, duplicates, 0, collapsed,
             emptyList(), emptyList(), 0)
 
     private fun reading(id: String, conflictOf: String? = null, value: Int = 123) =
@@ -30,7 +30,8 @@ class ObservationSummaryTest {
     @Test fun countsEveryOutcomeAndKeepsTheLastSender() {
         val read = ObservationRead.Loaded(
             listOf(
-                message("m1", 1, StoredMessageOutcome.OBSERVED, duplicates = 2),
+                // Codex review on PR #47: duplicates collapsed inside a message are counted separately.
+                message("m1", 1, StoredMessageOutcome.OBSERVED, duplicates = 2, collapsed = 3),
                 message("m2", 2, StoredMessageOutcome.PAYLOAD_REJECTED, DexcomG7RejectionCode.WRONG_TYPE),
                 message("m3", 3, StoredMessageOutcome.PAYLOAD_REJECTED, DexcomG7RejectionCode.EMPTY_BATCH),
                 message("m4", 4, StoredMessageOutcome.PAYLOAD_REJECTED, DexcomG7RejectionCode.WRONG_TYPE),
@@ -46,6 +47,7 @@ class ObservationSummaryTest {
                 rejectedByCode = mapOf("dexcom_g7.payload.empty_batch" to 1, "dexcom_g7.payload.wrong_type" to 2),
                 storedReadings = 2,
                 duplicates = 2,
+                collapsedInMessage = 3,
                 conflicts = 1,
                 lastReceivedAtEpochMs = 5,
                 lastSender = newer,

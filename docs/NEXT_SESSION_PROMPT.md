@@ -260,13 +260,14 @@ la huella, reloj inyectado solo para sellar, emisor autenticado (paquete,
 versión, firmantes) guardado con cada mensaje. `ObservationLog.kt` (común) y
 `glucose/dexcom/storage/` (Android, `dexcom-observations.db` v1 con triggers
 append-only, índice único parcial y trigger de conflicto). JVM 18 pruebas
-nuevas; `SqliteDexcomObservationStoreDeviceTest` (8) pendiente de ejecutar en
+nuevas; `SqliteDexcomObservationStoreDeviceTest` (9) pendiente de ejecutar en
 el Pixel. Véase docs/validation/dexcom-g7-observation-log-2026-10-11.md.
 
 ADR 0021 — REGISTRO DEXCOM EN DIAGNÓSTICO (implementado)
 docs/adr/0021-dexcom-log-diagnostics-view.md, aceptado el 2026-10-11 con F1
 (solo recuentos y estado, nunca valores de glucosa) y F2 (solo Diagnóstico,
-relectura en cada entrada). F3 y F4 técnicas: bloque plegado sin guardar,
+relectura en cada entrada). F3 a F5 técnicas: bloque plegado sin guardar,
+resumen agregado en SQLite (`summary()`) sin cargar el historial,
 lectura fuera del hilo principal, y la lectura de producción no crea el
 fichero si no existe. `ObservationSummary` (común), `ui/DexcomLogBlock`,
 `ui/DexcomLogModel`, `DexcomLogReader` y la costura
@@ -281,7 +282,7 @@ PENDIENTE DEL PROPIETARIO (ADR 0018 a 0021)
   `DexcomLogDiagnosticsDeviceTest` (3) nunca se han ejecutado en dispositivo.
   Si alguna falla, corregir antes de cualquier otro incremento.
 - Revisar las decisiones técnicas T1 a T6 (ADR 0019), E5 a E9 (ADR 0020) y F3
-  a F4 (ADR 0021).
+  a F5 (ADR 0021).
 - Para el receiver productivo: archivar release reproducible de la app Dexcom
   modificada, activar `setShareIdentityEnabled(true)` en el productor y
   aprobar anclas (paquete, versionCode, SHA-256 de firmantes).

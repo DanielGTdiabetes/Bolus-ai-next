@@ -28,6 +28,7 @@ internal object DexcomLogBlock {
             ) + rejectedByCode.map { (code, count) -> "dexcom_log.rejected.$code=$count" } + listOf(
                 "dexcom_log.readings_stored=$storedReadings",
                 "dexcom_log.duplicates=$duplicates",
+                "dexcom_log.collapsed_in_message=$collapsedInMessage",
                 "dexcom_log.conflicts=$conflicts",
                 "dexcom_log.last_received_utc=${lastReceivedAtEpochMs?.let { Instant.ofEpochMilli(it).toString() } ?: "none"}",
                 "dexcom_log.last_sender=${lastSender?.let { "${it.packageName}@${it.versionCode}" } ?: "none"}",

@@ -7,6 +7,7 @@ import org.bolusai.dexcomg7.DexcomObservationStore
 import org.bolusai.dexcomg7.ObservationFailure
 import org.bolusai.dexcomg7.ObservationInput
 import org.bolusai.dexcomg7.ObservationRead
+import org.bolusai.dexcomg7.ObservationSummaryRead
 import org.bolusai.dexcomg7.ObservationWrite
 import org.bolusai.dexcomg7.ObservedDexcomG7Message
 import org.bolusai.dexcomg7.ObservedDexcomG7Reading
@@ -42,6 +43,7 @@ class DexcomG7RecorderTest {
             )
         }
         override fun read(): ObservationRead = error("unused")
+        override fun summary(): ObservationSummaryRead = error("unused")
     }
 
     private val clock = EpochClock { 42L }
@@ -98,6 +100,7 @@ class DexcomG7RecorderTest {
         val store = object : DexcomObservationStore {
             override fun record(input: ObservationInput): ObservationWrite = throw defect
             override fun read(): ObservationRead = error("unused")
+        override fun summary(): ObservationSummaryRead = error("unused")
         }
         assertSame(defect, assertThrows(IllegalStateException::class.java) { DexcomG7Recorder(store, clock).record(observed) })
     }
