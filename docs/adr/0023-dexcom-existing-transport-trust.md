@@ -1,8 +1,9 @@
 # ADR 0023: recepción Dexcom por permiso y conjunto aprobado, y presentación local de la última lectura
 
 - Estado: propuesto. Propuesta única del primer hito Android (Fase 5). Solo D1
-  está decidida por el propietario (2026-10-11). Siguen pendientes la política
-  de recepción, sus riesgos residuales y las decisiones de presentación
+  está decidida por el propietario (2026-10-11) y el inventario L1 está hecho.
+  Siguen pendientes L2, la política de recepción, sus riesgos residuales y las
+  decisiones de presentación
 - Fecha: 2026-10-11
 - Fase: 5, recepción local compatible con el productor instalado y presentación
   sin cálculo
@@ -27,9 +28,10 @@ permiso de la PR #55 y la propuesta de presentación de la rama
 El propietario confirma que la Dexcom modificada ya funciona y Bolus AI la usa.
 Next debe aprovechar su transporte sin modificar, recompilar ni reinstalar
 Dexcom o Legacy. La rectificación del ADR 0022 conserva este alcance. No se ha
-realizado una nueva auditoría de Legacy ni inspeccionado el teléfono para este
-ADR; los detalles del productor remiten al
+realizado una nueva auditoría de Legacy; los detalles del productor remiten al
 [contrato observado](../contracts/modified-dexcom-g7-broadcast-observed-v1.md).
+El teléfono se inspeccionó solo con el inventario de solo lectura L1
+([validación](../validation/dexcom-installed-inventory-2026-10-11.md)).
 
 La política implementada en Next exige identidad compartida por Android, que
 el envío observado no proporciona. Por eso **no existe ninguna obligación de
@@ -48,8 +50,8 @@ presenta glucosa y `ReadOverview` devuelve `input.glucose.policy_not_approved`.
 
 | ID | Acción | Bloquea |
 |---|---|---|
-| L1 | Autorizar una lectura de solo lectura en el teléfono (`dumpsys package`, `pm list packages`, `apksigner verify --print-certs` sobre una copia de la APK) para obtener paquete, `versionCode`, firmantes y titulares efectivos de `com.dexcom.cgm.EXTERNAL_PERMISSION`, y el propietario y nivel del permiso. Sin cambiar permisos, instalaciones ni ajustes | anclas (I-2) y conjunto (I-1) |
-| L2 | Revisar los valores obtenidos y aprobarlos como anclas de la instalación actual. El hash histórico del contrato (`6746ac78…`) no se importa como ancla aprobada | política `Approved` de la parte I |
+| L1 | Inventario de solo lectura en el teléfono: paquete, UID, `versionCode`, firmantes y titulares efectivos de `com.dexcom.cgm.EXTERNAL_PERMISSION`, y propietario y nivel del permiso. **Autorizado y hecho el 2026-10-11** sin cambiar permisos, instalaciones ni ajustes ([validación](../validation/dexcom-installed-inventory-2026-10-11.md)) | — |
+| L2 | Revisar los valores observados en L1 (sección «Valores observados y propuesta de conjunto y anclas») y aprobarlos como anclas de la instalación actual. El hash histórico del contrato (`6746ac78…`) coincide con la APK instalada, pero no se usa como ancla: el ancla es paquete, versión y firmantes | política `Approved` de la parte I |
 
 ## Parte I — Recepción técnica
 
@@ -124,7 +126,36 @@ no se promete detección instantánea de cada concesión o revocación.
 | Enumeración incompleta o UID/perfil ambiguo | Un resultado parcial no demuestra cierre del conjunto; bloquear, no aceptarlo como una lista completa |
 | Cambio detectado sin un mensaje nuevo | El estado visible se actualiza al ejecutar comprobaciones; no hay garantía de vigilancia continua ni de aviso de mensajes que Android descarta antes de invocar Next |
 
+| Clave de firma compartida por apps del propietario | Legacy, Next y `com.wtachtsugar` comparten certificado (`1d1f25bf…`, inventario L1). Quien tenga esa clave puede firmar una app nueva. Con el ancla por paquete, UID y versión, esa app cambia el conjunto y bloquea; sin anclar la versión, una actualización firmada con la misma clave pasaría sin revisión. No se sabe qué almacén es ni quién lo custodia |
+| Instalación lateral | Los cuatro paquetes tienen instalador `null`: ninguna tienda aporta garantía de origen. La confianza descansa solo en las anclas aprobadas |
+
 Ninguno de estos riesgos queda aceptado por este borrador.
+
+### Valores observados y propuesta de conjunto y anclas
+
+Valores del inventario L1 del 2026-10-11 (Android 17, API 37, build
+`CP3A.260905.009`, usuario único `0`). Son la base de L2, I-1 e I-2; ninguno
+está aprobado.
+
+**Definición del permiso.** Declarante único `com.dexcom.g7` (UID 10451),
+protección `dangerous`. Se propone comprobarla en cada lectura: un segundo
+declarante, otro propietario u otro nivel de protección bloquea.
+
+**Titulares efectivos hoy:** `com.dexcom.g7`, `org.bolusai.companion` y
+`com.wtachtsugar`, los tres por concesión runtime en el usuario 0. Next no
+solicita el permiso (R2 del ADR 0022); al concedérselo (I-6) pasaría a ser el
+cuarto titular.
+
+| Miembro propuesto | Paquete | UID | `versionCode` | SHA-256 del firmante | Ancla propuesta |
+|---|---|---|---|---|---|
+| Dexcom (productor) | `com.dexcom.g7` | 10451 | 4537 | `d30e0d3f08b70cedbc0804c96f2ec4599f243b5e149ef73a601757ad94c74145` | paquete, UID, versión y firmante exactos. Además declara el permiso |
+| Legacy | `org.bolusai.companion` | 10450 | 13 | `1d1f25bf2aadfd82956610084f3acbf06bb69225b0c4fb031df8eae24f4f6a8d` | paquete, UID, versión y firmante exactos |
+| `com.wtachtsugar` | `com.wtachtsugar` | 10350 | 3 | `1d1f25bf2aadfd82956610084f3acbf06bb69225b0c4fb031df8eae24f4f6a8d` | solo si el propietario confirma qué es y que debe tener el permiso (I-1) |
+| Next (receptor) | `org.bolusai.next` | el propio (`Process.myUid()`) | sin ancla | se registra, no se ancla | Next se identifica a sí mismo. Anclar su versión bloquearía cada actualización de Next sin aportar defensa: si otra app ocupara ese paquete, sería ella quien ejecuta la comprobación |
+
+El UID se ancla para detectar una desinstalación y reinstalación aunque
+mantenga versión y firma. Cualquier diferencia en la tabla bloquea de forma
+durable hasta una aprobación nueva (parte I, punto 5).
 
 ### Decisiones solicitadas de la parte I
 
@@ -132,8 +163,8 @@ Recomendación en negrita. Ninguna se aplica sin respuesta.
 
 | ID | Pregunta | Opciones | Recomendación y motivo |
 |---|---|---|---|
-| I-1 | Conjunto aprobado de titulares | Dexcom, Legacy y Next según L1; otro conjunto | **El que muestre L1**, revisado miembro a miembro. Si Dexcom no aparece como titular efectivo, la política no sirve y se vuelve a este ADR |
-| I-2 | Anclas y reglas de actualización | (a) paquete, `versionCode` y firmantes de Dexcom, Legacy y Next; toda actualización de cualquiera genera bloqueo durable hasta aprobar; (b) anclar solo firmantes de Legacy y Next y aceptar sus versiones nuevas | **(a)**. Más fricción al actualizar, pero ningún cambio entra sin revisión. (b) es aceptable para Next si el propietario lo prefiere |
+| I-1 | Conjunto aprobado de titulares | (a) Dexcom, Legacy, `com.wtachtsugar` y Next; (b) sin `com.wtachtsugar`, que el propietario le retire el permiso antes de activar la recepción y que Next bloquee mientras lo tenga; (c) no aprobar la política | **(a) si el propietario confirma que `com.wtachtsugar` es suyo y necesita el permiso; si no, (b)**. Dexcom sí es titular efectivo (L1), así que la política es aplicable. Retirar el permiso es una acción del propietario en su teléfono, nunca de Next ni del agente |
+| I-2 | Anclas y reglas de actualización | (a) los valores de la tabla anterior: toda actualización o reinstalación de Dexcom, Legacy o `com.wtachtsugar` bloquea hasta aprobar; Next sin ancla de versión; (b) para Legacy y `com.wtachtsugar`, aceptar versiones nuevas con el mismo firmante | **(a)**. La clave compartida hace que (b) deje pasar sin revisión cualquier app de ese firmante que reutilice un paquete aprobado. La fricción no tiene coste clínico: Next no calcula |
 | I-3 | Visibilidad de paquetes | (a) `QUERY_ALL_PACKAGES` si la prueba en el Pixel demuestra que sin él la enumeración es parcial; (b) solo `<queries>` | **Decidir tras la prueba**. Con (b) la comparación debe fallar cerrada si no puede demostrar cobertura |
 | I-4 | Riesgos residuales de la tabla anterior | Aceptarlos todos, aceptar algunos o rechazar la política | **Decisión exclusiva del propietario**. El agente no recomienda aceptar riesgos |
 | I-5 | Dónde viven las anclas aprobadas | (a) constante en código de producción revisada por PR y comprobada por `verify.ps1` contra una tabla del contrato; (b) propiedad de Gradle local | **(a)**. Paquetes, versiones y digests no son secretos y quedan trazados por commit |
@@ -273,7 +304,8 @@ Presentación:
 
 ## Decisiones pendientes
 
-Parte I: L1, L2 e I-1 a I-8, con I-4 como aceptación explícita de riesgos.
+Parte I: L2 e I-1 a I-8, con I-4 como aceptación explícita de riesgos. L1
+está hecho (inventario de solo lectura del 2026-10-11).
 Parte II: B1 a B5, C1 a C7 y D2, con B4 y C5 reservadas al propietario.
 D1 ya está decidida: prueba sin Internet con Bluetooth activo y sin modo avión.
 Esta decisión no acepta riesgos ni aprueba otras partes de la propuesta.

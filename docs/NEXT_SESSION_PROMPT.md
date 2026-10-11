@@ -31,6 +31,10 @@ Wi-Fi y datos móviles apagados, Bluetooth activo y sin activar modo avión,
 para no desconectar el sensor G7. Comprobar continuidad de recepción y ausencia
 de red validada, también tras reinicio. No volver a pedir esta decisión;
 no implica aceptación de riesgos ni aprobación del resto del ADR.
+L1 hecho el 2026-10-11 (docs/validation/dexcom-installed-inventory-2026-10-11.md):
+Dexcom tiene el permiso concedido; titulares actuales Dexcom, Legacy y
+`com.wtachtsugar`; Legacy, Next y `com.wtachtsugar` comparten firmante. El ADR
+propone conjunto y anclas con esos valores; L2, I-1 e I-2 siguen sin aprobar.
 Siguiente paso: recoger respuestas, marcar el ADR como aceptado e implementar
 su plan en una sola entrega. Sin respuesta, no implementar ni presentar valores.
 
