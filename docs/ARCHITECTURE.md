@@ -177,6 +177,12 @@ Diagnóstico es la única pantalla que lee ese registro: muestra en un bloque
 plegado solo recuentos, rechazos por código, última recepción y emisor, nunca
 valores de glucosa. Leer no crea el fichero. Véase el
 [ADR 0021](adr/0021-dexcom-log-diagnostics-view.md).
+`DexcomG7Receiver` es el punto de entrada del broadcast, declarado con
+`android:enabled="false"` y activable solo por `adb`. Comprueba la acción,
+autentica y solo después lee extras, parsea y, en otro hilo, guarda con
+`DexcomG7Recorder`. La política de producción es `Pending`: todo emisor se
+rechaza sin leer ni abrir el registro. La lógica vive en `DexcomG7Intake`, sin
+Android. Véase el [ADR 0022](adr/0022-dexcom-g7-receiver-disabled.md).
 
 ## Presentación Android local
 

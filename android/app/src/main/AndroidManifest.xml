@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
     <application
         android:allowBackup="false"
         android:dataExtractionRules="@xml/data_extraction_rules"
@@ -18,5 +19,19 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+        <!--
+            ADR 0022: disabled by default; only `adb shell pm enable` turns it on (R1). No android:permission: the
+            producer's permission is dangerous and proves nothing (R8). Authenticity comes from the sender identity,
+            checked before any extra is read; with the Pending policy every message is rejected and nothing is stored.
+        -->
+        <receiver
+            android:name=".glucose.dexcom.DexcomG7Receiver"
+            android:enabled="false"
+            android:exported="true"
+            tools:ignore="ExportedReceiver">
+            <intent-filter>
+                <action android:name="com.dexcom.cgm.EXTERNAL_BROADCAST" />
+            </intent-filter>
+        </receiver>
     </application>
 </manifest>

@@ -87,7 +87,7 @@ class AndroidDexcomSenderEvidenceTest {
     }
 
     @Test
-    fun productionCompositionRemainsBlockedAndHasNoReceiverOrClinicalPermissions() {
+    fun productionCompositionRemainsBlockedWithOnlyTheDisabledReceiverAndNoClinicalPermissions() {
         val status = org.bolusai.next.glucose.PendingDexcomSource.readLatest()
         assertEquals(
             org.bolusai.next.glucose.LocalGlucoseSourceResult.Unavailable(UnavailabilityReason.POLICY_NOT_APPROVED),
@@ -95,9 +95,12 @@ class AndroidDexcomSenderEvidenceTest {
         )
         val info = context.packageManager.getPackageInfo(
             context.packageName,
-            PackageManager.PackageInfoFlags.of((PackageManager.GET_RECEIVERS or PackageManager.GET_PERMISSIONS).toLong()),
+            PackageManager.PackageInfoFlags.of(
+                (PackageManager.GET_RECEIVERS or PackageManager.GET_PERMISSIONS or PackageManager.MATCH_DISABLED_COMPONENTS).toLong(),
+            ),
         )
-        assertTrue(info.receivers.isNullOrEmpty())
+        // ADR 0022: the only receiver is the Dexcom one, declared disabled; DexcomG7ReceiverDeviceTest covers it.
+        assertEquals(listOf(DexcomG7Receiver::class.java.name to false), info.receivers.orEmpty().map { it.name to it.enabled })
         assertTrue(info.requestedPermissions.orEmpty().none {
             it == "android.permission.INTERNET" || it.startsWith("com.dexcom.")
         })

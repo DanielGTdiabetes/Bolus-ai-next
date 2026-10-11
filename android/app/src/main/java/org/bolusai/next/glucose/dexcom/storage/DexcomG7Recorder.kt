@@ -2,6 +2,7 @@ package org.bolusai.next.glucose.dexcom.storage
 
 import org.bolusai.dexcomg7.AuthenticatedSender
 import org.bolusai.dexcomg7.DexcomObservationStore
+import org.bolusai.dexcomg7.ObservationIds
 import org.bolusai.dexcomg7.ObservationInput
 import org.bolusai.dexcomg7.ObservationWrite
 import org.bolusai.dexcomg7.TransmitterFingerprint
@@ -11,6 +12,7 @@ import org.bolusai.engine.UnavailabilityReason
 import org.bolusai.engine.UnavailableInput
 import org.bolusai.next.glucose.dexcom.DexcomG7ReceptionOutcome
 import java.security.MessageDigest
+import java.util.UUID
 
 /** Device wall clock in epoch milliseconds, injected. It only stamps reception; no freshness is derived from it. */
 internal fun interface EpochClock {
@@ -71,4 +73,9 @@ internal object AndroidTransmitterHasher : TransmitterHasher {
         }.digest()
         return TransmitterFingerprint(digest.joinToString("") { "%02x".format(it.toInt() and 0xff) })
     }
+}
+
+/** Random message and observation identifiers for the production log (ADR 0022, R7). They carry no meaning. */
+internal object AndroidObservationIds : ObservationIds {
+    override fun next(): String = UUID.randomUUID().toString()
 }

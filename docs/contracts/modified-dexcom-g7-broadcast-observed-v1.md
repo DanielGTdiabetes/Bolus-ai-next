@@ -140,7 +140,11 @@ duplicados idénticos, rechaza los conflictivos, no aplica rango al valor y
 marca toda lectura como `NOT_APPROVED_FOR_USE`. El
 [ADR 0019](../adr/0019-dexcom-g7-reception-composition.md) compone
 autenticación, lectura de extras y parser sin receiver: todo resultado sigue
-bloqueando la glucosa.
+bloqueando la glucosa. El
+[ADR 0022](../adr/0022-dexcom-g7-receiver-disabled.md) declara el receiver de
+`com.dexcom.cgm.EXTERNAL_BROADCAST` desactivado por defecto y sin pedir
+`com.dexcom.cgm.EXTERNAL_PERMISSION`: el productor no lo descubre y, con la
+política `Pending`, todo emisor se rechaza antes de leer extras.
 
 Next dispone de un [verificador preparatorio de identidad](android-dexcom-sender-authentication-v1.md)
 que modela estos rechazos sin anclas reales ni acceso a payloads. Todavía falta

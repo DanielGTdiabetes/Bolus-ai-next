@@ -301,9 +301,32 @@ Pro Fold (`rango`, Android 17, API 37, build `CP3A.260905.009`), único en
 3/3/3. Sigue sin prueba en dispositivo la rama `BadParcelableException`
 (ADR 0019).
 
-PENDIENTE DEL PROPIETARIO (ADR 0018 a 0021)
-- Revisar las decisiones técnicas T1 a T6 (ADR 0019), E5 a E9 (ADR 0020) y F3
-  a F5 (ADR 0021).
+ADR 0022 — RECEIVER DEXCOM G7 DESACTIVADO (implementado, preparatorio)
+docs/adr/0022-dexcom-g7-receiver-disabled.md, aceptado el 2026-10-11 con R1
+(componente `android:enabled="false"`, solo `adb shell pm enable`, Diagnóstico
+muestra `dexcom_receiver.component` y `dexcom_receiver.policy`), R2 (sin
+`com.dexcom.cgm.EXTERNAL_PERMISSION`: el productor real no descubre a Next) y
+R3 (rechazo del emisor sin leer extras ni abrir el registro, E5). R4 a R9
+técnicas: acción → autenticación → extras → parser síncrono, almacén abierto
+solo tras autenticar y escrito con `goAsync()` en un hilo serie, política de
+producción constante `Pending`, UUID como identificadores, exportado sin
+`android:permission`. `DexcomG7Receiver.kt` (`DexcomReceiverConfiguration`,
+`DexcomReceipt`, `DexcomG7Intake`, receiver y costura `receipts`),
+`DexcomReceiverStatus.kt` y `AndroidObservationIds`. El fixture sintético
+añade la orden `TRIGGER_G7`. `verify.ps1` exige la forma exacta del receiver
+en los manifiestos, ningún valor `com.dexcom.` salvo la acción, política
+`Pending` y ninguna subclase, ancla aprobada ni observador en producción. JVM
+10 pruebas nuevas; `DexcomG7ReceiverDeviceTest` (8) en la lista de
+instrumentación, **sin ejecutar en el Pixel**. Véase
+docs/validation/dexcom-g7-receiver-disabled-2026-10-11.md.
+Toda prueba que active el receiver debe restaurar
+`COMPONENT_ENABLED_STATE_DEFAULT` y toda subclase de prueba debe abrir una base
+sintética: `DexcomStorageGuard` rechaza la real.
+
+PENDIENTE DEL PROPIETARIO (ADR 0018 a 0022)
+- Ejecutar `.\scripts\verify.ps1 -DeviceTests` para el ADR 0022.
+- Revisar las decisiones técnicas T1 a T6 (ADR 0019), E5 a E9 (ADR 0020), F3
+  a F5 (ADR 0021) y R4 a R9 (ADR 0022).
 - Para el receiver productivo: archivar release reproducible de la app Dexcom
   modificada, activar `setShareIdentityEnabled(true)` en el productor y
   aprobar anclas (paquete, versionCode, SHA-256 de firmantes).
@@ -321,16 +344,14 @@ probar bloques de `verify.ps1` con rutas Linux. Maven Central puede devolver
 el propietario.
 
 SIGUIENTE PASO
-Los ADR 0014, 0015, 0017, 0018, 0019, 0020 y 0021 y la opción A del ADR 0016 están
+Los ADR 0014, 0015, 0017 a 0022 y la opción A del ADR 0016 están
 implementados. No hay ningún incremento funcional ni clínico autorizado. El
-ADR 0019 y 0020 componen autenticación, extras, parser y registro local sin
-receiver. Sus pruebas de `Bundle`, SQLite y Diagnóstico ya pasaron en el Pixel
-(`OK (146 tests)` sobre `cacc8a9`). Antes del receiver productivo, el
-propietario debe archivar la release reproducible, activar el opt-in de
-identidad y aprobar las anclas.
-Sin esas puertas, siguen abiertos sin bloqueo externo: el receiver productivo
-detrás de un interruptor desactivado por defecto (ADR propio; sin anclas
-aprobadas la política sigue `Pending` y todo se rechaza), el ADR de retención
+receiver existe desactivado y con política `Pending` (ADR 0022). Antes de la
+validación con Dexcom real, el propietario debe archivar la release
+reproducible, activar el opt-in de identidad y aprobar las anclas; esa
+validación necesita su propio ADR (permiso del productor, anclas, prueba en
+modo avión).
+Sin esas puertas, siguen abiertos sin bloqueo externo: el ADR de retención
 (E4) y, fuera de Dexcom, P4 (franjas en cambios de hora) y P6
 (exportación/importación de copias) del ADR 0012.
 Cualquier capacidad nueva necesita antes un ADR que defina su alcance y sus

@@ -92,6 +92,7 @@ class DexcomLogDiagnosticsDeviceTest {
             scenario.onActivity { activity ->
                 assertFalse("Folded by default", lines(activity).isVisible)
                 val text = lines(activity).text.toString()
+                assertTrue(text.startsWith("dexcom_receiver.component=disabled_by_default\ndexcom_receiver.policy=pending\n"))
                 assertTrue(text.contains("dexcom_log.status=dexcom_g7.reading.not_approved_for_use"))
                 assertTrue(text.contains("dexcom_log.readings_stored=1"))
                 assertTrue(text.contains("dexcom_log.last_sender=example.sender@42"))
@@ -108,7 +109,10 @@ class DexcomLogDiagnosticsDeviceTest {
         answer = ObservationSummaryRead.Failed(ObservationFailure.UNSUPPORTED_SCHEMA)
         ActivityScenario.launch(MainActivity::class.java).use { scenario ->
             openDiagnostics(scenario)
-            await(scenario, "failed") { lines(it).text.toString() == "dexcom_observation.unsupported_schema" }
+            await(scenario, "failed") {
+                lines(it).text.toString() == "dexcom_receiver.component=disabled_by_default\n" +
+                    "dexcom_receiver.policy=pending\ndexcom_observation.unsupported_schema"
+            }
         }
     }
 

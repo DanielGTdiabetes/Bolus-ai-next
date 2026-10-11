@@ -146,6 +146,13 @@ claro. Nada lo usa todavía. Véanse el
 Diagnóstico muestra ese registro como recuentos y estado, sin valores de
 glucosa. Véanse el [ADR 0021](docs/adr/0021-dexcom-log-diagnostics-view.md) y
 la [validación](docs/validation/dexcom-log-diagnostics-2026-10-11.md).
+El receiver del broadcast Dexcom está declarado pero desactivado por defecto:
+solo se activa por `adb` y, con la política de confianza pendiente, rechaza todo
+emisor sin leer ni guardar su contenido. No declara el permiso del productor,
+así que la app Dexcom real todavía no le envía nada. Diagnóstico muestra su
+estado. Es un paso preparatorio, no la validación con Dexcom real. Véanse el
+[ADR 0022](docs/adr/0022-dexcom-g7-receiver-disabled.md) y la
+[validación](docs/validation/dexcom-g7-receiver-disabled-2026-10-11.md).
 Se ha verificado el flujo en la pantalla interior del Pixel 10 Pro Fold, además
 de layouts anchos vertical/horizontal con texto ampliado. Pausar y reanudar los
 editores conserva sus campos, foco y posición de desplazamiento.

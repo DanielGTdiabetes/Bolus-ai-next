@@ -30,6 +30,7 @@ import org.bolusai.next.ui.BlockingView
 import org.bolusai.next.ui.DexcomLogBlock
 import org.bolusai.next.ui.DexcomLogModel
 import org.bolusai.next.ui.DexcomLogView
+import org.bolusai.next.glucose.dexcom.DexcomReceiverStatus
 import org.bolusai.next.glucose.dexcom.storage.readDexcomObservationLog
 import org.bolusai.dexcomg7.ObservationSummaryRead
 import org.bolusai.next.ui.ScreenRenderer
@@ -237,7 +238,8 @@ class MainActivity : ComponentActivity() {
 
     private fun dexcomLogView(destination: Destination): DexcomLogView? {
         if (destination != Destination.DIAGNOSTICS) return null
-        val lines = DexcomLogBlock.lines(checkNotNull(dexcomLog.state))
+        // ADR 0022, R9: the receiver component and policy are read on every paint, read-only.
+        val lines = DexcomLogBlock.lines(checkNotNull(dexcomLog.state), DexcomReceiverStatus.read(this))
         return DexcomLogView(lines, dexcomLogOpen) { dexcomLogOpen = it }
     }
 
