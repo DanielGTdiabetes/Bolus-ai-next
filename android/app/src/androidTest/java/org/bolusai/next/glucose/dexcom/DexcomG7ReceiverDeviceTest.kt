@@ -44,14 +44,17 @@ class DexcomG7ReceiverDeviceTest {
     private var n = 0
     private val ids = ObservationIds { "receiver-test-${++n}" }
 
-    /** Same receiver code; only the policy and the store are synthetic. */
+    /** Same receiver code; only the policy, the store and, when given, the sender evidence are synthetic. */
     private inner class ProbeReceiver(
         private val policy: DexcomSenderTrustPolicy,
+        private val evidence: ((Context) -> DexcomSenderEvidenceSource)? = null,
         private val open: (Context) -> SqliteDexcomObservationStore = {
             SqliteDexcomObservationStore(it, SYNTHETIC_DB, ids, AndroidTransmitterHasher)
         },
     ) : DexcomG7Receiver() {
         override fun trustPolicy(): DexcomSenderTrustPolicy = policy
+        override fun senderEvidence(context: Context): DexcomSenderEvidenceSource =
+            evidence?.invoke(context) ?: super.senderEvidence(context)
         override fun openStore(context: Context): SqliteDexcomObservationStore {
             opens.incrementAndGet()
             return open(context)
@@ -167,7 +170,7 @@ class DexcomG7ReceiverDeviceTest {
 
     @Test
     fun aStoreThatFailsToOpenIsDeliveredAsStorageFailedAndTheProcessSurvives() {
-        val failing = ProbeReceiver(policy()) { error("synthetic open failure") }
+        val failing = ProbeReceiver(policy(), open = { error("synthetic open failure") })
         val receipt = probe(failing, shareIdentity = true, payload(FIXTURE_PACKAGE))
         assertEquals(DexcomReceipt.StorageFailed(DexcomStorageFailure.OPEN_FAILED, 1), receipt)
         assertEquals("input.glucose.persistence_failed", (receipt as DexcomReceipt.StorageFailed).glucose.code)
@@ -181,14 +184,30 @@ class DexcomG7ReceiverDeviceTest {
     @Test
     fun theBarrierDenyingTheRealLogIsAStorageFailureAndTheRealLogIsUntouched() {
         val existedBefore = realLog().exists()
-        val real = ProbeReceiver(policy()) {
+        val real = ProbeReceiver(policy(), open = {
             SqliteDexcomObservationStore(it, SqliteDexcomObservationStore.DATABASE_NAME, ids, AndroidTransmitterHasher)
-        }
+        })
         assertEquals(
             DexcomReceipt.StorageFailed(DexcomStorageFailure.OPEN_FAILED, 1),
             probe(real, shareIdentity = true, payload(FIXTURE_PACKAGE)),
         )
         assertEquals(existedBefore, realLog().exists())
+    }
+
+    @Test
+    fun aSenderEvidenceFailureOnTheMainThreadIsIntakeFailedAndTheProcessSurvives() {
+        // R11: onReceive runs on the main thread, where an escaping exception would kill the process.
+        val failing = ProbeReceiver(policy(), evidence = { error("synthetic evidence failure") })
+        val receipt = probe(failing, shareIdentity = true, payload(FIXTURE_PACKAGE))
+        assertEquals(DexcomReceipt.IntakeFailed(DexcomIntakeFailure.AUTHENTICATION, 0), receipt)
+        assertEquals("input.glucose.authentication_failed", (receipt as DexcomReceipt.IntakeFailed).glucose.code)
+        assertEquals(0, opens.get())
+        assertFalse(context.getDatabasePath(SYNTHETIC_DB).exists())
+        // Same process: the next message is authenticated, read and recorded normally.
+        val next = probe(policy(), shareIdentity = true, payload(FIXTURE_PACKAGE)) as DexcomReceipt.Recorded
+        assertEquals("input.glucose.policy_not_approved", (next.recording as DexcomG7Recording.Recorded).glucose.code)
+        assertEquals(1, next.payloadReads)
+        assertEquals(1, opens.get())
     }
 
     private fun probe(policy: DexcomSenderTrustPolicy, shareIdentity: Boolean, payload: Bundle): DexcomReceipt =

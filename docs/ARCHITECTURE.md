@@ -182,7 +182,8 @@ valores de glucosa. Leer no crea el fichero. Véase el
 autentica y solo después lee extras, parsea y, en otro hilo, guarda con
 `DexcomG7Recorder`. La política de producción es `Pending`: todo emisor se
 rechaza sin leer ni abrir el registro. La lógica vive en `DexcomG7Intake`, sin
-Android. Véase el [ADR 0022](adr/0022-dexcom-g7-receiver-disabled.md).
+Android. Las excepciones del almacén (R10) y de la fase síncrona (R11) se
+convierten en recibos con código estable, sin cerrar el proceso. Véase el [ADR 0022](adr/0022-dexcom-g7-receiver-disabled.md).
 
 ## Presentación Android local
 

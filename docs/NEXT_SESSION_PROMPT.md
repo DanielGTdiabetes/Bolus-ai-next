@@ -326,13 +326,28 @@ cerrar el almacén en `DexcomReceipt.StorageFailed` (glucosa
 `AndroidDexcomSenderEvidenceTest` 8/8 y `DexcomLogDiagnosticsDeviceTest` 3/3,
 con la instrumentación completa en `OK (164 tests)`. Véase
 docs/validation/dexcom-g7-receiver-storage-failure-2026-10-11.md.
+R11 (aprobada el 2026-10-11 sobre `61e5f6f`, decisiones 1a a 5a con los
+ajustes de alcance y etapas): en `DexcomG7Intake.accept` ninguna `Exception`
+escapa. Cuatro límites separados (fábrica de la fuente y autenticación,
+lectura de extras, parser y reloj, este último por la revisión de Codex) dan
+`DexcomReceipt.IntakeFailed` con `dexcom_receiver.intake_authentication_failed`,
+`intake_extras_failed`, `intake_parser_failed` o `intake_clock_failed`
+(glucosa `clock_anomaly`), sin guardar nada. Fallo de autenticación sin extras,
+almacén ni reloj. `accept` recibe una fábrica de la fuente
+(`DexcomG7Receiver.senderEvidence`) y `DexcomG7Reception` el parser. T3 sin
+cambios. Los `Error` (incluido `StackOverflowError` en extras, solo provocable
+por un emisor autenticado) siguen cerrando el proceso: riesgo aceptado.
+`goAsync()` y `writer.execute` fuera de R11. JVM `DexcomG7IntakeTest` 24/24
+en el contenedor. `DexcomG7ReceiverDeviceTest` 11/11 en el Pixel sobre
+`d1708f4`, con la instrumentación completa en `OK (165 tests)`. Véase
+docs/validation/dexcom-g7-receiver-intake-failure-2026-10-11.md.
 Toda prueba que active el receiver debe restaurar
 `COMPONENT_ENABLED_STATE_DEFAULT` y toda subclase de prueba debe abrir una base
 sintética: `DexcomStorageGuard` rechaza la real.
 
 PENDIENTE DEL PROPIETARIO (ADR 0018 a 0022)
-- Decidir si Diagnóstico muestra un contador duradero de fallos de
-  almacenamiento del receiver (R10).
+- Decidir si Diagnóstico muestra un contador duradero de fallos del receiver
+  (almacenamiento R10 y fase síncrona R11).
 - Revisar las decisiones técnicas T1 a T6 (ADR 0019), E5 a E9 (ADR 0020), F3
   a F5 (ADR 0021) y R4 a R9 (ADR 0022).
 - Para el receiver productivo: archivar release reproducible de la app Dexcom
@@ -352,8 +367,8 @@ probar bloques de `verify.ps1` con rutas Linux. Maven Central puede devolver
 el propietario.
 
 SIGUIENTE PASO
-Los ADR 0014, 0015, 0017 a 0022 y la opción A del ADR 0016 están
-implementados. No hay ningún incremento funcional ni clínico autorizado. El
+Los ADR 0014, 0015, 0017 a 0022 (con R10 y R11) y la opción A del ADR 0016
+están implementados. No hay ningún incremento funcional ni clínico autorizado. El
 receiver existe desactivado y con política `Pending` (ADR 0022). Antes de la
 validación con Dexcom real, el propietario debe archivar la release
 reproducible, activar el opt-in de identidad y aprobar las anclas; esa

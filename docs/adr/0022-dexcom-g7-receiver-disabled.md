@@ -5,7 +5,9 @@
   Diagnóstico, sin declarar el permiso del productor, rechazo del emisor sin
   leer ni guardar su payload). R4 a R9 son decisiones técnicas del agente,
   revisables en la PR. R10 se añadió tras la revisión de `main` posterior a la
-  PR #51 (commit `ccfb753`)
+  PR #51 (commit `ccfb753`). R11 la aprobó el propietario el 2026-10-11 sobre
+  `61e5f6f` (decisiones 1a a 5a de la sesión), con los ajustes de alcance y
+  etapas, y la cuarta etapa del reloj tras la revisión de Codex en la PR #53
 - Fecha: 2026-10-11
 - Fase y criterio de aceptación: Fase 5, trabajo 2 («adaptador de plataforma
   separado del dominio»). Incremento **preparatorio**: no cumple ningún criterio
@@ -54,6 +56,7 @@ Sin anclas, la política de confianza es `Pending` y todo mensaje se rechaza.
 | R7 | Identificadores de mensaje y observación: UUID aleatorio (`AndroidObservationIds`). Reloj: pared del dispositivo, solo para sellar la recepción (E8 del ADR 0020) |
 | R8 | Componente exportado sin `android:permission`: el permiso del productor es `dangerous`, cualquier app puede obtenerlo y no autentica. La autenticidad la da la identidad del emisor (ADR 0005 y 0006). Se documenta con `tools:ignore="ExportedReceiver"` |
 | R10 | En el hilo de escritura ninguna `Exception` escapa: en Android mataría el proceso. `DexcomG7Intake.record` captura por separado la apertura, la escritura y el cierre del almacén y devuelve `DexcomReceipt.StorageFailed` con la primera etapa que falló: `dexcom_receiver.store_open_failed`, `dexcom_receiver.store_record_failed` o `dexcom_receiver.store_close_failed`. El recibo no guarda el texto de la excepción ni el payload. No se reintenta ni se descarta en silencio. El almacén se cierra siempre que se abrió y `finish()` se llama siempre. La glucosa queda bloqueada como `persistence_failed`. Tras `store_close_failed` la escritura pudo confirmarse: decide el registro, no el recibo. Los `Error` de la JVM no se capturan. Los fallos que el almacén SQLite ya convierte en `ObservationWrite.Failed` siguen llegando como `Recorded` con `persistence_failed` |
+| R11 | En `DexcomG7Intake.accept` ninguna `Exception` escapa, tampoco la del reloj. `goAsync()` y `writer.execute` quedan fuera de R11 y no se capturan: el ejecutor serie nunca se cierra y no puede lanzar `RejectedExecutionException`. `accept` recibe una fábrica de la fuente de evidencia (no un `PackageManager`) y captura cuatro etapas, cada una en su propio límite: la fábrica de la fuente y `reception.receive` hasta la decisión de autenticación, la llamada a `readPayload`, el parser y la lectura del reloj, que ocurre después del parser y solo para un mensaje autenticado. Así una excepción del parser nunca se presenta como `intake_extras_failed` ni la de los extras como `intake_parser_failed`. La traducción del resultado del parser pertenece a la etapa del parser. Cada etapa da `DexcomReceipt.IntakeFailed(DexcomIntakeFailure, payloadReads)` con su código: `dexcom_receiver.intake_authentication_failed`, `dexcom_receiver.intake_extras_failed`, `dexcom_receiver.intake_parser_failed` o `dexcom_receiver.intake_clock_failed`. La glucosa queda bloqueada como `authentication_failed` en la primera etapa, como `parse_failed` en extras y parser y como `clock_anomaly` en el reloj. Los tres motivos ya existen en `UnavailabilityReason`. Un fallo de autenticación falla cerrado como R3: `payloadReads = 0`, no se abre el almacén, no se guarda nada y no se lee el reloj. Un fallo de extras, del parser o del reloj tras autenticar no se guarda en el registro ni abre el almacén: solo se entrega el recibo, como `StorageFailed` en R10. Tras un fallo del reloj `payloadReads = 1`. El reloj solo se lee si las tres etapas anteriores terminan. El recibo no guarda el texto de la excepción ni datos del payload. No se reintenta. El orden acción → autenticación → extras → parser no cambia y la acción ajena sigue ignorándose sin invocar la fábrica. T3 del ADR 0019 no cambia de significado: `BundleExtrasView` sigue convirtiendo solo `BadParcelableException` en `PayloadUnreadable` y propaga cualquier otra excepción. La captura nueva vive solo en `accept`, convierte la excepción en un recibo y nunca la reetiqueta como `payload_unreadable`. Con la política `Pending` la fábrica se invoca, pero la autenticación rechaza antes de llamar a `attributedIdentity()` o `resolvePackage()`, así que no se consulta `PackageManager`. Crear `AndroidDexcomSenderEvidenceSource` solo guarda referencias. El receiver obtiene la fábrica de un método `senderEvidence(context)` abierto solo para que la instrumentación lo sustituya, como `trustPolicy()` y `openStore()` (R6). Los `Error` de la JVM no se capturan: un `StackOverflowError` (por ejemplo, un `Bundle` anidado sin límite) o cualquier otro `Error` en la lectura de extras sigue cerrando el proceso. Solo puede provocarlo un emisor ya autenticado. Es un riesgo aceptado por el propietario, no una omisión |
 | R9 | Diagnóstico añade dos líneas al bloque del registro: `dexcom_receiver.component` (`disabled_by_default`, `enabled`, `disabled` o `unknown`) y `dexcom_receiver.policy` (`pending`). Se leen en cada pintado. `ScreenRenderer` sigue sin conocer el receiver |
 
 ### Componentes
@@ -62,7 +65,8 @@ En `android/app`, paquete `org.bolusai.next.glucose.dexcom`:
 
 - `DexcomG7Receiver.kt`: `DexcomReceiverConfiguration` (acción y política),
   `DexcomReceipt` (`IgnoredAction`, `SenderRejected` con lecturas de extras,
-  `Recorded`, `StorageFailed` con `DexcomStorageFailure`), `DexcomG7Intake` (lógica sin Android, probada en JVM) y el
+  `Recorded`, `StorageFailed` con `DexcomStorageFailure`, `IntakeFailed` con
+  `DexcomIntakeFailure`), `DexcomG7Intake` (lógica sin Android, probada en JVM) y el
   `BroadcastReceiver` `DexcomG7Receiver`, con la costura de pruebas
   `DexcomG7Receiver.receipts`.
 - `DexcomReceiverStatus.kt`: estado del componente y de la política para
@@ -97,6 +101,17 @@ sync ni uso clínico. Cálculo y tratamiento siguen bloqueados.
   R5): en el hilo del ejecutor llega al `UncaughtExceptionHandler` y cierra el
   proceso. Inalcanzable con `Pending`, pero debía corregirse antes de aprobar
   cualquier política (R10).
+- **Dejar que las excepciones de la fase síncrona se propaguen**: en el hilo
+  principal cierran el proceso. Inalcanzable con `Pending`, porque la
+  autenticación rechaza antes de tocar `PackageManager`, pero debía corregirse
+  antes de aprobar cualquier política (R11).
+- **Guardar en el registro los fallos de extras o del parser** (R11): como
+  `payload_unreadable` reetiquetaría excepciones que T3 manda propagar y haría
+  pasar un fallo nuestro por un defecto del productor. Como resultado nuevo
+  exige migrar `dexcom-observations.db` a v2 y equivale a decidir el contador
+  duradero, pendiente del propietario.
+- **Capturar también `StackOverflowError` en los extras** (R11): ocultaría un
+  `Error` de la JVM. Riesgo aceptado: solo un emisor autenticado lo provoca.
 - **Contador de fallos de almacenamiento en Diagnóstico**: aplazado. Un
   contador en memoria se pierde al morir el proceso que atendió el broadcast,
   así que Diagnóstico mostraría `0` tras fallos reales: un falso «todo bien».
@@ -122,7 +137,15 @@ sync ni uso clínico. Cálculo y tratamiento siguen bloqueados.
   fallida como `persistence_failed`, ningún resultado hace disponible la
   glucosa. R10: apertura que lanza (excepciones de barrera, esquema y E/S),
   escritura que lanza y cierre que lanza dan `StorageFailed` con su etapa y el
-  almacén cerrado. Códigos estables. Un `Error` no se oculta.
+  almacén cerrado. Códigos estables. Un `Error` no se oculta. R11: una
+  autenticación que lanza (también al crear la fuente) da `IntakeFailed` con
+  `payloadReads = 0`, sin leer extras, sin abrir el almacén y sin leer el reloj. Una lectura de extras
+  que lanza y un parser que lanza dan su etapa con `payloadReads = 1`, sin
+  guardar nada, y ninguna se presenta como la otra. Un reloj que lanza da
+  `IntakeFailed(CLOCK_FAILED, 1)` y `clock_anomaly` sin abrir el almacén. Con `Pending`
+  la fábrica se invoca una vez y la fuente no recibe ninguna llamada. Un
+  `Error` se propaga en cada etapa, también en el reloj. Códigos estables. Ningún recibo hace
+  disponible la glucosa.
 - `DexcomReceiverStatusTest` (JVM): correspondencia de estados del componente
   y de la política.
 - `DexcomLogBlockTest` (JVM): líneas del receiver antes de las del registro.
@@ -135,7 +158,9 @@ sync ni uso clínico. Cálculo y tratamiento siguen bloqueados.
   abrir el almacén y un payload mal formado se guarda solo como rechazo. R10:
   un almacén sintético que falla al abrir y la barrera que niega el registro
   real entregan `StorageFailed` sin tumbar el proceso, que recibe y guarda el
-  mensaje siguiente. El registro real no se crea.
+  mensaje siguiente. El registro real no se crea. R11: una subclase cuya
+  fábrica de fuente lanza entrega `IntakeFailed(AUTHENTICATION)` sin tumbar el
+  proceso, que recibe y guarda el mensaje siguiente en una base sintética.
 - Sin red por construcción: la app no declara `android.permission.INTERNET`,
   `verify.ps1` lo impide y `DexcomG7ReceiverDeviceTest` lo comprueba en el
   dispositivo. Las pruebas no activan el modo avión: el propietario lo descartó
