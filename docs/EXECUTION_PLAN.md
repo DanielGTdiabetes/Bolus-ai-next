@@ -15,6 +15,15 @@ El plan no autoriza tratamientos ni sustituye validación clínica. Cualquier
 parámetro, límite, fórmula o umbral no demostrado queda marcado como decisión
 pendiente y bloquea la recomendación que lo necesite.
 
+**Alcance Dexcom confirmado por el propietario — 2026-10-11:** partir de la
+app Dexcom ya modificada, instalada y utilizada por `bolus_ai`. Next es su
+sustituto y debe aprovechar el transporte existente. Adaptar Next; no modificar,
+recompilar, reinstalar ni sustituir Dexcom para satisfacer un requisito nuevo
+del consumidor. Archivar e identificar la APK instalada mediante solo lectura
+no exige reconstruirla. La política estricta de identidad implementada en Next
+requiere revisión para ser compatible con ese transporte, sin presentar como
+autenticación por mensaje una comprobación de la APK instalada.
+
 ## 2. Resultado objetivo
 
 Al final de la migración:
@@ -292,7 +301,8 @@ sin Internet.
 **Trabajo:**
 
 1. Auditar de solo lectura la integración Legacy y las opciones autorizadas de
-   Android.
+   Android, reutilizando el transporte de la Dexcom instalada. La compatibilidad
+   debe resolverse en Next sin intervenir en el productor ni en Legacy.
 2. Implementar un adaptador de plataforma separado del dominio.
 3. Normalizar y persistir valor, unidad, timestamp del dato/recepción, tendencia,
    origen e identidad.
@@ -680,7 +690,9 @@ activable solo por `adb`, sin el permiso del productor. Comprueba la acción,
 autentica antes de leer y solo guarda lo autenticado. Con la política `Pending`
 rechaza todo emisor sin leer ni abrir el registro. Diagnóstico muestra el
 estado del componente y de la política. No valida la recepción con Dexcom real:
-siguen pendientes release reproducible, opt-in de identidad, anclas y permiso.
+en ese incremento se dejaron pendientes release reproducible, opt-in de
+identidad, anclas y permiso. La rectificación de alcance Dexcom de este plan
+sustituye la exigencia de cambiar el productor por adaptar Next al envío actual.
 Véase la [validación](validation/dexcom-g7-receiver-disabled-2026-10-11.md).
 
 ### Fallos de almacenamiento del receiver Dexcom G7 — 2026-10-11
@@ -732,7 +744,8 @@ este ajuste. No queda pendiente de fusión; comprobar el CI del SHA integrado.
 1. Concentrar la siguiente entrega funcional en el primer hito Android: recepción
    local Dexcom, persistencia y presentación con origen, hora y estado, sin
    habilitar cálculo. Reunir en una sola propuesta las decisiones pendientes de
-   release reproducible, opt-in de identidad, anclas, permiso y presentación;
+   identificación de la APK instalada, política compatible con su envío actual,
+   permiso y presentación; no exigir `setShareIdentityEnabled(true)` al productor;
    implementar después el recorrido completo dentro del alcance aprobado.
 2. Si faltan esas decisiones o artefactos, dejar explícito qué bloquean y avanzar
    solo con preparativos independientes del mismo hito. Retención, contadores,
@@ -740,7 +753,10 @@ este ajuste. No queda pendiente de fusión; comprobar el CI del SHA integrado.
    que sean necesarios para un riesgo concreto o los priorice el propietario.
 
 La recepción y presentación con Dexcom real conservan las puertas de los ADR
-vigentes. No aprobar por inferencia unidad, timestamps, vigencia ni uso clínico.
+vigentes que no contradigan el alcance Dexcom confirmado arriba. Revisar la
+política de Next en el ADR existente; esta decisión no activa el receiver ni
+aprueba una política alternativa de confianza. No aprobar por inferencia unidad,
+timestamps, vigencia ni uso clínico.
 La validación offline debe preservar la recepción del sensor: según la decisión
 registrada en el ADR 0022, no activar el modo avión que corta su Bluetooth;
 documentar y probar la ausencia de dependencia de Internet sin interrumpirlo.

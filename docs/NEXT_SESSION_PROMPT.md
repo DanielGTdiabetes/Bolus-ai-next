@@ -6,6 +6,17 @@ docs/EXECUTION_PLAN.md §3.3: decisiones técnicas reversibles autónomas, ADR s
 cuando corresponda, preguntas necesarias agrupadas y evidencia sin duplicación.
 Se mantienen los controles clínicos y las pruebas obligatorias.
 
+DEXCOM INSTALADA: NO MODIFICAR
+El propietario confirma que Dexcom ya está modificada, funciona y la utiliza
+`bolus_ai`. Next debe aprovechar ese mismo transporte como sustituto de Bolus AI.
+No pedir cambios, recompilación, reinstalación ni `setShareIdentityEnabled(true)`
+en Dexcom. La adaptación corresponde a Next. Identificar y archivar la APK
+instalada es una operación de solo lectura, no una obligación de reconstruirla.
+Revisar en el ADR 0022 la política de recepción de Next: la implementada hoy
+exige identidad compartida y todavía no es compatible con el envío existente.
+No simular esa identidad ni llamar autenticación por mensaje a verificar una
+APK instalada. Este cambio de alcance no habilita cálculo ni tratamiento.
+
 La PR #53 (ADR 0022 R11) ya está integrada en `origin/main` mediante
 `740af25`; no reabrir su trabajo como un paso pendiente. Comprobar el CI del
 SHA integrado al continuar. Priorizar ahora una entrega completa de
@@ -366,9 +377,10 @@ PENDIENTE DEL PROPIETARIO (ADR 0018 a 0022)
   (almacenamiento R10 y fase síncrona R11).
 - Revisar las decisiones técnicas T1 a T6 (ADR 0019), E5 a E9 (ADR 0020), F3
   a F5 (ADR 0021) y R4 a R9 (ADR 0022).
-- Para el receiver productivo: archivar release reproducible de la app Dexcom
-  modificada, activar `setShareIdentityEnabled(true)` en el productor y
-  aprobar anclas (paquete, versionCode, SHA-256 de firmantes).
+- Para el receiver productivo: identificar la APK instalada mediante solo
+  lectura y definir/probar en Next una política compatible con el transporte
+  existente y sus limitaciones, sin cambiar Dexcom. No reabrir la elección del
+  productor ni presentar su modificación como un requisito pendiente.
 
 FLUJO DE TRABAJO SIMPLIFICADO (2026-10-11)
 El propietario sustituye el paso obligatorio «ADR + preguntas + aprobación»
@@ -392,9 +404,9 @@ Los ADR 0014, 0015, 0017 a 0022 (con R10 y R11) y la opción A del ADR 0016
 están implementados. La recepción real y el uso clínico requieren todavía sus
 decisiones específicas; el ajuste de flujo no las aprueba. El
 receiver existe desactivado y con política `Pending` (ADR 0022). Antes de la
-validación con Dexcom real, el propietario debe archivar la release
-reproducible, activar el opt-in de identidad y aprobar las anclas; esa
-validación necesita su ADR de alcance (permiso del productor, anclas y prueba
+validación con Dexcom real, Next debe resolver la incompatibilidad de su política
+con el productor instalado y registrar sus garantías y limitaciones. Ampliar el
+ADR existente para esa entrega (permiso, política compatible y prueba
 offline sin cortar el Bluetooth del sensor, según el ADR 0022).
 Sin esas puertas, siguen abiertos sin bloqueo externo: el ADR de retención
 (E4) y, fuera de Dexcom, P4 (franjas en cambios de hora) y P6
