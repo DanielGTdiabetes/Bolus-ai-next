@@ -73,7 +73,10 @@ Se crea el módulo KMP `shared/dexcom-g7-payload` (paquete
 - Nombres desconocidos fuera de `[A-Za-z0-9_.]{1,64}` no se listan: se cuentan
   una vez por nombre distinto (`unreportableUnknownFieldCount`).
 - `toString` de payload, lectura y mensaje nunca imprime `transmitterId` ni
-  textos del productor.
+  textos del productor. El payload en bruto, aún sin validar, solo muestra si
+  la acción coincide con el contrato y los nombres de clave dentro de la
+  gramática anterior; el resto se cuenta. Lo mismo vale para grupos anidados y
+  nombres de tipo no admitidos (revisión de Codex en la PR #44).
 
 Códigos de rechazo estables: `dexcom_g7.payload.wrong_action`, `missing_field`,
 `null_field`, `wrong_type`, `blank_text`, `unsupported_sensor`,
@@ -122,14 +125,15 @@ queda para el ADR que conecte el parser.
   observado.
 - G2: la salida está marcada `NOT_APPROVED_FOR_USE` y no existe otro estado.
 - G3: función pura; la prueba de determinismo y copia defensiva lo comprueba.
-- `DexcomG7PayloadParserTest` (20 pruebas JVM, payloads sintéticos): forma
+- `DexcomG7PayloadParserTest` (21 pruebas JVM, payloads sintéticos): forma
   observada, estado único, valores enteros extremos sin rango (D4), timestamps
   en bruto, orden de índices, acción, sensor, afirmación de paquete y
   precondición, lote vacío o mal tipado, índices no canónicos o con huecos,
   rechazo completo por una lectura (D1), cada campo ausente, nulo, mal tipado o
   vacío, lectura que no es grupo, duplicados idénticos y conflictivos (D3),
   campos desconocidos listados y contados (D2), diagnósticos sin
-  `transmitterId` y códigos estables.
+  `transmitterId`, payload en bruto sin acción ni nombres fuera de gramática
+  y códigos estables.
 - `verify.ps1`: el módulo no importa motor, perfil, comidas, Android ni Java y
   ningún fichero de `android/` o `shared/` fuera del módulo lo usa.
 

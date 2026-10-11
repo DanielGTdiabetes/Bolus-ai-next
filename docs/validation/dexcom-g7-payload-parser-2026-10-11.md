@@ -25,12 +25,12 @@ devolviendo `policy_not_approved`.
 
 | Clase | Pruebas | Cubre |
 |---|---|---|
-| `DexcomG7PayloadParserTest` (JVM común) | 20 | véase la sección «Seguridad y pruebas» del ADR 0018 |
+| `DexcomG7PayloadParserTest` (JVM común) | 21 | véase la sección «Seguridad y pruebas» del ADR 0018 |
 
 ## Comandos y resultados (contenedor Linux de la sesión)
 
 ```bash
-./gradlew --no-daemon :shared:dexcom-g7-payload:androidJvmTest   # BUILD SUCCESSFUL, 20 tests, 0 fallos
+./gradlew --no-daemon :shared:dexcom-g7-payload:androidJvmTest   # BUILD SUCCESSFUL, 21 tests, 0 fallos
 ./gradlew --no-daemon :shared:dexcom-g7-payload:allMetadataJar   # BUILD SUCCESSFUL
 git diff --check                                                  # sin salida
 ```

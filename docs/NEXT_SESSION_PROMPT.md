@@ -234,7 +234,7 @@ JVM: `DexcomG7Payload`/`PayloadValue` (copia tipada sin `Bundle`),
 `DexcomG7PayloadParser.parse(payload, authenticatedPackage)`, lecturas siempre
 `NOT_APPROVED_FOR_USE` y códigos `dexcom_g7.payload.*`. `verify.ps1` impide
 que dependa de motor, perfil, comidas, Android o Java y que nadie fuera del
-módulo lo use. 20 pruebas JVM. Véase
+módulo lo use. 21 pruebas JVM. Véase
 docs/validation/dexcom-g7-payload-parser-2026-10-11.md.
 
 SIGUIENTE PASO

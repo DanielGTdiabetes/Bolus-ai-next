@@ -17,8 +17,12 @@ public class DexcomG7Payload(
 
     override fun hashCode(): Int = 31 * (action?.hashCode() ?: 0) + extras.hashCode()
 
-    /** Values may identify a device; diagnostics only see the key names. */
-    override fun toString(): String = "DexcomG7Payload(action=$action, keys=${extras.keys.sorted()})"
+    /**
+     * Nothing here is validated yet: diagnostics show whether the action matches the contract and only key names
+     * inside the parser's reportable grammar, never values or arbitrary producer text.
+     */
+    override fun toString(): String =
+        "DexcomG7Payload(actionMatches=${action == ObservedDexcomG7Contract.ACTION}, ${diagnosticKeys(extras.keys)})"
 }
 
 /** The runtime type Android reported for one extra, with no conversion between types. */
@@ -40,12 +44,29 @@ public sealed interface PayloadValue {
 
         override fun equals(other: Any?): Boolean = other is Group && other.entries == entries
         override fun hashCode(): Int = entries.hashCode()
-        override fun toString(): String = "Group(keys=${entries.keys.sorted()})"
+        override fun toString(): String = "Group(${diagnosticKeys(entries.keys)})"
     }
 
     /** Present with a null value; distinct from an absent key. */
     public data object Null : PayloadValue
 
     /** Any other runtime type. Only its technical type name is kept, never its content. */
-    public data class Unsupported(public val typeName: String) : PayloadValue
+    public class Unsupported(public val typeName: String) : PayloadValue {
+        override fun equals(other: Any?): Boolean = other is Unsupported && other.typeName == typeName
+        override fun hashCode(): Int = typeName.hashCode()
+
+        /** A sender-defined class name is producer text too: it is printed only inside the reportable grammar. */
+        override fun toString(): String =
+            if (isReportableName(typeName)) "Unsupported(typeName=$typeName)" else "Unsupported(typeName=<unreportable>)"
+    }
+}
+
+private val reportableName = Regex("[A-Za-z0-9_.]{1,64}")
+
+/** The grammar of names that diagnostics may print. Anything else is only counted. */
+internal fun isReportableName(name: String): Boolean = reportableName.matches(name)
+
+internal fun diagnosticKeys(keys: Set<String>): String {
+    val reportable = keys.filter(::isReportableName).sorted()
+    return "keys=$reportable, unreportableKeys=${keys.size - reportable.size}"
 }

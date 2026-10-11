@@ -301,6 +301,35 @@ class DexcomG7PayloadParserTest {
         for (text in printed) assertFalse(text.contains("SYNTH-SECRET-TX"), text)
     }
 
+    @Test fun rawPayloadDiagnosticsNeverPrintUnvalidatedActionOrNames() {
+        // Codex review on PR #44: a rejected raw payload may be logged before any validation.
+        val secret = "SYNTH-SECRET\nINJECTED"
+        val raw = DexcomG7Payload(
+            action = secret,
+            extras = mapOf(
+                secret to PayloadValue.Group(mapOf(secret to PayloadValue.Int32(1), "safe_name" to PayloadValue.Null)),
+                "glucoseValues" to PayloadValue.Unsupported(secret),
+            ),
+        )
+        val printed = listOf(
+            raw.toString(),
+            raw.extras.getValue(secret).toString(),
+            raw.extras.getValue("glucoseValues").toString(),
+        )
+        for (text in printed) {
+            assertFalse(text.contains("SYNTH-SECRET"), text)
+            assertFalse(text.contains("\n"), text)
+        }
+        assertEquals("DexcomG7Payload(actionMatches=false, keys=[glucoseValues], unreportableKeys=1)", printed[0])
+        assertEquals("Group(keys=[safe_name], unreportableKeys=1)", printed[1])
+        assertEquals("Unsupported(typeName=<unreportable>)", printed[2])
+        assertEquals("Unsupported(typeName=synthetic.Type)", PayloadValue.Unsupported("synthetic.Type").toString())
+        assertEquals(
+            "DexcomG7Payload(actionMatches=true, keys=[glucoseValues, packageName, sensorType], unreportableKeys=0)",
+            payload().toString(),
+        )
+    }
+
     @Test fun parsingIsDeterministicAndDefensive() {
         val source = linkedMapOf<String, PayloadValue>("0" to reading())
         val input = payload(source)

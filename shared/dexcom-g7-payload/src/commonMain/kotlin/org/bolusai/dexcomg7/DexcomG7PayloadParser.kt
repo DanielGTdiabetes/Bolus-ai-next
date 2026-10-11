@@ -139,7 +139,6 @@ public sealed interface DexcomG7ParseResult {
  */
 public object DexcomG7PayloadParser {
     private val canonicalIndex = Regex("0|[1-9][0-9]{0,8}")
-    private val reportableName = Regex("[A-Za-z0-9_.]{1,64}")
 
     /**
      * [authenticatedPackage] is the package the sender authentication proved. The `packageName` extra is only a
@@ -186,7 +185,7 @@ public object DexcomG7PayloadParser {
             }
         }
 
-        val unknownNames = UnknownNames(reportableName)
+        val unknownNames = UnknownNames()
         unknownNames.collect(extras.keys - ObservedDexcomG7Contract.topLevelFields, topLevel = true)
 
         val kept = ArrayList<ObservedDexcomG7Reading>(positions.size)
@@ -252,7 +251,7 @@ public object DexcomG7PayloadParser {
             ?: reject(DexcomG7RejectionCode.WRONG_TYPE, name, index)
 }
 
-private class UnknownNames(private val reportableName: Regex) {
+private class UnknownNames {
     val topLevel = LinkedHashSet<String>()
     val reading = LinkedHashSet<String>()
     private val unreportableNames = HashSet<String>()
@@ -261,7 +260,7 @@ private class UnknownNames(private val reportableName: Regex) {
     fun collect(names: Set<String>, topLevel: Boolean) {
         for (name in names) {
             when {
-                !reportableName.matches(name) -> unreportableNames += name
+                !isReportableName(name) -> unreportableNames += name
                 topLevel -> this.topLevel += name
                 else -> reading += name
             }
