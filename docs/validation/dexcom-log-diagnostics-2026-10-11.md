@@ -11,7 +11,7 @@ ni se modifica.
 |---|---|---|
 | `ObservationSummaryTest` (JVM común) | 3 | ejecutada, 0 fallos |
 | `DexcomLogBlockTest` (JVM Android) | 3 | ejecutada, 0 fallos |
-| `DexcomLogDiagnosticsDeviceTest` (dispositivo) | 3 | compilada; **pendiente de ejecutar** en el Pixel |
+| `DexcomLogDiagnosticsDeviceTest` (dispositivo) | 3 | 3 existentes, 3 ejecutadas en el Pixel, 0 fallos (ver «Ejecución en dispositivo») |
 
 ## Comandos y resultados (contenedor Linux de la sesión)
 
@@ -24,8 +24,22 @@ pwsh check.ps1                               # bloque ADR 0018-0021 de verify.ps
 git diff --check                             # sin salida
 ```
 
+## Ejecución en dispositivo (2026-10-11)
+
+- SHA probado: `cacc8a905f0e3977d9d4fa44f35f7fdb0752dcd3` (merge de la PR #47,
+  igual a `origin/main` en ese momento).
+- Dispositivo: Pixel 10 Pro Fold (`rango`), Android 17, API 37, build
+  `CP3A.260905.009`. Era el único dispositivo en `adb devices`.
+- Comando: `.\scripts\verify.ps1 -DeviceTests` en Windows. Salida 0, con Gradle
+  `BUILD SUCCESSFUL` (205 tareas), comprobaciones de arquitectura y autoprueba
+  de aislamiento de instrumentación correctas e instrumentación `OK (146 tests)`.
+- `DexcomLogDiagnosticsDeviceTest`: 3/3 superadas:
+  `showsFoldedCountsWithoutAnyGlucoseValue`,
+  `onlyDiagnosticsReadsTheLogAndEachEntryReadsAgain` y
+  `aFailedReadShowsItsCode`.
+- En la misma ejecución, `SqliteDexcomObservationStoreDeviceTest` superó 9/9 y
+  `DexcomBundleExtrasDeviceTest` 3/3.
+
 ## Pendiente
 
-`verify.ps1 -DeviceTests` en el Pixel: `DexcomLogDiagnosticsDeviceTest`,
-`SqliteDexcomObservationStoreDeviceTest` y `DexcomBundleExtrasDeviceTest`.
 Revisión visual de la tarjeta en tema claro y oscuro.

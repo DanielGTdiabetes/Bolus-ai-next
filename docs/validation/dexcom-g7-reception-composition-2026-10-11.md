@@ -24,7 +24,7 @@ nuevos. `PendingDexcomSource` sigue devolviendo `policy_not_approved`.
 |---|---|---|
 | `DexcomPayloadExtrasTest` (JVM Android) | 5 | ejecutada, 0 fallos |
 | `DexcomG7ReceptionTest` (JVM Android) | 7 | ejecutada, 0 fallos |
-| `DexcomBundleExtrasDeviceTest` (dispositivo) | 3 | compilada; **pendiente de ejecutar** en el Pixel |
+| `DexcomBundleExtrasDeviceTest` (dispositivo) | 3 | 3 existentes, 3 ejecutadas en el Pixel, 0 fallos (ver «Ejecución en dispositivo») |
 
 ## Comandos y resultados (contenedor Linux de la sesión)
 
@@ -45,11 +45,21 @@ Linux: pasa con el árbol actual, falla si `MainActivity` menciona el parser y
 falla si el módulo del parser importa `android.`. `verify.ps1` completo corre
 en el CI de Windows de la PR.
 
+## Ejecución en dispositivo (2026-10-11)
+
+- SHA probado: `cacc8a905f0e3977d9d4fa44f35f7fdb0752dcd3` (merge de la PR #47,
+  igual a `origin/main` en ese momento).
+- Dispositivo: Pixel 10 Pro Fold (`rango`), Android 17, API 37, build
+  `CP3A.260905.009`. Era el único dispositivo en `adb devices`.
+- Comando: `.\scripts\verify.ps1 -DeviceTests` en Windows. Salida 0, con Gradle
+  `BUILD SUCCESSFUL` (205 tareas), comprobaciones de arquitectura y autoprueba
+  de aislamiento de instrumentación correctas e instrumentación `OK (146 tests)`.
+- `DexcomBundleExtrasDeviceTest`: 3/3 superadas:
+  `intentWithoutExtrasHasAnEmptyPayload`, `bundleTypesMapWithoutConversion` y
+  `parcelRoundTripKeepsTheSameTypes`.
+
 ## Pendiente
 
-- `verify.ps1 -DeviceTests` en el Pixel del propietario para
-  `DexcomBundleExtrasDeviceTest`. La APK solo añade clases sin uso: no cambia
-  pantallas ni manifiesto.
 - Prueba en dispositivo de `BadParcelableException` (ver ADR 0019).
 - Receiver productivo, anclas, release reproducible, persistencia, vigencia y
   prueba en modo avión. R-010 y R-014 siguen abiertos.
