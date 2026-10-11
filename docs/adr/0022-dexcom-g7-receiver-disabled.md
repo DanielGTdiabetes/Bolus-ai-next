@@ -4,7 +4,8 @@
   desactivado por defecto con R1 a R3 (interruptor solo por `adb` con estado en
   Diagnóstico, sin declarar el permiso del productor, rechazo del emisor sin
   leer ni guardar su payload). R4 a R9 son decisiones técnicas del agente,
-  revisables en la PR
+  revisables en la PR. R10 se añadió tras la revisión de `main` posterior a la
+  PR #51 (commit `ccfb753`)
 - Fecha: 2026-10-11
 - Fase y criterio de aceptación: Fase 5, trabajo 2 («adaptador de plataforma
   separado del dominio»). Incremento **preparatorio**: no cumple ningún criterio
@@ -48,10 +49,11 @@ Sin anclas, la política de confianza es `Pending` y todo mensaje se rechaza.
 | ID | Regla |
 |---|---|
 | R4 | Orden fijo en `onReceive`: acción → autenticación → extras → parser, síncrono, mediante `DexcomG7Reception`. Una acción distinta de la observada se ignora sin autenticar ni leer: el componente es exportado y cualquiera puede enviarle un `Intent` explícito |
-| R5 | El almacén solo se construye para un resultado autenticado, se usa para un mensaje y se cierra. La escritura corre fuera del hilo principal con `goAsync()` en un único hilo serie, y `finish()` se llama siempre. El instante de recepción se lee dentro de `onReceive`, antes de encolar la escritura, y solo para un mensaje autenticado (revisión de Codex en la PR #51) Un defecto inesperado se propaga sin reetiquetar |
+| R5 | El almacén solo se construye para un resultado autenticado, se usa para un mensaje y se cierra. La escritura corre fuera del hilo principal con `goAsync()` en un único hilo serie, y `finish()` se llama siempre. El instante de recepción se lee dentro de `onReceive`, antes de encolar la escritura, y solo para un mensaje autenticado (revisión de Codex en la PR #51). Los fallos del almacén en el hilo de escritura siguen R10 |
 | R6 | La política de producción es la constante `DexcomReceiverConfiguration.policy = Pending`. `verify.ps1` rechaza cualquier `DexcomSenderTrustPolicy.Approved(` y cualquier subclase de `DexcomG7Receiver` en el código de producción. Solo la instrumentación crea una subclase con una política sintética para el emisor de pruebas |
 | R7 | Identificadores de mensaje y observación: UUID aleatorio (`AndroidObservationIds`). Reloj: pared del dispositivo, solo para sellar la recepción (E8 del ADR 0020) |
 | R8 | Componente exportado sin `android:permission`: el permiso del productor es `dangerous`, cualquier app puede obtenerlo y no autentica. La autenticidad la da la identidad del emisor (ADR 0005 y 0006). Se documenta con `tools:ignore="ExportedReceiver"` |
+| R10 | En el hilo de escritura ninguna `Exception` escapa: en Android mataría el proceso. `DexcomG7Intake.record` captura por separado la apertura, la escritura y el cierre del almacén y devuelve `DexcomReceipt.StorageFailed` con la primera etapa que falló: `dexcom_receiver.store_open_failed`, `dexcom_receiver.store_record_failed` o `dexcom_receiver.store_close_failed`. El recibo no guarda el texto de la excepción ni el payload. No se reintenta ni se descarta en silencio. El almacén se cierra siempre que se abrió y `finish()` se llama siempre. La glucosa queda bloqueada como `persistence_failed`. Tras `store_close_failed` la escritura pudo confirmarse: decide el registro, no el recibo. Los `Error` de la JVM no se capturan. Los fallos que el almacén SQLite ya convierte en `ObservationWrite.Failed` siguen llegando como `Recorded` con `persistence_failed` |
 | R9 | Diagnóstico añade dos líneas al bloque del registro: `dexcom_receiver.component` (`disabled_by_default`, `enabled`, `disabled` o `unknown`) y `dexcom_receiver.policy` (`pending`). Se leen en cada pintado. `ScreenRenderer` sigue sin conocer el receiver |
 
 ### Componentes
@@ -60,7 +62,7 @@ En `android/app`, paquete `org.bolusai.next.glucose.dexcom`:
 
 - `DexcomG7Receiver.kt`: `DexcomReceiverConfiguration` (acción y política),
   `DexcomReceipt` (`IgnoredAction`, `SenderRejected` con lecturas de extras,
-  `Recorded`), `DexcomG7Intake` (lógica sin Android, probada en JVM) y el
+  `Recorded`, `StorageFailed` con `DexcomStorageFailure`), `DexcomG7Intake` (lógica sin Android, probada en JVM) y el
   `BroadcastReceiver` `DexcomG7Receiver`, con la costura de pruebas
   `DexcomG7Receiver.receipts`.
 - `DexcomReceiverStatus.kt`: estado del componente y de la política para
@@ -91,6 +93,15 @@ sync ni uso clínico. Cálculo y tratamiento siguen bloqueados.
 - **Escribir en el hilo principal**: `synchronous=FULL` puede bloquear la
   interfaz. Se usa `goAsync()` (R5).
 - **Guardar los rechazos del emisor**: prohibido por E5 y R3.
+- **Dejar que la excepción del almacén se propague** (redacción original de
+  R5): en el hilo del ejecutor llega al `UncaughtExceptionHandler` y cierra el
+  proceso. Inalcanzable con `Pending`, pero debía corregirse antes de aprobar
+  cualquier política (R10).
+- **Contador de fallos de almacenamiento en Diagnóstico**: aplazado. Un
+  contador en memoria se pierde al morir el proceso que atendió el broadcast,
+  así que Diagnóstico mostraría `0` tras fallos reales: un falso «todo bien».
+  Uno duradero necesita otro fichero y su propia decisión, porque el registro
+  que falló no puede guardarlo.
 
 ## Consecuencias
 
@@ -109,7 +120,9 @@ sync ni uso clínico. Cálculo y tratamiento siguen bloqueados.
   rechazos del emisor sin leer extras ni abrir el almacén, mensaje autenticado
   leído una vez, almacén abierto una vez y cerrado también si falla, escritura
   fallida como `persistence_failed`, ningún resultado hace disponible la
-  glucosa.
+  glucosa. R10: apertura que lanza (excepciones de barrera, esquema y E/S),
+  escritura que lanza y cierre que lanza dan `StorageFailed` con su etapa y el
+  almacén cerrado. Códigos estables. Un `Error` no se oculta.
 - `DexcomReceiverStatusTest` (JVM): correspondencia de estados del componente
   y de la política.
 - `DexcomLogBlockTest` (JVM): líneas del receiver antes de las del registro.
@@ -119,7 +132,10 @@ sync ni uso clínico. Cálculo y tratamiento siguen bloqueados.
   rechaza sin leer extras ni crear la base, e ignora otra acción; con el emisor
   sintético y una política sintética, el mensaje autenticado se guarda en una
   base sintética y sigue bloqueado, sin identidad compartida se rechaza sin
-  abrir el almacén y un payload mal formado se guarda solo como rechazo.
+  abrir el almacén y un payload mal formado se guarda solo como rechazo. R10:
+  un almacén sintético que falla al abrir y la barrera que niega el registro
+  real entregan `StorageFailed` sin tumbar el proceso, que recibe y guarda el
+  mensaje siguiente. El registro real no se crea.
 - Sin red por construcción: la app no declara `android.permission.INTERNET`,
   `verify.ps1` lo impide y `DexcomG7ReceiverDeviceTest` lo comprueba en el
   dispositivo. Las pruebas no activan el modo avión: el propietario lo descartó

@@ -651,6 +651,16 @@ estado del componente y de la política. No valida la recepción con Dexcom real
 siguen pendientes release reproducible, opt-in de identidad, anclas y permiso.
 Véase la [validación](validation/dexcom-g7-receiver-disabled-2026-10-11.md).
 
+### Fallos de almacenamiento del receiver Dexcom G7 — 2026-10-11
+
+Corrección tras revisar `main` en `ccfb753` (R10 del
+[ADR 0022](adr/0022-dexcom-g7-receiver-disabled.md)): una excepción al abrir,
+escribir o cerrar el registro en el hilo de escritura ya no puede cerrar el
+proceso. Se entrega `DexcomReceipt.StorageFailed` con un código estable por
+etapa y la glucosa sigue bloqueada como `persistence_failed`. Sin cambios en la
+política (`Pending`) ni en la lógica clínica. Véase la
+[validación](validation/dexcom-g7-receiver-storage-failure-2026-10-11.md).
+
 ### Secuencia de capacidades
 
 No intentar construir toda una fase en un solo cambio. Secuencia inicial:

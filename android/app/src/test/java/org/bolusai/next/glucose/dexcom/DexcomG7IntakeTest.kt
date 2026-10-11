@@ -26,8 +26,11 @@ import java.io.Closeable
 
 /** ADR 0022: receiver logic with synthetic senders, payloads and stores only. No real Dexcom data. */
 class DexcomG7IntakeTest {
-    private class Store(private val fail: Boolean = false, private val defect: Throwable? = null) :
-        DexcomObservationStore, Closeable {
+    private class Store(
+        private val fail: Boolean = false,
+        private val defect: Throwable? = null,
+        private val closeDefect: Throwable? = null,
+    ) : DexcomObservationStore, Closeable {
         val inputs = mutableListOf<ObservationInput>()
         var closed = 0
         override fun record(input: ObservationInput): ObservationWrite {
@@ -42,7 +45,10 @@ class DexcomG7IntakeTest {
         }
         override fun read(): ObservationRead = error("unused")
         override fun summary(): ObservationSummaryRead = error("unused")
-        override fun close() { closed++ }
+        override fun close() {
+            closed++
+            closeDefect?.let { throw it }
+        }
     }
 
     /** Fails if touched: proves that nothing about the sender was looked at. */
@@ -91,7 +97,7 @@ class DexcomG7IntakeTest {
         assertEquals(1, step.payloadReads)
         val store = Store()
         var opened = 0
-        val receipt = intake.record(step) { opened++; store }
+        val receipt = intake.record(step) { opened++; store }.recorded()
         assertEquals(1, opened)
         assertEquals(1, store.closed)
         assertEquals(1, receipt.payloadReads)
@@ -122,7 +128,7 @@ class DexcomG7IntakeTest {
             DexcomExtrasRead.Read(DexcomG7Payload(ObservedDexcomG7Contract.ACTION, emptyMap()))
         } as DexcomG7Intake.Step.Record
         val store = Store()
-        val receipt = intake.record(step) { store }
+        val receipt = intake.record(step) { store }.recorded()
         assertTrue(store.inputs.single() is ObservationInput.PayloadRejected)
         assertEquals(UnavailabilityReason.PARSE_FAILED, (receipt.recording as DexcomG7Recording.Recorded).glucose.reason)
     }
@@ -132,20 +138,65 @@ class DexcomG7IntakeTest {
         val intake = DexcomG7Intake(ACTION, policy())
         val step = intake.accept(ACTION, Source(), clock) { DexcomExtrasRead.Unreadable } as DexcomG7Intake.Step.Record
         val store = Store(fail = true)
-        val receipt = intake.record(step) { store }
+        val receipt = intake.record(step) { store }.recorded()
         assertEquals("input.glucose.persistence_failed", receipt.recording.glucose.code)
         assertEquals(1, store.closed)
     }
 
     @Test
-    fun `store defects propagate unchanged and the store is still closed`() {
+    fun `a store that cannot be opened is a storage failure, not an uncaught exception`() {
+        val intake = DexcomG7Intake(ACTION, policy())
+        val step = intake.accept(ACTION, Source(), clock) { DexcomExtrasRead.Read(payload()) } as DexcomG7Intake.Step.Record
+        // Same exception types the SQLite store and the instrumentation barrier throw; their text must not leak.
+        listOf(
+            IllegalStateException("dexcom_storage.real_database_denied_in_instrumentation"),
+            RuntimeException("dexcom_observation.unsupported_schema: inventory"),
+            java.io.IOException("synthetic open failure"),
+        ).forEach { defect ->
+            val receipt = intake.record<Store>(step) { throw defect }
+            assertEquals(DexcomReceipt.StorageFailed(DexcomStorageFailure.OPEN_FAILED, 1), receipt)
+            assertEquals("input.glucose.persistence_failed", (receipt as DexcomReceipt.StorageFailed).glucose.code)
+        }
+    }
+
+    @Test
+    fun `a record that throws is a storage failure and the store is still closed`() {
         val intake = DexcomG7Intake(ACTION, policy())
         val step = intake.accept(ACTION, Source(), clock) { DexcomExtrasRead.Unreadable } as DexcomG7Intake.Step.Record
-        val defect = IllegalStateException("synthetic store defect")
-        val store = Store(defect = defect)
-        val thrown = assertThrows(IllegalStateException::class.java) { intake.record(step) { store } }
-        assertSame(defect, thrown)
+        val store = Store(defect = IllegalStateException("synthetic store defect"))
+        val receipt = intake.record(step) { store }
+        assertEquals(DexcomReceipt.StorageFailed(DexcomStorageFailure.RECORD_FAILED, 1), receipt)
         assertEquals(1, store.closed)
+    }
+
+    @Test
+    fun `the first failing stage wins and a failed close is never reported as recorded`() {
+        val intake = DexcomG7Intake(ACTION, policy())
+        val step = intake.accept(ACTION, Source(), clock) { DexcomExtrasRead.Unreadable } as DexcomG7Intake.Step.Record
+        val both = Store(defect = IllegalStateException("record"), closeDefect = java.io.IOException("close"))
+        assertEquals(DexcomReceipt.StorageFailed(DexcomStorageFailure.RECORD_FAILED, 1), intake.record(step) { both })
+        assertEquals(1, both.closed)
+        val closeOnly = Store(closeDefect = java.io.IOException("close"))
+        assertEquals(DexcomReceipt.StorageFailed(DexcomStorageFailure.CLOSE_FAILED, 1), intake.record(step) { closeOnly })
+        assertEquals(1, closeOnly.inputs.size)
+        assertEquals(1, closeOnly.closed)
+    }
+
+    @Test
+    fun `storage failure codes are stable`() {
+        assertEquals(
+            listOf("dexcom_receiver.store_open_failed", "dexcom_receiver.store_record_failed", "dexcom_receiver.store_close_failed"),
+            DexcomStorageFailure.entries.map { it.code },
+        )
+    }
+
+    @Test
+    fun `jvm errors are not swallowed`() {
+        val intake = DexcomG7Intake(ACTION, policy())
+        val step = intake.accept(ACTION, Source(), clock) { DexcomExtrasRead.Unreadable } as DexcomG7Intake.Step.Record
+        val error = AssertionError("synthetic error")
+        val store = Store(defect = error)
+        assertSame(error, assertThrows(AssertionError::class.java) { intake.record(step) { store } })
     }
 
     @Test
@@ -160,15 +211,27 @@ class DexcomG7IntakeTest {
             intake.record(intake.accept(ACTION, Source(), clock) { DexcomExtrasRead.Unreadable } as DexcomG7Intake.Step.Record) {
                 Store(fail = true)
             },
+            intake.record<Store>(intake.accept(ACTION, Source(), clock) { DexcomExtrasRead.Unreadable }
+                as DexcomG7Intake.Step.Record) { error("synthetic open failure") },
+            intake.record(intake.accept(ACTION, Source(), clock) { DexcomExtrasRead.Unreadable } as DexcomG7Intake.Step.Record) {
+                Store(defect = IllegalStateException("synthetic"))
+            },
         ).map {
             when (it) {
                 is DexcomReceipt.IgnoredAction -> error("unexpected")
                 is DexcomReceipt.SenderRejected -> it.outcome.glucose.code
                 is DexcomReceipt.Recorded -> it.recording.glucose.code
+                is DexcomReceipt.StorageFailed -> it.glucose.code
             }
         }
         assertEquals(
-            listOf("input.glucose.authentication_failed", "input.glucose.policy_not_approved", "input.glucose.persistence_failed"),
+            listOf(
+                "input.glucose.authentication_failed",
+                "input.glucose.policy_not_approved",
+                "input.glucose.persistence_failed",
+                "input.glucose.persistence_failed",
+                "input.glucose.persistence_failed",
+            ),
             codes,
         )
     }
@@ -200,6 +263,8 @@ class DexcomG7IntakeTest {
             DexcomReceiverStatus(DexcomReceiverComponent.DISABLED_BY_DEFAULT, policy()).lines(),
         )
     }
+
+    private fun DexcomReceipt.recorded() = this as DexcomReceipt.Recorded
 
     private fun payload() = DexcomG7Payload(
         ObservedDexcomG7Contract.ACTION,
