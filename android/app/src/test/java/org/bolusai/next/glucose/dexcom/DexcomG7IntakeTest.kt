@@ -52,12 +52,13 @@ class DexcomG7IntakeTest {
     }
 
     private val clock = EpochClock { 42L }
+    private val unread = EpochClock { error("clock must not be read") }
 
     @Test
     fun `another action is ignored without authenticating or reading`() {
-        val step = DexcomG7Intake(ACTION, policy()).accept("example.OTHER", Untouchable) { error("must not read") }
+        val step = DexcomG7Intake(ACTION, policy()).accept("example.OTHER", Untouchable, unread) { error("must not read") }
         assertEquals(DexcomG7Intake.Step.Done(DexcomReceipt.IgnoredAction("example.OTHER")), step)
-        val missing = DexcomG7Intake(ACTION, policy()).accept(null, Untouchable) { error("must not read") }
+        val missing = DexcomG7Intake(ACTION, policy()).accept(null, Untouchable, unread) { error("must not read") }
         assertEquals(DexcomG7Intake.Step.Done(DexcomReceipt.IgnoredAction(null)), missing)
     }
 
@@ -66,7 +67,7 @@ class DexcomG7IntakeTest {
         assertSame(DexcomSenderTrustPolicy.Pending, DexcomReceiverConfiguration.policy)
         assertEquals(ObservedDexcomG7Contract.ACTION, DexcomReceiverConfiguration.ACTION)
         val step = DexcomG7Intake(DexcomReceiverConfiguration.ACTION, DexcomReceiverConfiguration.policy)
-            .accept(DexcomReceiverConfiguration.ACTION, Untouchable) { error("must not read") }
+            .accept(DexcomReceiverConfiguration.ACTION, Untouchable, unread) { error("must not read") }
         val receipt = (step as DexcomG7Intake.Step.Done).receipt as DexcomReceipt.SenderRejected
         assertEquals(0, receipt.payloadReads)
         assertEquals(DexcomSenderAuthenticationFailure.POLICY_NOT_APPROVED, receipt.outcome.authentication.failure)
@@ -75,7 +76,7 @@ class DexcomG7IntakeTest {
 
     @Test
     fun `a rejected sender never reaches the store`() {
-        val step = DexcomG7Intake(ACTION, policy()).accept(ACTION, Source(AttributedSenderIdentity(null, null))) {
+        val step = DexcomG7Intake(ACTION, policy()).accept(ACTION, Source(AttributedSenderIdentity(null, null)), unread) {
             error("must not read")
         }
         val receipt = (step as DexcomG7Intake.Step.Done).receipt as DexcomReceipt.SenderRejected
@@ -86,11 +87,11 @@ class DexcomG7IntakeTest {
     @Test
     fun `an authenticated message is read once, recorded once and stays blocked`() {
         val intake = DexcomG7Intake(ACTION, policy())
-        val step = intake.accept(ACTION, Source()) { DexcomExtrasRead.Read(payload()) } as DexcomG7Intake.Step.Record
+        val step = intake.accept(ACTION, Source(), clock) { DexcomExtrasRead.Read(payload()) } as DexcomG7Intake.Step.Record
         assertEquals(1, step.payloadReads)
         val store = Store()
         var opened = 0
-        val receipt = intake.record(step, { opened++; store }, clock)
+        val receipt = intake.record(step) { opened++; store }
         assertEquals(1, opened)
         assertEquals(1, store.closed)
         assertEquals(1, receipt.payloadReads)
@@ -102,13 +103,26 @@ class DexcomG7IntakeTest {
     }
 
     @Test
+    fun `the reception instant is captured on accept, not when a queued write runs`() {
+        var now = 1_000L
+        val intake = DexcomG7Intake(ACTION, policy())
+        val step = intake.accept(ACTION, Source(), EpochClock { now }) { DexcomExtrasRead.Read(payload()) }
+            as DexcomG7Intake.Step.Record
+        assertEquals(1_000L, step.receivedAtEpochMs)
+        now = 9_000L // a delayed serial writer runs later
+        val store = Store()
+        intake.record(step) { store }
+        assertEquals(1_000L, store.inputs.single().receivedAtEpochMs)
+    }
+
+    @Test
     fun `a malformed payload from an authenticated sender is stored only as a rejection`() {
         val intake = DexcomG7Intake(ACTION, policy())
-        val step = intake.accept(ACTION, Source()) {
+        val step = intake.accept(ACTION, Source(), clock) {
             DexcomExtrasRead.Read(DexcomG7Payload(ObservedDexcomG7Contract.ACTION, emptyMap()))
         } as DexcomG7Intake.Step.Record
         val store = Store()
-        val receipt = intake.record(step, { store }, clock)
+        val receipt = intake.record(step) { store }
         assertTrue(store.inputs.single() is ObservationInput.PayloadRejected)
         assertEquals(UnavailabilityReason.PARSE_FAILED, (receipt.recording as DexcomG7Recording.Recorded).glucose.reason)
     }
@@ -116,9 +130,9 @@ class DexcomG7IntakeTest {
     @Test
     fun `a failed write blocks as persistence failed and the store is closed`() {
         val intake = DexcomG7Intake(ACTION, policy())
-        val step = intake.accept(ACTION, Source()) { DexcomExtrasRead.Unreadable } as DexcomG7Intake.Step.Record
+        val step = intake.accept(ACTION, Source(), clock) { DexcomExtrasRead.Unreadable } as DexcomG7Intake.Step.Record
         val store = Store(fail = true)
-        val receipt = intake.record(step, { store }, clock)
+        val receipt = intake.record(step) { store }
         assertEquals("input.glucose.persistence_failed", receipt.recording.glucose.code)
         assertEquals(1, store.closed)
     }
@@ -126,10 +140,10 @@ class DexcomG7IntakeTest {
     @Test
     fun `store defects propagate unchanged and the store is still closed`() {
         val intake = DexcomG7Intake(ACTION, policy())
-        val step = intake.accept(ACTION, Source()) { DexcomExtrasRead.Unreadable } as DexcomG7Intake.Step.Record
+        val step = intake.accept(ACTION, Source(), clock) { DexcomExtrasRead.Unreadable } as DexcomG7Intake.Step.Record
         val defect = IllegalStateException("synthetic store defect")
         val store = Store(defect = defect)
-        val thrown = assertThrows(IllegalStateException::class.java) { intake.record(step, { store }, clock) }
+        val thrown = assertThrows(IllegalStateException::class.java) { intake.record(step) { store } }
         assertSame(defect, thrown)
         assertEquals(1, store.closed)
     }
@@ -138,12 +152,14 @@ class DexcomG7IntakeTest {
     fun `no receipt makes glucose available`() {
         val intake = DexcomG7Intake(ACTION, policy())
         val codes = listOf(
-            (intake.accept(ACTION, Source(AttributedSenderIdentity("example.spoof", UID))) { error("unused") }
+            (intake.accept(ACTION, Source(AttributedSenderIdentity("example.spoof", UID)), unread) { error("unused") }
                 as DexcomG7Intake.Step.Done).receipt,
-            intake.record(intake.accept(ACTION, Source()) { DexcomExtrasRead.Read(payload()) } as DexcomG7Intake.Step.Record,
-                { Store() }, clock),
-            intake.record(intake.accept(ACTION, Source()) { DexcomExtrasRead.Unreadable } as DexcomG7Intake.Step.Record,
-                { Store(fail = true) }, clock),
+            intake.record(intake.accept(ACTION, Source(), clock) { DexcomExtrasRead.Read(payload()) } as DexcomG7Intake.Step.Record) {
+                Store()
+            },
+            intake.record(intake.accept(ACTION, Source(), clock) { DexcomExtrasRead.Unreadable } as DexcomG7Intake.Step.Record) {
+                Store(fail = true)
+            },
         ).map {
             when (it) {
                 is DexcomReceipt.IgnoredAction -> error("unexpected")

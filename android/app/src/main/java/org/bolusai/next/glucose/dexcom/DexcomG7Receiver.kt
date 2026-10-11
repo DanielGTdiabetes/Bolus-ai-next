@@ -42,22 +42,37 @@ internal class DexcomG7Intake(private val action: String, policy: DexcomSenderTr
 
     sealed interface Step {
         data class Done(val receipt: DexcomReceipt) : Step
-        data class Record(val outcome: DexcomG7ReceptionOutcome.Authenticated, val payloadReads: Int) : Step
+        /** [receivedAtEpochMs] was read inside onReceive, so a queued write keeps the reception instant (R5). */
+        data class Record(
+            val outcome: DexcomG7ReceptionOutcome.Authenticated,
+            val payloadReads: Int,
+            val receivedAtEpochMs: Long,
+        ) : Step
     }
 
-    fun accept(receivedAction: String?, source: DexcomSenderEvidenceSource, readPayload: () -> DexcomExtrasRead): Step {
+    /** [clock] is read once, only for an authenticated message, before anything is queued. */
+    fun accept(
+        receivedAction: String?,
+        source: DexcomSenderEvidenceSource,
+        clock: EpochClock,
+        readPayload: () -> DexcomExtrasRead,
+    ): Step {
         if (receivedAction != action) return Step.Done(DexcomReceipt.IgnoredAction(receivedAction))
         var reads = 0
         return when (val outcome = reception.receive(source) { reads++; readPayload() }) {
             is DexcomG7ReceptionOutcome.SenderRejected -> Step.Done(DexcomReceipt.SenderRejected(outcome, reads))
-            is DexcomG7ReceptionOutcome.Authenticated -> Step.Record(outcome, reads)
+            is DexcomG7ReceptionOutcome.Authenticated -> Step.Record(outcome, reads, clock.nowEpochMs())
         }
     }
 
-    /** Opens the store only now, after authentication (R5), and closes it even if recording fails. */
-    fun <S> record(step: Step.Record, openStore: () -> S, clock: EpochClock): DexcomReceipt.Recorded
-        where S : DexcomObservationStore, S : Closeable =
-        openStore().use { store -> DexcomReceipt.Recorded(DexcomG7Recorder(store, clock).record(step.outcome), step.payloadReads) }
+    /**
+     * Opens the store only now, after authentication (R5), and closes it even if recording fails. The message is
+     * stamped with the instant captured by [accept], never with the time the queued write happens to run.
+     */
+    fun <S> record(step: Step.Record, openStore: () -> S): DexcomReceipt.Recorded
+        where S : DexcomObservationStore, S : Closeable = openStore().use { store ->
+        DexcomReceipt.Recorded(DexcomG7Recorder(store) { step.receivedAtEpochMs }.record(step.outcome), step.payloadReads)
+    }
 }
 
 /**
@@ -75,7 +90,8 @@ open class DexcomG7Receiver : BroadcastReceiver() {
 
     final override fun onReceive(context: Context, intent: Intent) {
         val intake = DexcomG7Intake(DexcomReceiverConfiguration.ACTION, trustPolicy())
-        val step = intake.accept(intent.action, AndroidDexcomSenderEvidenceSource(this, context.packageManager)) {
+        val source = AndroidDexcomSenderEvidenceSource(this, context.packageManager)
+        val step = intake.accept(intent.action, source, wallClock) {
             intent.readDexcomPayload()
         }
         when (step) {
@@ -85,7 +101,7 @@ open class DexcomG7Receiver : BroadcastReceiver() {
                 val application = context.applicationContext
                 writer.execute {
                     try {
-                        deliver(intake.record(step, { openStore(application) }, wallClock))
+                        deliver(intake.record(step) { openStore(application) })
                     } finally {
                         pending.finish()
                     }

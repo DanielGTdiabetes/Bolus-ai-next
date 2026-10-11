@@ -13,7 +13,7 @@ anclas aprobadas y el permiso del productor.
 
 | Clase | Pruebas | Resultado |
 |---|---|---|
-| `DexcomG7IntakeTest` (JVM Android) | 10 | ejecutada, 0 fallos |
+| `DexcomG7IntakeTest` (JVM Android) | 11 | ejecutada, 0 fallos |
 | `DexcomLogBlockTest` (JVM Android) | 3 | actualizada con las líneas del receiver, ejecutada, 0 fallos |
 | `DexcomG7ReceiverDeviceTest` (dispositivo) | 8 | compilada, en la lista de `verify.ps1`; **sin ejecutar**: no hay dispositivo en la sesión |
 | `AndroidDexcomSenderEvidenceTest` (dispositivo) | 8 | una prueba actualizada: el único receiver es el de Dexcom, desactivado; **sin ejecutar** |
@@ -48,6 +48,16 @@ copias del manifiesto fusionado de release: receiver activado, con
 receiver, otra acción y segundo `intent-filter`. Las siete fallan con el
 mensaje del ADR 0022. Política distinta de `Pending`, subclase del receiver y
 `DexcomSenderTrustPolicy.Approved(` en producción también fallan.
+
+## Revisión de Codex en la PR #51
+
+- P2, confirmado: el reloj se leía en el hilo de escritura, de modo que una
+  escritura encolada sellaba la hora de proceso y no la de recepción.
+  `DexcomG7Intake.accept` lee ahora el reloj dentro de `onReceive`, solo para un
+  mensaje autenticado, y `record` usa ese instante fijo. Regresión:
+  `the reception instant is captured on accept, not when a queued write runs`.
+  Las pruebas de ignorado y rechazo usan un reloj que falla si se lee.
+- P1, prueba en modo avión: pendiente de decisión del propietario. Ver la PR.
 
 ## Pendiente
 
