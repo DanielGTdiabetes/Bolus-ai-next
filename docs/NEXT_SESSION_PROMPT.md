@@ -260,8 +260,10 @@ la huella, reloj inyectado solo para sellar, emisor autenticado (paquete,
 versión, firmantes) guardado con cada mensaje. `ObservationLog.kt` (común) y
 `glucose/dexcom/storage/` (Android, `dexcom-observations.db` v1 con triggers
 append-only, índice único parcial y trigger de conflicto). JVM 18 pruebas
-nuevas; `SqliteDexcomObservationStoreDeviceTest` (9) pendiente de ejecutar en
-el Pixel. Véase docs/validation/dexcom-g7-observation-log-2026-10-11.md.
+nuevas; `SqliteDexcomObservationStoreDeviceTest` (8 en la entrega del ADR 0020;
+9 existentes desde la PR #47, que añadió una del ADR 0021) pendiente de
+ejecutar en el Pixel. Véase
+docs/validation/dexcom-g7-observation-log-2026-10-11.md.
 
 ADR 0021 — REGISTRO DEXCOM EN DIAGNÓSTICO (implementado)
 docs/adr/0021-dexcom-log-diagnostics-view.md, aceptado el 2026-10-11 con F1
@@ -278,8 +280,10 @@ docs/validation/dexcom-log-diagnostics-2026-10-11.md.
 
 PENDIENTE DEL PROPIETARIO (ADR 0018 a 0021)
 - `verify.ps1 -DeviceTests` en el Pixel: `DexcomBundleExtrasDeviceTest` (3),
-  `SqliteDexcomObservationStoreDeviceTest` (8) y
-  `DexcomLogDiagnosticsDeviceTest` (3) nunca se han ejecutado en dispositivo.
+  `SqliteDexcomObservationStoreDeviceTest` (9 existentes: 8 del ADR 0020 y 1
+  del ADR 0021) y `DexcomLogDiagnosticsDeviceTest` (3) nunca se han ejecutado
+  en dispositivo. Los números son pruebas existentes en el código, no
+  ejecutadas.
   Si alguna falla, corregir antes de cualquier otro incremento.
 - Revisar las decisiones técnicas T1 a T6 (ADR 0019), E5 a E9 (ADR 0020) y F3
   a F5 (ADR 0021).

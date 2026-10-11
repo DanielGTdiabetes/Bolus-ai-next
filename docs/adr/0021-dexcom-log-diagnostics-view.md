@@ -55,9 +55,10 @@ tratamiento siguen bloqueados.
   sin valor, tendencia ni huella en el resumen.
 - `DexcomLogBlockTest` (JVM Android, 3): pendiente y fallo, registro vacío
   sin inventar recepción, líneas exactas de un registro cargado.
-- `SqliteDexcomObservationStoreDeviceTest` añade la igualdad entre
-  `summary()` y `ObservationSummary.of(read())` y la corrupción también en el
-  resumen.
+- `SqliteDexcomObservationStoreDeviceTest` añade una prueba
+  (`storageSummaryEqualsTheReferenceWithoutLoadingTheHistory`, 9 existentes en
+  la clase) con la igualdad entre `summary()` y `ObservationSummary.of(read())`.
+  La prueba existente de corrupción comprueba además el resumen.
 - `DexcomLogDiagnosticsDeviceTest` (dispositivo, 3): bloque plegado sin
   valores, fallo con su código, solo Diagnóstico lee y cada entrada vuelve a
   leer. En la lista de `verify.ps1`.

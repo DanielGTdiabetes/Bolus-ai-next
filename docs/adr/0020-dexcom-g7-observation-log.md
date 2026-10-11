@@ -105,7 +105,8 @@ igual. Nadie fuera de la lista cerrada de `verify.ps1` usa el registro.
   el reloj, resultados autenticados guardados con el reloj inyectado y
   bloqueados, fallo de escritura como `persistence_failed`, defectos
   propagados y vector SHA-256 con prefijo.
-- `SqliteDexcomObservationStoreDeviceTest` (dispositivo, 8): reapertura con
+- `SqliteDexcomObservationStoreDeviceTest` (dispositivo, 8 en esta entrega; el
+  ADR 0021 añadió una más, 9 existentes): reapertura con
   duplicados y conflictos, rechazos sin contenido, identificador ausente del
   fichero, escritura fallida sin restos, triggers append-only, trigger de
   conflicto, código desconocido como corrupción y esquema alterado como
