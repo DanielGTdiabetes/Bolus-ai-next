@@ -747,6 +747,9 @@ este ajuste. No queda pendiente de fusión; comprobar el CI del SHA integrado.
    identificación de la APK instalada, política compatible con su envío actual,
    permiso y presentación; no exigir `setShareIdentityEnabled(true)` al productor;
    implementar después el recorrido completo dentro del alcance aprobado.
+   La combinación de permiso, conjunto de titulares y anclas se evalúa en el
+   [ADR 0023](adr/0023-dexcom-existing-transport-trust.md), todavía propuesto y
+   pendiente de aceptación de sus garantías condicionadas y riesgos residuales.
 2. Si faltan esas decisiones o artefactos, dejar explícito qué bloquean y avanzar
    solo con preparativos independientes del mismo hito. Retención, contadores,
    exportación y refinamientos visuales quedan fuera de la ruta inmediata salvo

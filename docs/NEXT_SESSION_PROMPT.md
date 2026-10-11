@@ -17,6 +17,13 @@ exige identidad compartida y todavía no es compatible con el envío existente.
 No simular esa identidad ni llamar autenticación por mensaje a verificar una
 APK instalada. Este cambio de alcance no habilita cálculo ni tratamiento.
 
+PROPUESTA DE RECEPCIÓN PENDIENTE
+El ADR 0023 (docs/adr/0023-dexcom-existing-transport-trust.md) evalúa el receiver
+protegido por permiso, conjunto exacto de titulares y anclas de la APK instalada.
+Es un borrador para decisión del propietario: visibilidad completa, ventana
+temporal, apps aprobadas que falsifiquen y emisores privilegiados limitan la
+garantía. No atribuye mensajes a Dexcom ni autoriza implementar o calcular.
+
 La PR #53 (ADR 0022 R11) ya está integrada en `origin/main` mediante
 `740af25`; no reabrir su trabajo como un paso pendiente. Comprobar el CI del
 SHA integrado al continuar. Priorizar ahora una entrega completa de
