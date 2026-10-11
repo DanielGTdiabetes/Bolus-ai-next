@@ -2,6 +2,7 @@ package org.bolusai.next.ui
 
 import org.bolusai.dexcomg7.ObservationFailure
 import org.bolusai.dexcomg7.ObservationSummary
+import org.bolusai.next.glucose.dexcom.DexcomReceiverStatus
 import java.time.Instant
 
 /** State of the Diagnóstico view of the Dexcom observation log (ADR 0021). */
@@ -13,10 +14,13 @@ internal sealed interface DexcomLogState {
 
 /**
  * Technical lines of the folded block (ADR 0021, F1 and F3): counts, status, last reception and sender only. No
- * glucose value, trend, producer timestamp or transmitter fingerprint is ever printed.
+ * glucose value, trend, producer timestamp or transmitter fingerprint is ever printed. The receiver status comes first
+ * and does not depend on the log read (ADR 0022, R9).
  */
 internal object DexcomLogBlock {
-    fun lines(state: DexcomLogState): List<String> = when (state) {
+    fun lines(state: DexcomLogState, receiver: DexcomReceiverStatus): List<String> = receiver.lines() + log(state)
+
+    private fun log(state: DexcomLogState): List<String> = when (state) {
         DexcomLogState.Reading -> listOf("dexcom_log.read.pending")
         is DexcomLogState.Failed -> listOf(state.reason.code)
         is DexcomLogState.Loaded -> with(state.summary) {

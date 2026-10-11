@@ -639,6 +639,18 @@ muestra, plegados, solo recuentos, rechazos por código, última recepción y
 emisor. Nunca valores de glucosa. Leer no crea el fichero. Véase la
 [validación](validation/dexcom-log-diagnostics-2026-10-11.md).
 
+### Entrega del receiver Dexcom G7 desactivado — 2026-10-11
+
+Fase 5 (trabajo 2), incremento preparatorio según el
+[ADR 0022](adr/0022-dexcom-g7-receiver-disabled.md), con R1 a R3 del
+propietario: `DexcomG7Receiver` declarado con `android:enabled="false"`,
+activable solo por `adb`, sin el permiso del productor. Comprueba la acción,
+autentica antes de leer y solo guarda lo autenticado. Con la política `Pending`
+rechaza todo emisor sin leer ni abrir el registro. Diagnóstico muestra el
+estado del componente y de la política. No valida la recepción con Dexcom real:
+siguen pendientes release reproducible, opt-in de identidad, anclas y permiso.
+Véase la [validación](validation/dexcom-g7-receiver-disabled-2026-10-11.md).
+
 ### Secuencia de capacidades
 
 No intentar construir toda una fase en un solo cambio. Secuencia inicial:

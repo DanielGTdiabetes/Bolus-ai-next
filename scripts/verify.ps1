@@ -41,13 +41,33 @@ try {
     if (Select-String -LiteralPath $mergedManifest -SimpleMatch "android.permission.INTERNET" -Quiet) {
         throw "The Android foundation must not request Internet permission"
     }
-    if (Select-String -LiteralPath $mergedManifest -Pattern '<receiver\b|com\.dexcom\.' -Quiet) {
-        throw "The preparatory Android foundation must not register receivers or Dexcom permissions"
-    }
     $releaseManifest = Join-Path $repositoryRoot "android\app\build\intermediates\merged_manifest\release\processReleaseMainManifest\AndroidManifest.xml"
     if (-not (Test-Path -LiteralPath $releaseManifest) -or
-        (Select-String -LiteralPath $releaseManifest -Pattern 'senderfixture|android.permission.INTERNET|<receiver\b|com\.dexcom\.' -Quiet)) {
-        throw "Release manifest must stay isolated from fixtures, receivers and clinical/network permissions"
+        (Select-String -LiteralPath $releaseManifest -Pattern 'senderfixture|android.permission.INTERNET' -Quiet)) {
+        throw "Release manifest must stay isolated from fixtures and network permissions"
+    }
+    # ADR 0022: the only receiver is the Dexcom one, declared disabled (R1) and exported without android:permission
+    # (R8), with a single intent filter holding only the observed action. No Dexcom permission is requested (R2): the
+    # action is the only com.dexcom. value of the whole merged manifest.
+    foreach ($manifest in @($mergedManifest, $releaseManifest)) {
+        [xml]$manifestXml = Get-Content -Raw -LiteralPath $manifest
+        $androidNs = "http://schemas.android.com/apk/res/android"
+        $receivers = @($manifestXml.SelectNodes("//receiver"))
+        $dexcomValues = @($manifestXml.SelectNodes("//@*[starts-with(., 'com.dexcom.')]"))
+        $receiver = if ($receivers.Count -eq 1) { $receivers[0] } else { $null }
+        $filters = @(if ($null -ne $receiver) { $receiver.SelectNodes("intent-filter") })
+        $filterChildren = @(if ($filters.Count -eq 1) { $filters[0].SelectNodes("*") })
+        if ($null -eq $receiver -or
+                $receiver.GetAttribute("name", $androidNs) -cne "org.bolusai.next.glucose.dexcom.DexcomG7Receiver" -or
+                $receiver.GetAttribute("enabled", $androidNs) -cne "false" -or
+                $receiver.GetAttribute("exported", $androidNs) -cne "true" -or
+                $receiver.HasAttribute("permission", $androidNs) -or
+                $filters.Count -ne 1 -or $filterChildren.Count -ne 1 -or
+                $filterChildren[0].LocalName -cne "action" -or
+                $filterChildren[0].GetAttribute("name", $androidNs) -cne "com.dexcom.cgm.EXTERNAL_BROADCAST" -or
+                $dexcomValues.Count -ne 1) {
+            throw "The only receiver must be the disabled Dexcom receiver for the observed action, with no Dexcom permission (ADR 0022): $manifest"
+        }
     }
     foreach ($manifest in @($mergedManifest, $releaseManifest)) {
         $manifestText = Get-Content -Raw -LiteralPath $manifest
@@ -99,8 +119,8 @@ try {
     if ($dexcomParserDependencies.Count -gt 0) {
         throw "The Dexcom G7 payload parser must stay pure and dependency-free: $($dexcomParserDependencies.Path -join ', ')"
     }
-    # ADR 0019 to ADR 0021: only the Dexcom reception composition, its Bundle adapter, the observation log, the read-only
-    # Diagnostico view of its counts and their tests may use the parser. No receiver or other screen consumes them.
+    # ADR 0019 to ADR 0022: only the Dexcom reception composition, its Bundle adapter, the observation log, the read-only
+    # Diagnostico view of its counts, the disabled receiver and their tests may use the parser. No other screen does.
     $allowedDexcomParserConsumers = @(
         "android\app\build.gradle.kts",
         "android\app\src\main\java\org\bolusai\next\glucose\dexcom\DexcomPayloadExtras.kt",
@@ -122,14 +142,28 @@ try {
         "android\app\src\main\java\org\bolusai\next\ui\DexcomLogModel.kt",
         "android\app\src\main\java\org\bolusai\next\MainActivity.kt",
         "android\app\src\test\java\org\bolusai\next\DexcomLogBlockTest.kt",
-        "android\app\src\androidTest\java\org\bolusai\next\DexcomLogDiagnosticsDeviceTest.kt"
+        "android\app\src\androidTest\java\org\bolusai\next\DexcomLogDiagnosticsDeviceTest.kt",
+        "android\app\src\main\java\org\bolusai\next\glucose\dexcom\DexcomG7Receiver.kt",
+        "android\app\src\test\java\org\bolusai\next\glucose\dexcom\DexcomG7IntakeTest.kt",
+        "android\app\src\androidTest\java\org\bolusai\next\glucose\dexcom\DexcomG7ReceiverDeviceTest.kt"
     ) | ForEach-Object { Join-Path $repositoryRoot $_ }
     $dexcomParserConsumers = @(Get-ChildItem -LiteralPath (Join-Path $repositoryRoot "android"), (Join-Path $repositoryRoot "shared") -Recurse -File |
         Where-Object { $_.FullName -notmatch '\\build\\' -and -not $_.FullName.StartsWith($dexcomParserRoot + [IO.Path]::DirectorySeparatorChar) } |
         Select-String -Pattern 'dexcom-g7-payload|org\.bolusai\.dexcomg7|DexcomG7Reception|DexcomPayloadExtras|readDexcomPayload|BundleExtrasView|DexcomObservation|DexcomG7Recorder|dexcom-observations' -List |
         Where-Object { $allowedDexcomParserConsumers -notcontains $_.Path })
     if ($dexcomParserConsumers.Count -gt 0) {
-        throw "Only the Dexcom reception and observation files of ADR 0019 and ADR 0020 may use the parser or that composition: $($dexcomParserConsumers.Path -join ', ')"
+        throw "Only the Dexcom reception and observation files of ADR 0019 to ADR 0022 may use the parser or that composition: $($dexcomParserConsumers.Path -join ', ')"
+    }
+    # ADR 0022, R6: production keeps the Pending policy. No approved anchors, no other policy source and no subclass of
+    # the receiver exist in production code; only instrumentation subclasses it or observes its receipts.
+    $receiverSource = Join-Path $repositoryRoot "android\app\src\main\java\org\bolusai\next\glucose\dexcom\DexcomG7Receiver.kt"
+    if (-not (Select-String -LiteralPath $receiverSource -SimpleMatch -Quiet -Pattern 'val policy: DexcomSenderTrustPolicy = DexcomSenderTrustPolicy.Pending')) {
+        throw "The production Dexcom receiver policy must stay Pending (ADR 0022, R6)"
+    }
+    $productionTrust = @(Get-ChildItem -LiteralPath (Join-Path $repositoryRoot "android\app\src\main") -Recurse -File -Include *.kt, *.java |
+        Select-String -Pattern 'DexcomSenderTrustPolicy\.Approved\(|:\s*DexcomG7Receiver\(|DexcomG7Receiver\.receipts\s*=' -List)
+    if ($productionTrust.Count -gt 0) {
+        throw "Production code must not approve Dexcom senders, subclass the receiver or observe its receipts (ADR 0022, R6): $($productionTrust.Path -join ', ')"
     }
 
     # ADR 0021: ScreenRenderer only receives composed lines; it never reads the log nor knows its domain types.
@@ -377,7 +411,7 @@ jobs:
             }
             # Direct instrumentation avoids collecting unrelated device logcat or clinical data.
             $instrumentation = @(adb shell am instrument -w -r `
-                -e class org.bolusai.next.glucose.dexcom.AndroidDexcomSenderEvidenceTest,org.bolusai.next.NavigationDeviceTest,org.bolusai.next.MealDraftDeviceTest,org.bolusai.next.MealHistoryDeviceTest,org.bolusai.next.MealRestoreDeviceTest,org.bolusai.next.meals.SqliteMealRepositoryDeviceTest,org.bolusai.next.DarkThemeDeviceTest,org.bolusai.next.profile.SqliteClinicalProfileRepositoryDeviceTest,org.bolusai.next.profile.ClinicalProfileConfirmationDeviceTest,org.bolusai.next.ClinicalProfileDeviceTest,org.bolusai.next.ClinicalProfileConfirmationUiDeviceTest,org.bolusai.next.ClinicalProfileUnavailabilityDeviceTest,org.bolusai.next.BolusProfileDetailsDeviceTest,org.bolusai.next.ProfileStorageGuardDeviceTest,org.bolusai.next.glucose.dexcom.DexcomBundleExtrasDeviceTest,org.bolusai.next.glucose.dexcom.storage.SqliteDexcomObservationStoreDeviceTest,org.bolusai.next.DexcomLogDiagnosticsDeviceTest,org.bolusai.next.glucose.dexcom.storage.DexcomLogIsolationDeviceTest `
+                -e class org.bolusai.next.glucose.dexcom.AndroidDexcomSenderEvidenceTest,org.bolusai.next.NavigationDeviceTest,org.bolusai.next.MealDraftDeviceTest,org.bolusai.next.MealHistoryDeviceTest,org.bolusai.next.MealRestoreDeviceTest,org.bolusai.next.meals.SqliteMealRepositoryDeviceTest,org.bolusai.next.DarkThemeDeviceTest,org.bolusai.next.profile.SqliteClinicalProfileRepositoryDeviceTest,org.bolusai.next.profile.ClinicalProfileConfirmationDeviceTest,org.bolusai.next.ClinicalProfileDeviceTest,org.bolusai.next.ClinicalProfileConfirmationUiDeviceTest,org.bolusai.next.ClinicalProfileUnavailabilityDeviceTest,org.bolusai.next.BolusProfileDetailsDeviceTest,org.bolusai.next.ProfileStorageGuardDeviceTest,org.bolusai.next.glucose.dexcom.DexcomBundleExtrasDeviceTest,org.bolusai.next.glucose.dexcom.storage.SqliteDexcomObservationStoreDeviceTest,org.bolusai.next.DexcomLogDiagnosticsDeviceTest,org.bolusai.next.glucose.dexcom.storage.DexcomLogIsolationDeviceTest,org.bolusai.next.glucose.dexcom.DexcomG7ReceiverDeviceTest `
                 "$testPackage/$isolationRunner")
             $instrumentationExit = $LASTEXITCODE
             $instrumentation | Write-Output
