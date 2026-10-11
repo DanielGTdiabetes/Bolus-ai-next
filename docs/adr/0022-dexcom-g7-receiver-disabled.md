@@ -18,6 +18,21 @@
 
 ## Contexto
 
+### Rectificación de alcance del propietario — 2026-10-11
+
+Dexcom ya está modificada, instalada, funciona y el propietario confirma que
+Bolus AI la utiliza. Next debe aprovechar ese transporte como sustituto, sin
+modificar, recompilar, reinstalar ni sustituir el productor. El opt-in de
+identidad no es un trabajo pendiente del propietario: es una precondición del
+diseño estricto de Next que resulta incompatible con el envío observado.
+La siguiente entrega debe adaptar la recepción en Next y registrar garantías,
+limitaciones y pruebas de su política compatible. Comprobar la APK instalada o
+exigir un permiso no equivale a atribuir cada mensaje a Dexcom. No se aprueba
+aquí una política alternativa ni se cambia la implementación: `Pending`, el
+receiver desactivado y los bloqueos clínicos siguen vigentes hasta esa entrega.
+Esta rectificación sustituye las exigencias de modificar el productor que
+aparezcan en antecedentes; no reescribe la evidencia del transporte observado.
+
 Los [ADR 0019](0019-dexcom-g7-reception-composition.md),
 [0020](0020-dexcom-g7-observation-log.md) y
 [0021](0021-dexcom-log-diagnostics-view.md) dejaron autenticación, lectura de
@@ -28,11 +43,10 @@ broadcast `com.dexcom.cgm.EXTERNAL_BROADCAST`
 
 Siguen pendientes, y este ADR **no** las resuelve:
 
-- release reproducible del productor modificado;
-- opt-in de identidad (`setShareIdentityEnabled(true)`) en el productor;
-- anclas aprobadas (paquete, `versionCode`, SHA-256 de firmantes);
+- identificación mediante solo lectura de la APK instalada;
+- política de Next compatible con el envío actual y sus garantías/limitaciones;
 - permiso del productor, semántica de timestamps, tendencia e identidad,
-  vigencia y validación con Dexcom real en modo avión.
+  vigencia y validación con Dexcom real sin Internet y sin cortar el Bluetooth.
 
 Sin anclas, la política de confianza es `Pending` y todo mensaje se rechaza.
 
@@ -122,9 +136,10 @@ sync ni uso clínico. Cálculo y tratamiento siguen bloqueados.
 
 - Activar el receiver por `adb` no cambia nada observable con `Pending`:
   todo mensaje se rechaza sin leerse ni guardarse.
-- El día que existan anclas aprobadas, la validación con Dexcom real necesitará
-  su propio ADR: permiso del productor, opt-in de identidad, anclas y prueba en
-  modo avión. Hasta entonces este receiver no recibe nada del productor.
+- La validación con Dexcom real ampliará este ADR con permiso, política de Next
+  compatible con el productor instalado y prueba offline sin cortar el sensor.
+  No requiere modificar Dexcom. Hasta implementar esa entrega, este receiver
+  no recibe nada del productor.
 - Offline: sin efecto, nada usa red.
 - iOS: no recibe este broadcast. Necesitará otra fuente local y su ADR.
 - Rollback: quitar el componente del manifiesto. El registro no cambia.
@@ -172,6 +187,6 @@ sync ni uso clínico. Cálculo y tratamiento siguen bloqueados.
 
 ## Condiciones para revisar este ADR
 
-- Release reproducible, opt-in de identidad y anclas aprobadas.
+- Compatibilidad con el productor instalado y política de confianza de Next.
 - ADR de validación con Dexcom real o de presentación de lecturas.
 - Cambio de la acción o del transporte observado.
