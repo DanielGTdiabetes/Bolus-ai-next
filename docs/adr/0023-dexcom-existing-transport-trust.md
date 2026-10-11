@@ -127,6 +127,7 @@ no se promete detección instantánea de cada concesión o revocación.
 | Cambio detectado sin un mensaje nuevo | El estado visible se actualiza al ejecutar comprobaciones; no hay garantía de vigilancia continua ni de aviso de mensajes que Android descarta antes de invocar Next |
 
 | Clave de firma compartida por apps del propietario | Legacy, Next y `com.wtachtsugar` comparten certificado (`1d1f25bf…`, inventario L1). Quien tenga esa clave puede firmar una app nueva. Con el ancla por paquete, UID y versión, esa app cambia el conjunto y bloquea; sin anclar la versión, una actualización firmada con la misma clave pasaría sin revisión. No se sabe qué almacén es ni quién lo custodia |
+| Mensajes de la app del reloj indistinguibles de los de Dexcom | La app del reloj tiene el permiso y puede conectarse al sensor sin Dexcom. Si envía la misma acción con la misma forma, Next no sabe cuál de los dos la emitió: la política solo prueba pertenencia al conjunto. Dos fuentes pueden registrar la misma lectura (duplicado) o versiones distintas con el mismo `timestamp` (conflicto E2, mostrado sin valor según C2). Hoy no consta que el reloj envíe esa acción; hasta su contrato propio, todo mensaje aceptado se presenta como «emisor del conjunto aprobado», nunca «Dexcom» |
 | Instalación lateral | Los cuatro paquetes tienen instalador `null`: ninguna tienda aporta garantía de origen. La confianza descansa solo en las anclas aprobadas |
 
 Ninguno de estos riesgos queda aceptado por este borrador.
