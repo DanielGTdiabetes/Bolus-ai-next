@@ -154,6 +154,15 @@ políticas no estén aprobados, el puerto no tiene una variante de lectura váli
 y devuelve `policy_not_approved`. Véanse el [ADR 0003](adr/0003-android-local-glucose-boundary.md)
 y el [contrato v1](contracts/android-local-glucose-boundary-v1.md).
 
+El módulo KMP `shared/dexcom-g7-payload` contiene el parser estructural y puro
+del [transporte observado](contracts/modified-dexcom-g7-broadcast-observed-v1.md):
+recibe una copia tipada de acción y extras (nunca un `Intent` o `Bundle`) y el
+paquete ya autenticado, y devuelve un mensaje observado o un rechazo con código
+estable. Sus lecturas solo pueden estar `NOT_APPROVED_FOR_USE`: no hay rango,
+vigencia, conversión, tendencia ni identidad aprobados. No tiene consumidor ni
+depende del motor, el perfil o Android. Véase el
+[ADR 0018](adr/0018-dexcom-g7-payload-parser.md).
+
 ## Presentación Android local
 
 La estructura de UI usa Views/XML y AndroidX Activity para el ciclo de vida y

@@ -131,7 +131,13 @@ como mínimo:
 - el fallo de identidad ocurre antes del parseo y no persiste ningún payload.
 
 Hasta entonces, `PendingDexcomSource` sigue devolviendo
-`input.glucose.policy_not_approved` y no se interpretan payloads.
+`input.glucose.policy_not_approved` y la app no interpreta payloads. El parser
+estructural de esta forma existe desde el
+[ADR 0018](../adr/0018-dexcom-g7-payload-parser.md) en
+`shared/dexcom-g7-payload`, sin consumidor: rechaza el mensaje completo ante
+cualquier lectura mal formada, lista campos desconocidos por nombre, colapsa
+duplicados idénticos, rechaza los conflictivos, no aplica rango al valor y
+marca toda lectura como `NOT_APPROVED_FOR_USE`.
 
 Next dispone de un [verificador preparatorio de identidad](android-dexcom-sender-authentication-v1.md)
 que modela estos rechazos sin anclas reales ni acceso a payloads. Todavía falta

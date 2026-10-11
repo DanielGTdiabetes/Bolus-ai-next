@@ -126,6 +126,13 @@ perfil. Véanse el
 [ADR 0014](docs/adr/0014-clinical-profile-confirmation-eligibility.md) y las
 validaciones del [dominio](docs/validation/profile-confirmation-domain-2026-10-03.md)
 y de la [pantalla](docs/validation/profile-confirmation-ui-2026-10-03.md).
+El núcleo compartido incluye un parser puro del broadcast observado de la app
+Dexcom G7 modificada. Comprueba la forma del mensaje y lo rechaza entero ante
+cualquier lectura mal formada, sin rango, vigencia ni conversión. Sus lecturas
+quedan siempre como no aprobadas para uso y todavía no lo usa la app: no hay
+receiver ni recepción de glucosa real. Véanse el
+[ADR 0018](docs/adr/0018-dexcom-g7-payload-parser.md) y la
+[validación](docs/validation/dexcom-g7-payload-parser-2026-10-11.md).
 Se ha verificado el flujo en la pantalla interior del Pixel 10 Pro Fold, además
 de layouts anchos vertical/horizontal con texto ampliado. Pausar y reanudar los
 editores conserva sus campos, foco y posición de desplazamiento.
