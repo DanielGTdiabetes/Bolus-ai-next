@@ -138,6 +138,11 @@ traduce cada resultado a un bloqueo de glucosa explícito. Sigue sin receiver
 registrado ni lectura disponible. Véanse el
 [ADR 0019](docs/adr/0019-dexcom-g7-reception-composition.md) y la
 [validación](docs/validation/dexcom-g7-reception-composition-2026-10-11.md).
+Lo recibido tras autenticar ya puede guardarse en una base local append-only
+con duplicados y conflictos explícitos, sin el identificador del transmisor en
+claro. Nada lo usa todavía. Véanse el
+[ADR 0020](docs/adr/0020-dexcom-g7-observation-log.md) y la
+[validación](docs/validation/dexcom-g7-observation-log-2026-10-11.md).
 Se ha verificado el flujo en la pantalla interior del Pixel 10 Pro Fold, además
 de layouts anchos vertical/horizontal con texto ampliado. Pausar y reanudar los
 editores conserva sus campos, foco y posición de desplazamiento.

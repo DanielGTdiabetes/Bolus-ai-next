@@ -620,6 +620,16 @@ con el paquete autenticado y traduce el resultado a `authentication_failed`,
 ni UI. Véase la
 [validación](validation/dexcom-g7-reception-composition-2026-10-11.md).
 
+### Entrega del registro local de observaciones Dexcom G7 — 2026-10-11
+
+Continuación de la fase 5 (persistencia del trabajo 3, duplicados del trabajo
+4) según el [ADR 0020](adr/0020-dexcom-g7-observation-log.md), con E1 a E4 del
+propietario: base propia `dexcom-observations.db` append-only con mensajes,
+rechazos sin contenido y lecturas con huella SHA-256 del transmisor,
+duplicados contados, conflictos enlazados a la primera observación y fallo de
+escritura como `persistence_failed`. Sin receiver ni consumidor. Véase la
+[validación](validation/dexcom-g7-observation-log-2026-10-11.md).
+
 ### Secuencia de capacidades
 
 No intentar construir toda una fase en un solo cambio. Secuencia inicial:

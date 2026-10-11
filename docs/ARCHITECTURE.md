@@ -165,8 +165,14 @@ Su único usuario es `DexcomG7Reception` en Android: autentica al emisor, solo
 entonces copia el `Bundle` a esa forma tipada sin convertir tipos, llama al
 parser con el paquete autenticado y traduce el resultado a
 `input.glucose.authentication_failed`, `parse_failed` o
-`policy_not_approved`. Ningún receiver, pantalla ni almacenamiento la usa
-todavía. Véase el [ADR 0019](adr/0019-dexcom-g7-reception-composition.md).
+`policy_not_approved`. Ningún receiver ni pantalla la usa todavía. Véase el
+[ADR 0019](adr/0019-dexcom-g7-reception-composition.md).
+`DexcomG7Recorder` guarda lo que llega tras autenticar en una base propia
+`dexcom-observations.db`, append-only: mensajes, rechazos sin contenido y
+lecturas con la huella SHA-256 del transmisor. Los duplicados se cuentan y los
+conflictos se enlazan a la primera observación sin sobrescribir. Un fallo de
+escritura bloquea como `persistence_failed`. La política es común en
+`ObservationLog.kt`. Véase el [ADR 0020](adr/0020-dexcom-g7-observation-log.md).
 
 ## Presentación Android local
 
