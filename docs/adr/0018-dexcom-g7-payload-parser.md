@@ -94,6 +94,10 @@ el perfil, las comidas, SQLite y el contrato de indisponibilidad no cambian.
 La traducción de un rechazo a `input.glucose.parse_failed` (u otro motivo)
 queda para el ADR que conecte el parser.
 
+Actualización: el [ADR 0019](0019-dexcom-g7-reception-composition.md)
+conecta el parser con la frontera autenticada de Android, todavía sin receiver
+ni persistencia, y traduce sus rechazos a `input.glucose.parse_failed`.
+
 ## Alternativas consideradas
 
 - **Parser dentro de `android/app` sobre `Bundle`**: obliga a probar con

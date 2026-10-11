@@ -91,7 +91,7 @@ try {
         $instrumentationIsolation.TestSha256)
 
     # ADR 0018: the observed Dexcom G7 payload parser is pure and has no consumer yet. It must not depend on the
-    # engine, the profile, the meals or Android, and nothing outside its module may use it until a later ADR connects it.
+    # engine, the profile, the meals or Android. ADR 0019 limits its consumers below.
     $dexcomParserRoot = Join-Path $repositoryRoot "shared\dexcom-g7-payload"
     $dexcomParserDependencies = @(Get-ChildItem -LiteralPath $dexcomParserRoot -Recurse -File |
         Where-Object { $_.FullName -notmatch '\\build\\' } |
@@ -99,11 +99,22 @@ try {
     if ($dexcomParserDependencies.Count -gt 0) {
         throw "The Dexcom G7 payload parser must stay pure and dependency-free: $($dexcomParserDependencies.Path -join ', ')"
     }
+    # ADR 0019: only the Dexcom reception composition, its Bundle adapter and their tests may use the parser, and no
+    # other source may use that composition yet: no receiver, screen, use case or storage consumes it.
+    $allowedDexcomParserConsumers = @(
+        "android\app\build.gradle.kts",
+        "android\app\src\main\java\org\bolusai\next\glucose\dexcom\DexcomPayloadExtras.kt",
+        "android\app\src\main\java\org\bolusai\next\glucose\dexcom\DexcomG7Reception.kt",
+        "android\app\src\test\java\org\bolusai\next\glucose\dexcom\DexcomPayloadExtrasTest.kt",
+        "android\app\src\test\java\org\bolusai\next\glucose\dexcom\DexcomG7ReceptionTest.kt",
+        "android\app\src\androidTest\java\org\bolusai\next\glucose\dexcom\DexcomBundleExtrasDeviceTest.kt"
+    ) | ForEach-Object { Join-Path $repositoryRoot $_ }
     $dexcomParserConsumers = @(Get-ChildItem -LiteralPath (Join-Path $repositoryRoot "android"), (Join-Path $repositoryRoot "shared") -Recurse -File |
         Where-Object { $_.FullName -notmatch '\\build\\' -and -not $_.FullName.StartsWith($dexcomParserRoot + [IO.Path]::DirectorySeparatorChar) } |
-        Select-String -Pattern 'dexcom-g7-payload|org\.bolusai\.dexcomg7' -List)
+        Select-String -Pattern 'dexcom-g7-payload|org\.bolusai\.dexcomg7|DexcomG7Reception|DexcomPayloadExtras|readDexcomPayload|BundleExtrasView' -List |
+        Where-Object { $allowedDexcomParserConsumers -notcontains $_.Path })
     if ($dexcomParserConsumers.Count -gt 0) {
-        throw "No consumer may use the Dexcom G7 payload parser before its ADR (ADR 0018): $($dexcomParserConsumers.Path -join ', ')"
+        throw "Only the Dexcom reception files of ADR 0019 may use the parser or that composition: $($dexcomParserConsumers.Path -join ', ')"
     }
 
     # ADR 0012: the clinical profile is capture only. The engine and the Bolo overview must not depend on it.
@@ -320,7 +331,7 @@ jobs:
             }
             # Direct instrumentation avoids collecting unrelated device logcat or clinical data.
             $instrumentation = @(adb shell am instrument -w -r `
-                -e class org.bolusai.next.glucose.dexcom.AndroidDexcomSenderEvidenceTest,org.bolusai.next.NavigationDeviceTest,org.bolusai.next.MealDraftDeviceTest,org.bolusai.next.MealHistoryDeviceTest,org.bolusai.next.MealRestoreDeviceTest,org.bolusai.next.meals.SqliteMealRepositoryDeviceTest,org.bolusai.next.DarkThemeDeviceTest,org.bolusai.next.profile.SqliteClinicalProfileRepositoryDeviceTest,org.bolusai.next.profile.ClinicalProfileConfirmationDeviceTest,org.bolusai.next.ClinicalProfileDeviceTest,org.bolusai.next.ClinicalProfileConfirmationUiDeviceTest,org.bolusai.next.ClinicalProfileUnavailabilityDeviceTest,org.bolusai.next.BolusProfileDetailsDeviceTest,org.bolusai.next.ProfileStorageGuardDeviceTest `
+                -e class org.bolusai.next.glucose.dexcom.AndroidDexcomSenderEvidenceTest,org.bolusai.next.NavigationDeviceTest,org.bolusai.next.MealDraftDeviceTest,org.bolusai.next.MealHistoryDeviceTest,org.bolusai.next.MealRestoreDeviceTest,org.bolusai.next.meals.SqliteMealRepositoryDeviceTest,org.bolusai.next.DarkThemeDeviceTest,org.bolusai.next.profile.SqliteClinicalProfileRepositoryDeviceTest,org.bolusai.next.profile.ClinicalProfileConfirmationDeviceTest,org.bolusai.next.ClinicalProfileDeviceTest,org.bolusai.next.ClinicalProfileConfirmationUiDeviceTest,org.bolusai.next.ClinicalProfileUnavailabilityDeviceTest,org.bolusai.next.BolusProfileDetailsDeviceTest,org.bolusai.next.ProfileStorageGuardDeviceTest,org.bolusai.next.glucose.dexcom.DexcomBundleExtrasDeviceTest `
                 "$testPackage/$isolationRunner")
             $instrumentationExit = $LASTEXITCODE
             $instrumentation | Write-Output

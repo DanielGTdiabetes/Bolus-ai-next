@@ -159,9 +159,14 @@ del [transporte observado](contracts/modified-dexcom-g7-broadcast-observed-v1.md
 recibe una copia tipada de acción y extras (nunca un `Intent` o `Bundle`) y el
 paquete ya autenticado, y devuelve un mensaje observado o un rechazo con código
 estable. Sus lecturas solo pueden estar `NOT_APPROVED_FOR_USE`: no hay rango,
-vigencia, conversión, tendencia ni identidad aprobados. No tiene consumidor ni
-depende del motor, el perfil o Android. Véase el
-[ADR 0018](adr/0018-dexcom-g7-payload-parser.md).
+vigencia, conversión, tendencia ni identidad aprobados. No depende del motor, el perfil
+ni Android. Véase el [ADR 0018](adr/0018-dexcom-g7-payload-parser.md).
+Su único usuario es `DexcomG7Reception` en Android: autentica al emisor, solo
+entonces copia el `Bundle` a esa forma tipada sin convertir tipos, llama al
+parser con el paquete autenticado y traduce el resultado a
+`input.glucose.authentication_failed`, `parse_failed` o
+`policy_not_approved`. Ningún receiver, pantalla ni almacenamiento la usa
+todavía. Véase el [ADR 0019](adr/0019-dexcom-g7-reception-composition.md).
 
 ## Presentación Android local
 

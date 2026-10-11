@@ -237,14 +237,26 @@ que dependa de motor, perfil, comidas, Android o Java y que nadie fuera del
 módulo lo use. 21 pruebas JVM. Véase
 docs/validation/dexcom-g7-payload-parser-2026-10-11.md.
 
-SIGUIENTE PASO
-Los ADR 0014, 0015, 0017 y 0018 y la opción A del ADR 0016 están
+ADR 0019 — COMPOSICIÓN DE RECEPCIÓN DEXCOM G7 (implementado)
+docs/adr/0019-dexcom-g7-reception-composition.md, autorizado por el
+propietario el 2026-10-11 con T1 a T6 como decisiones técnicas revisables.
+`glucose/dexcom/DexcomPayloadExtras.kt` (`ExtrasView`, `BundleExtrasView`,
+`Intent.readDexcomPayload()`, sin conversión de tipos, `BadParcelableException`
+→ mensaje ilegible) y `DexcomG7Reception.kt` (autentica, lee una vez, parsea
+con el paquete autenticado; `SenderRejected` → motivo del autenticador,
+ilegible o rechazado → `parse_failed`, observado → `policy_not_approved`).
+`verify.ps1` fija la lista cerrada de ficheros que usan el parser o la
+composición. JVM 12 pruebas nuevas; `DexcomBundleExtrasDeviceTest` (3) en la
+lista de instrumentación, pendiente de ejecutar en el Pixel. Véase
+docs/validation/dexcom-g7-reception-composition-2026-10-11.md.
+
+Los ADR 0014, 0015, 0017, 0018 y 0019 y la opción A del ADR 0016 están
 implementados. No hay ningún incremento funcional ni clínico autorizado. El
-siguiente paso natural de la fase 5 es un ADR que conecte el parser: adaptador
-`Bundle` → `DexcomG7Payload` dentro de `DexcomAuthenticatedIngress`, traducción
-de rechazos a `input.glucose.*` y, por separado, persistencia de lecturas
-observadas. Sigue bloqueado por la release reproducible del productor, el
-opt-in de identidad y las anclas.
+ADR 0019 ya compone autenticación, extras y parser sin receiver. Lo siguiente
+de la fase 5 es la persistencia local de mensajes observados (ADR propio:
+esquema, identidad, duplicados entre mensajes, retención) y, cuando el
+propietario archive la release reproducible, active el opt-in de identidad y
+apruebe las anclas, el receiver productivo.
 Cualquier capacidad nueva necesita antes un ADR que defina su alcance y sus
 decisiones pendientes, y la aprobación explícita del propietario. Conectar el traductor con `ReadOverview`, el motor u
 otro consumidor exige su propio ADR. Siguen
