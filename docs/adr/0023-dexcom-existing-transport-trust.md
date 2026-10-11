@@ -151,7 +151,7 @@ aprueba. Mientras no se respondan, Next no presenta valores de glucosa.
 
 | ID | Pregunta | Opciones | Recomendación y motivo |
 |---|---|---|---|
-| B1 | Semántica de `timestamp` | (a) epoch UTC en segundos (el productor divide un valor interno entre 1000), aceptada solo tras comprobar en la validación real que la diferencia con la recepción es coherente; (b) no interpretarlo y mostrar solo la hora de recepción | **(a) con verificación**. Hasta superar la validación se presenta la hora de recepción, etiquetada como tal, y la hora de medida como «no verificada». El informe registra diferencias observadas, sin fijar umbrales clínicos |
+| B1 | Semántica de `timestamp` | (a) epoch UTC en segundos (el productor divide un valor interno entre 1000), aceptada solo tras comprobar en la validación real que la diferencia con la recepción es coherente; (b) no interpretarlo y mostrar solo la hora de recepción | **(a) con verificación**. Hasta superar la validación se presenta la hora de recepción, etiquetada como tal, y la hora de medida como «no verificada». El informe registra diferencias observadas, sin fijar umbrales clínicos. La verificación la aprueba el propietario sobre ese informe; el agente no la da por cumplida |
 | B2 | `egvTxTime` | (a) conservar sin interpretar; (b) investigar semántica | **(a)**. No se presenta ni se usa |
 | B3 | Unidad de `glucoseValue` | (a) mg/dL como afirmación versionada del productor (especificación `06f25370…`); (b) unidad desconocida y no mostrar valor | **(a)**, mostrando siempre «mg/dL». **Sin conversión** a mmol/L aunque el perfil esté en mmol/L: convertir es una regla pendiente |
 | B4 | **Clínica** — valores extremos (D4 del ADR 0018 no aplica rango) | (a) mostrar el entero recibido con el estado «no aprobada para uso»; (b) no mostrar valores fuera de `1..400` y presentar «valor fuera del intervalo emitido por el productor» | **Decisión del propietario**. (b) usa un literal observado del productor como filtro de presentación, no como rango clínico; (a) no inventa nada pero puede enseñar un número sin sentido |
@@ -181,9 +181,11 @@ conjunto aprobado», nunca «enviada por Dexcom».
 
 ## Documentos afectados al aceptar
 
-Estas puertas siguen vigentes hasta que el propietario acepte este ADR. Al
-aceptarlo, la entrega las actualiza para distinguir la ruta estricta (que se
-conserva) de la política por permiso:
+Cada uno lleva ya una nota de rectificación: el opt-in de identidad y la
+release reproducible dejan de ser trabajo pendiente del productor, y la
+recepción real sigue bloqueada mientras este ADR siga propuesto. Al aceptarlo,
+la entrega los actualiza para distinguir la ruta estricta (que se conserva) de
+la política por permiso:
 
 - `README.md` (estado: «hasta fijar una release reproducible, autenticar el emisor»);
 - `docs/contracts/android-local-glucose-boundary-v1.md` y
@@ -245,8 +247,12 @@ Recepción por permiso:
 
 Presentación:
 
-- Sin lecturas, conflicto, timestamp futuro, reordenación y backfill, varios
-  transmisores, duplicados, antigüedad con reloj inyectado y registro ilegible.
+- Antes de verificar B1: sin lecturas, conflicto, varios transmisores,
+  duplicados y registro ilegible; selección por recepción (C2 b), tiempo desde
+  la recepción con reloj inyectado y hora de medida siempre «no verificada»,
+  sin ordenar, comparar ni calcular antigüedad con el `timestamp` del productor.
+- Tras verificar B1: timestamp futuro (C4), reordenación y backfill (C2 a) y
+  antigüedad de la medida con reloj inyectado.
 - Cada estado de C6 visible con su causa; ningún valor antiguo presentado como
   nuevo.
 - Ausencia de uso clínico en todos los estados: el motor y `ReadOverview` no

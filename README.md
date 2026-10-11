@@ -200,8 +200,10 @@ registra tratamientos. Las versiones mínimas y el contrato Dexcom definitivos
 continúan pendientes. La [investigación de recepción local G7 en Android](docs/validation/dexcom-g7-android-local-reception-2026-09-06.md)
 identifica la aplicación Dexcom modificada por el propietario como fuente local
 primaria y la Web API como contingencia de emergencia con retraso. El puerto
-devuelve `policy_not_approved` hasta fijar una release reproducible, autenticar
-el emisor y aprobar las políticas clínicas restantes.
+devuelve `policy_not_approved` hasta aprobar una política de recepción y las
+políticas clínicas restantes. Dexcom instalada no se modifica: la política
+compatible con su envío actual se propone en el
+[ADR 0023](docs/adr/0023-dexcom-existing-transport-trust.md), sin aprobar.
 
 ## Documentación para ejecutar el proyecto
 

@@ -50,6 +50,15 @@ resolver ninguna de las decisiones siguientes.
 
 ## Decisiones pendientes que bloquean una lectura disponible
 
+Rectificación del propietario, 2026-10-11: Dexcom instalada no se modifica,
+recompila ni reinstala. El opt-in de identidad y la release reproducible no son
+trabajo pendiente del productor, sino requisitos de la ruta estricta de Next,
+que se conserva. La política compatible se propone en el
+[ADR 0023](../adr/0023-dexcom-existing-transport-trust.md), todavía propuesto;
+hasta aceptarlo, el punto 1 sigue bloqueando. El permiso por sí solo sigue sin
+bastar: el ADR 0023 lo combina con el conjunto de titulares y las anclas, y
+declara la garantía condicionada que resulta.
+
 1. Release reproducible y contrato versionado del productor modificado, además
    de un mecanismo demostrable de autenticidad del emisor. No sirven como prueba
    un extra con

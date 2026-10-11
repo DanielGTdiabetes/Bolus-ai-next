@@ -26,6 +26,10 @@ el futuro receiver tendría que improvisar tipos y motivos.
 Siguen bloqueando una lectura disponible la release reproducible del productor,
 su opt-in de identidad, las anclas aprobadas, la semántica de timestamps,
 tendencia e identidad, la vigencia y la persistencia. Ninguna se resuelve aquí.
+Rectificación del propietario, 2026-10-11: release reproducible y opt-in ya no
+se piden al productor, que no se modifica. La política compatible se propone en
+el [ADR 0023](0023-dexcom-existing-transport-trust.md), todavía propuesto;
+hasta aceptarlo la lectura sigue bloqueada.
 
 ## Decisión
 

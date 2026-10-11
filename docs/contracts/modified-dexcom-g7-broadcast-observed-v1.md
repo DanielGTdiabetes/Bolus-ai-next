@@ -132,12 +132,18 @@ Antes de añadir `LocalGlucoseSourceResult.Available` deben aprobarse y probarse
 - persistencia local durable y recuperación tras reinicio;
 - permiso denegado, fuente ausente, emisor inválido, parseo e invalidez como
   estados distintos;
-- prueba Android real sin dependencia de Internet y con datos minimizados,
-  preservando el Bluetooth del sensor según la decisión del ADR 0022.
+- prueba Android real sin red y con datos minimizados, preservando la
+  recepción del sensor. El modo de la prueba (modo avión con Bluetooth
+  reactivado o red desactivada con Bluetooth intacto) es la decisión D1 del
+  [ADR 0023](../adr/0023-dexcom-existing-transport-trust.md); hasta que el
+  propietario decida, rige la regla del ADR 0022.
 
 Las pruebas de la ruta estricta implementada deben conservar estas garantías;
-no demuestran compatibilidad con el productor instalado. La política compatible
-necesitará sus propias pruebas en la misma entrega:
+no demuestran compatibilidad con el productor instalado. Las pruebas de
+aceptación de la política compatible (permiso, conjunto exacto de titulares,
+anclas, bloqueo durable y riesgos residuales) están en la sección «Pruebas de
+aceptación» del [ADR 0023](../adr/0023-dexcom-existing-transport-trust.md),
+todavía propuesto. Pruebas que conserva la ruta estricta:
 
 - el broadcast genuino con identity sharing expone el paquete y la UID esperados;
 - omitir identity sharing produce identidad no disponible y bloqueo explícito;
