@@ -58,6 +58,8 @@ class BolusProfileDetailsDeviceTest {
         MainActivity.profileClock = ProfileClock { 1_790_000_000_000 }
         MainActivity.profileTimeZoneRules = zones
         MainActivity.profileOperationIds = ids
+        // Diagnóstico also reads the Dexcom log (ADR 0021): a synthetic one, never the app's own file.
+        MainActivity.dexcomLogReader = { emptyDexcomLog }
     }
 
     @After fun clear() {
@@ -67,6 +69,7 @@ class BolusProfileDetailsDeviceTest {
         MainActivity.profileClock = null
         MainActivity.profileTimeZoneRules = null
         MainActivity.profileOperationIds = null
+        MainActivity.dexcomLogReader = null
         context.deleteDatabase(name)
     }
 

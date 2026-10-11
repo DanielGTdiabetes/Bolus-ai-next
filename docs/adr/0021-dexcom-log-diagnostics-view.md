@@ -65,6 +65,39 @@ tratamiento siguen bloqueados.
 - `verify.ps1`: `ScreenRenderer` no conoce el registro ni sus tipos, y la
   lista cerrada de usuarios del parser incluye solo estos ficheros.
 
+## Seguimiento de la revisión independiente del 2026-10-11
+
+Una revisión de Codex sobre `403f84e` encontró dos defectos P2. Los dos se
+confirmaron en el código. Esta sección precisa F4 sin cambiar F1 a F3 ni F5.
+
+1. **F4 no cubría un fichero existente sin inicializar.** `summary()` usa
+   `SQLiteOpenHelper.readableDatabase`, que puede abrir para escritura y llamar
+   a `onCreate` cuando `user_version` es 0 (AOSP, `getDatabaseLocked`). Un
+   fichero de cero bytes o una base v0, que es lo que deja un escritor que muere
+   durante su primer `onCreate`, se habría convertido en un registro v1 vacío al
+   abrir Diagnóstico. Precisión técnica de F4: Diagnóstico usa
+   `summaryOfExisting()`, que comprueba primero `user_version == 1` y el esquema
+   exacto en una conexión `OPEN_READONLY`. Un fichero vacío, v0, de otra versión
+   o con objetos ajenos devuelve `dexcom_observation.unsupported_schema`. Un
+   fichero que no es SQLite devuelve `dexcom_observation.corrupt_storage`. En los
+   dos casos el fichero se conserva byte a byte. Se reutilizan códigos
+   existentes y no se añade ninguno. Si el fichero no existe, la lectura sigue
+   presentando un registro vacío sin crearlo.
+2. **Las pruebas que visitaban Diagnóstico usaban el lector real.**
+   `NavigationDeviceTest` y `BolusProfileDetailsDeviceTest` entraban en
+   Diagnóstico sin inyectar `dexcomLogReader` y la barrera del ADR 0017 solo
+   protegía `clinical-profile.db`. Ahora `DexcomStorageGuard`, activado por
+   `ProfileIsolationTestRunner` antes de cualquier código de la app, rechaza
+   construir el almacén sobre `dexcom-observations.db` o leerlo desde
+   Diagnóstico durante la instrumentación. Falla de forma explícita antes de
+   mirar el fichero. Las dos pruebas inyectan un lector sintético y
+   `verify.ps1` exige esa inyección en toda prueba que lance `MainActivity` y
+   visite Diagnóstico.
+
+Pruebas: `DexcomLogIsolationDeviceTest` (dispositivo) y las comprobaciones
+nuevas de `verify.ps1`. Véase
+[la validación](../validation/dexcom-log-read-isolation-2026-10-11.md).
+
 ## Condiciones para revisar este ADR
 
 - ADR del receiver productivo o de presentación de lecturas.

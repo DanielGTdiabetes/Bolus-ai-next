@@ -40,8 +40,16 @@ internal class SqliteDexcomObservationStore(
 ) : DexcomObservationStore, Closeable {
     private class CorruptRow : RuntimeException("dexcom_observation.corrupt_storage")
 
+    // Before SQLite sees the name: during instrumentation the app's own file is never opened (DexcomStorageGuard).
+    init { DexcomStorageGuard.checkDatabase(context.applicationContext, name) }
+
+    private val file = name?.let { context.applicationContext.getDatabasePath(it) }
+
+    /** Never the platform default, which deletes a file it considers corrupt. */
+    private val errorHandler = DatabaseErrorHandler { throw SQLiteDatabaseCorruptException(ObservationFailure.CORRUPT_STORAGE.code) }
+
     private val helper = object : SQLiteOpenHelper(context.applicationContext, name, null, DexcomObservationSchema.V1,
-        DatabaseErrorHandler { throw SQLiteDatabaseCorruptException(ObservationFailure.CORRUPT_STORAGE.code) }) {
+        errorHandler) {
         override fun onConfigure(db: SQLiteDatabase) {
             db.execSQL("PRAGMA synchronous=FULL")
             db.setForeignKeyConstraintsEnabled(true)
@@ -141,6 +149,23 @@ internal class SqliteDexcomObservationStore(
             ))
         }
         result
+    } catch (failure: RuntimeException) {
+        ObservationSummaryRead.Failed(reason(failure, ObservationFailure.READ_FAILED))
+    }
+
+    /**
+     * The summary Diagnóstico reads (ADR 0021, F4): only from an existing v1 log. `readableDatabase` may open for writing
+     * and run `onCreate` on a file whose `user_version` is 0, so the version and the schema are first checked on a
+     * read-only connection. An empty, version-0 or foreign file is `unsupported_schema` and stays untouched; it is never
+     * initialised nor shown as an empty log. Only then are the rows aggregated as in [summary].
+     */
+    fun summaryOfExisting(): ObservationSummaryRead = try {
+        val path = checkNotNull(file) { "dexcom_observation.in_memory_has_no_file" }.path
+        SQLiteDatabase.openDatabase(path, null, SQLiteDatabase.OPEN_READONLY, errorHandler).use { db ->
+            if (db.version != DexcomObservationSchema.V1) throw DexcomObservationSchema.Mismatch("version ${db.version}")
+            DexcomObservationSchema.verify(db)
+        }
+        summary()
     } catch (failure: RuntimeException) {
         ObservationSummaryRead.Failed(reason(failure, ObservationFailure.READ_FAILED))
     }
