@@ -287,7 +287,8 @@ Diagnóstico lee con `summaryOfExisting()`, que comprueba versión y esquema en
 una conexión de solo lectura. Así un fichero vacío o v0 ya no se inicializa: da
 `unsupported_schema` y conserva sus bytes. `DexcomStorageGuard` aísla
 `dexcom-observations.db` en la instrumentación. `DexcomLogIsolationDeviceTest`
-(8) está en la lista de `verify.ps1`.
+(8) está en la lista de `verify.ps1`. Superó 8/8 en el Pixel sobre `2839a57`,
+con la instrumentación completa en `OK (154 tests)`.
 
 EJECUCIÓN EN DISPOSITIVO DE LOS ADR 0019 A 0021 (2026-10-11)
 `.\scripts\verify.ps1 -DeviceTests` sobre
@@ -301,9 +302,6 @@ Pro Fold (`rango`, Android 17, API 37, build `CP3A.260905.009`), único en
 (ADR 0019).
 
 PENDIENTE DEL PROPIETARIO (ADR 0018 a 0021)
-- `verify.ps1 -DeviceTests` en el Pixel para `DexcomLogIsolationDeviceTest` (8
-  existentes, ninguna ejecutada todavía) y para las clases modificadas
-  `NavigationDeviceTest` y `BolusProfileDetailsDeviceTest`.
 - Revisar las decisiones técnicas T1 a T6 (ADR 0019), E5 a E9 (ADR 0020) y F3
   a F5 (ADR 0021).
 - Para el receiver productivo: archivar release reproducible de la app Dexcom

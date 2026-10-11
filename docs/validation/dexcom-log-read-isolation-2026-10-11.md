@@ -34,7 +34,9 @@ Sin cambios de esquema, códigos, UI, receiver, motor, perfil ni comidas.
 
 | Clase | Pruebas | Resultado |
 |---|---|---|
-| `DexcomLogIsolationDeviceTest` (dispositivo) | 8 | compilada; **pendiente de ejecutar** en el Pixel |
+| `DexcomLogIsolationDeviceTest` (dispositivo) | 8 | 8 existentes, 8 ejecutadas en el Pixel, 0 fallos |
+| `NavigationDeviceTest` (dispositivo, modificada) | 7 | 7 ejecutadas en el Pixel, 0 fallos |
+| `BolusProfileDetailsDeviceTest` (dispositivo, modificada) | 8 | 8 ejecutadas en el Pixel, 0 fallos |
 
 Casos de `DexcomLogIsolationDeviceTest`, todos con ficheros sintéticos en una
 carpeta temporal y nunca con el fichero de la app:
@@ -65,7 +67,28 @@ Prueba negativa de la comprobación estática nueva: en una copia de
 `NavigationDeviceTest` sin la línea `dexcomLogReader = {`, el patrón de
 `verify.ps1` marca ese fichero.
 
+## Ejecución en dispositivo (2026-10-11)
+
+- SHA probado: `2839a57a7aff616349a889c7d0d0483bfc8a71e7` (rama
+  `claude/dexcom-log-read-isolation`; solo documentación cambia después).
+- Dispositivo: Pixel 10 Pro Fold (`rango`), Android 17, API 37, build
+  `CP3A.260905.009`. Era el único dispositivo en `adb devices`, despierto y
+  desbloqueado, sin otra instrumentación en curso.
+- Comando: `.\scripts\verify.ps1 -DeviceTests` en Windows. Salida 0, con Gradle
+  `BUILD SUCCESSFUL` (205 tareas), comprobaciones de arquitectura y autoprueba
+  de aislamiento correctas e instrumentación `OK (154 tests)` (146 anteriores y 8
+  nuevas).
+- `DexcomLogIsolationDeviceTest` 8/8: `theRunnerActivatesTheGuardBeforeAnyTest`,
+  `theRealLogIsRejectedBeforeItIsOpenedOrLookedAt`,
+  `aMissingLogReadsAsEmptyWithoutBeingCreated`,
+  `aZeroByteFileIsRejectedAndNotInitialised`,
+  `anEmptyVersionZeroDatabaseIsRejectedAndNotInitialised`,
+  `anUnsupportedSchemaOrVersionIsRejectedWithoutTouchingTheFile`,
+  `aFileThatIsNotSqliteIsCorruptionAndIsKept` y
+  `aValidLogIsCountedLikeTheReference`.
+
 ## Pendiente
 
-- `verify.ps1 -DeviceTests` en el Pixel con la clase nueva y las dos clases
-  modificadas. El Pixel se desconectó de `adb` antes de esta ejecución.
+- No se ejecutaron las regresiones contra el código anterior para demostrar que
+  fallaban. El razonamiento es el siguiente: con `readableDatabase`, los casos
+  de cero bytes y v0 pasan por `onCreate`, y las barreras no existían.
