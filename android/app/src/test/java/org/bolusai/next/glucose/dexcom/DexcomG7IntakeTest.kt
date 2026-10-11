@@ -277,6 +277,18 @@ class DexcomG7IntakeTest {
     }
 
     @Test
+    fun `a clock that throws after authentication is a clock failure and nothing is opened`() {
+        val secret = "synthetic secret text"
+        val step = DexcomG7Intake(ACTION, policy())
+            .accept(ACTION, { Source() }, EpochClock { throw IllegalStateException(secret) }) { DexcomExtrasRead.Read(payload()) }
+        // Done is final: there is no Record step, so the store cannot be opened.
+        val receipt = (step as DexcomG7Intake.Step.Done).receipt
+        assertEquals(DexcomReceipt.IntakeFailed(DexcomIntakeFailure.CLOCK_FAILED, 1), receipt)
+        assertEquals("input.glucose.clock_anomaly", (receipt as DexcomReceipt.IntakeFailed).glucose.code)
+        assertFalse(receipt.toString().contains(secret))
+    }
+
+    @Test
     fun `jvm errors in the synchronous stages are not swallowed`() {
         val error = AssertionError("synthetic error")
         val stages = listOf(
@@ -286,6 +298,10 @@ class DexcomG7IntakeTest {
             {
                 DexcomG7Intake(ACTION, policy()) { _, _ -> throw error }
                     .accept(ACTION, { Source() }, unread) { DexcomExtrasRead.Read(payload()) }
+            },
+            {
+                DexcomG7Intake(ACTION, policy())
+                    .accept(ACTION, { Source() }, EpochClock { throw error }) { DexcomExtrasRead.Read(payload()) }
             },
         )
         stages.forEach { stage -> assertSame(error, assertThrows(AssertionError::class.java) { stage() }) }
@@ -298,6 +314,7 @@ class DexcomG7IntakeTest {
                 "dexcom_receiver.intake_authentication_failed" to UnavailabilityReason.AUTHENTICATION_FAILED,
                 "dexcom_receiver.intake_extras_failed" to UnavailabilityReason.PARSE_FAILED,
                 "dexcom_receiver.intake_parser_failed" to UnavailabilityReason.PARSE_FAILED,
+                "dexcom_receiver.intake_clock_failed" to UnavailabilityReason.CLOCK_ANOMALY,
             ),
             DexcomIntakeFailure.entries.map { it.code to it.reason },
         )
@@ -324,6 +341,8 @@ class DexcomG7IntakeTest {
             (intake.accept(ACTION, { Source() }, unread) { error("synthetic") } as DexcomG7Intake.Step.Done).receipt,
             (DexcomG7Intake(ACTION, policy()) { _, _ -> error("synthetic") }
                 .accept(ACTION, { Source() }, unread) { DexcomExtrasRead.Read(payload()) } as DexcomG7Intake.Step.Done).receipt,
+            (intake.accept(ACTION, { Source() }, EpochClock { error("synthetic") }) { DexcomExtrasRead.Read(payload()) }
+                as DexcomG7Intake.Step.Done).receipt,
         ).map {
             when (it) {
                 is DexcomReceipt.IgnoredAction -> error("unexpected")
@@ -343,6 +362,7 @@ class DexcomG7IntakeTest {
                 "input.glucose.authentication_failed",
                 "input.glucose.parse_failed",
                 "input.glucose.parse_failed",
+                "input.glucose.clock_anomaly",
             ),
             codes,
         )

@@ -48,7 +48,7 @@ internal sealed interface DexcomReceipt {
     }
 
     /**
-     * Authentication, reading the extras or parsing threw inside onReceive (R11). Only the stage is kept: never the
+     * Authentication, reading the extras, parsing or reading the clock threw inside onReceive (R11). Only the stage is kept: never the
      * exception text nor the payload. Nothing is retried or stored. After [DexcomIntakeFailure.AUTHENTICATION] the
      * extras were never read and the store was never opened.
      */
@@ -69,6 +69,7 @@ internal enum class DexcomIntakeFailure(val code: String, val reason: Unavailabi
     AUTHENTICATION("dexcom_receiver.intake_authentication_failed", UnavailabilityReason.AUTHENTICATION_FAILED),
     EXTRAS("dexcom_receiver.intake_extras_failed", UnavailabilityReason.PARSE_FAILED),
     PARSER("dexcom_receiver.intake_parser_failed", UnavailabilityReason.PARSE_FAILED),
+    CLOCK_FAILED("dexcom_receiver.intake_clock_failed", UnavailabilityReason.CLOCK_ANOMALY),
 }
 
 /**
@@ -100,7 +101,7 @@ internal class DexcomG7Intake(
      *
      * Runs on the main thread, where an escaping exception would kill the process (R11): any [Exception] becomes
      * [DexcomReceipt.IntakeFailed]. Each stage has its own boundary: the source factory and the authentication
-     * decision, the [readPayload] call and the parser. The extras view keeps converting only unparcel failures into
+     * decision, the [readPayload] call, the parser and, for an authenticated message only, the clock. The extras view keeps converting only unparcel failures into
      * an unreadable payload (ADR 0019, T3); nothing is relabelled as one here. JVM [Error]s are not caught.
      */
     fun accept(
@@ -127,7 +128,14 @@ internal class DexcomG7Intake(
         }
         return when (outcome) {
             is DexcomG7ReceptionOutcome.SenderRejected -> Step.Done(DexcomReceipt.SenderRejected(outcome, reads))
-            is DexcomG7ReceptionOutcome.Authenticated -> Step.Record(outcome, reads, clock.nowEpochMs())
+            is DexcomG7ReceptionOutcome.Authenticated -> {
+                val receivedAt = try {
+                    stage(DexcomIntakeFailure.CLOCK_FAILED) { clock.nowEpochMs() }
+                } catch (failed: StageFailed) {
+                    return Step.Done(DexcomReceipt.IntakeFailed(failed.failure, reads))
+                }
+                Step.Record(outcome, reads, receivedAt)
+            }
         }
     }
 
@@ -195,7 +203,7 @@ open class DexcomG7Receiver : BroadcastReceiver() {
 
     final override fun onReceive(context: Context, intent: Intent) {
         val intake = DexcomG7Intake(DexcomReceiverConfiguration.ACTION, trustPolicy())
-        // accept() turns exceptions of authentication, extras and parser into IntakeFailed (R11).
+        // accept() turns exceptions of authentication, extras, parser and clock into IntakeFailed (R11).
         val step = intake.accept(intent.action, { senderEvidence(context) }, wallClock) {
             intent.readDexcomPayload()
         }

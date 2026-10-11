@@ -41,8 +41,9 @@ que podían lanzar con esa política:
 - Recibo nuevo `DexcomReceipt.IntakeFailed(DexcomIntakeFailure, payloadReads)`
   con `dexcom_receiver.intake_authentication_failed` (glucosa
   `authentication_failed`), `dexcom_receiver.intake_extras_failed` y
-  `dexcom_receiver.intake_parser_failed` (glucosa `parse_failed`). Ambos
-  motivos ya existían en `UnavailabilityReason`.
+  `dexcom_receiver.intake_parser_failed` (glucosa `parse_failed`) y, tras la
+  revisión de Codex, `dexcom_receiver.intake_clock_failed` (glucosa
+  `clock_anomaly`). Los tres motivos ya existían en `UnavailabilityReason`.
 - Sin texto de la excepción ni datos del payload en el recibo. El marcador
   interno de etapa no guarda ni mensaje original ni causa.
 - Fallo de autenticación: `payloadReads = 0`, sin almacén ni reloj. Fallo de
@@ -60,11 +61,24 @@ que podían lanzar con esa política:
 - Política `Pending`, orden acción → autenticación → extras → parser, motor,
   perfil, Bolo y lógica clínica sin cambios. Sin red.
 
+## Revisión de Codex (PR #53)
+
+Hallazgo P2 sobre `4137866`: `clock.nowEpochMs()` se leía en `accept` pero
+fuera de los límites, así que un reloj inyectado que lanzara escapaba de
+`onReceive`. El reloj de producción (`System.currentTimeMillis()`) no lanza,
+pero R11 promete que ninguna `Exception` escapa de `accept`. El propietario
+eligió una cuarta etapa: `dexcom_receiver.intake_clock_failed`, glucosa
+`clock_anomaly` (motivo existente), `payloadReads = 1`, sin guardar nada ni
+abrir el almacén. El reloj se sigue leyendo después del parser y solo para un
+mensaje autenticado. Regresión: sin el límite del reloj fallan
+`a clock that throws after authentication is a clock failure and nothing is opened`
+y `no receipt makes glucose available` con la excepción escapando.
+
 ## Pruebas
 
 | Clase | Pruebas | Resultado |
 |---|---|---|
-| `DexcomG7IntakeTest` (JVM Android) | 23 | 8 nuevas y 1 ampliada, ejecutadas, 0 fallos |
+| `DexcomG7IntakeTest` (JVM Android) | 24 | 9 nuevas (1 de la revisión de Codex) y 1 ampliada, ejecutadas, 0 fallos |
 | Resto de `org.bolusai.next.glucose.dexcom.*` y `DexcomLogBlockTest` (JVM Android) | 42 | ejecutadas, 0 fallos |
 | `DexcomG7ReceiverDeviceTest` (dispositivo) | 11 | 1 nueva. **Compiladas, sin ejecutar**: las ejecuta el propietario en el Pixel |
 
@@ -84,10 +98,13 @@ Pruebas nuevas en JVM:
   extras.
 - `an unreadable payload is still recorded as unreadable, not as an intake failure`
   (T3).
+- `a clock that throws after authentication is a clock failure and nothing is opened`:
+  `IntakeFailed(CLOCK_FAILED, 1)` y `clock_anomaly`, sin paso de escritura.
 - `jvm errors in the synchronous stages are not swallowed`: un `Error` en la
-  fábrica, en la fuente, en los extras y en el parser se propaga intacto.
-- `intake failure codes are stable`, con su motivo de glucosa.
-- `no receipt makes glucose available` añade los tres `IntakeFailed`.
+  fábrica, en la fuente, en los extras, en el parser y en el reloj se propaga
+  intacto.
+- `intake failure codes are stable`, con su motivo de glucosa (cuatro códigos).
+- `no receipt makes glucose available` añade los cuatro `IntakeFailed`.
 
 Mutación de control: sin el límite de extras, la prueba de extras falla con
 `expected IntakeFailed(EXTRAS, 1) but was IntakeFailed(PARSER, 1)`. Se restauró
@@ -115,7 +132,7 @@ export ANDROID_HOME=/tmp/android-sdk
   :android:app:compileDebugAndroidTestKotlin          # BUILD SUCCESSFUL, 65 pruebas, 0 fallos
 ./gradlew -I mirror.gradle androidJvmTest :android:app:testDebugUnitTest :android:app:lintDebug \
   :android:app:assembleDebug :android:app:assembleDebugAndroidTest \
-  :android:sender-fixture:assembleDebug               # BUILD SUCCESSFUL, 100 pruebas JVM de la app y 200 de shared, 0 fallos
+  :android:sender-fixture:assembleDebug               # BUILD SUCCESSFUL, 100 pruebas JVM de la app y 200 de shared, 0 fallos (101 tras la corrección del reloj)
 git diff --check                                      # sin salida
 ```
 

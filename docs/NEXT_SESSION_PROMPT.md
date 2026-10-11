@@ -328,17 +328,18 @@ con la instrumentación completa en `OK (164 tests)`. Véase
 docs/validation/dexcom-g7-receiver-storage-failure-2026-10-11.md.
 R11 (aprobada el 2026-10-11 sobre `61e5f6f`, decisiones 1a a 5a con los
 ajustes de alcance y etapas): en `DexcomG7Intake.accept` ninguna `Exception`
-escapa. Tres límites separados (fábrica de la fuente y autenticación, lectura
-de extras, parser) dan `DexcomReceipt.IntakeFailed` con
-`dexcom_receiver.intake_authentication_failed`, `intake_extras_failed` o
-`intake_parser_failed`, sin guardar nada. Fallo de autenticación sin extras,
+escapa. Cuatro límites separados (fábrica de la fuente y autenticación,
+lectura de extras, parser y reloj, este último por la revisión de Codex) dan
+`DexcomReceipt.IntakeFailed` con `dexcom_receiver.intake_authentication_failed`,
+`intake_extras_failed`, `intake_parser_failed` o `intake_clock_failed`
+(glucosa `clock_anomaly`), sin guardar nada. Fallo de autenticación sin extras,
 almacén ni reloj. `accept` recibe una fábrica de la fuente
 (`DexcomG7Receiver.senderEvidence`) y `DexcomG7Reception` el parser. T3 sin
 cambios. Los `Error` (incluido `StackOverflowError` en extras, solo provocable
 por un emisor autenticado) siguen cerrando el proceso: riesgo aceptado.
 `goAsync()` y `writer.execute` fuera de R11. Rama
 `claude/zealous-lamport-8buvya`, PR pendiente de la prueba en el Pixel y del CI
-de Windows. JVM `DexcomG7IntakeTest` 23/23 en el contenedor, y
+de Windows. JVM `DexcomG7IntakeTest` 24/24 en el contenedor, y
 `DexcomG7ReceiverDeviceTest` (11) compiladas, sin ejecutar. Véase
 docs/validation/dexcom-g7-receiver-intake-failure-2026-10-11.md.
 Toda prueba que active el receiver debe restaurar

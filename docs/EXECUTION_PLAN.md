@@ -666,12 +666,12 @@ política (`Pending`) ni en la lógica clínica. Véase la
 Continuación de R10 (R11 del
 [ADR 0022](adr/0022-dexcom-g7-receiver-disabled.md), decisiones 1a a 5a del
 propietario con los ajustes de alcance y etapas): una excepción en
-`DexcomG7Intake.accept` (autenticación, lectura de extras o parser, cada una
-en su propio límite) ya no puede cerrar el proceso desde el hilo principal. Se
+`DexcomG7Intake.accept` (autenticación, lectura de extras, parser o reloj,
+cada una en su propio límite) ya no puede cerrar el proceso desde el hilo principal. Se
 entrega `DexcomReceipt.IntakeFailed` con un código estable por etapa, sin
 guardar nada. Un fallo de autenticación no lee extras, no abre el registro ni
-lee el reloj. La glucosa sigue bloqueada (`authentication_failed` o
-`parse_failed`). Los `Error` de la JVM no se capturan. Política `Pending` y
+lee el reloj. La glucosa sigue bloqueada (`authentication_failed`,
+`parse_failed` o `clock_anomaly`). Los `Error` de la JVM no se capturan. Política `Pending` y
 lógica clínica sin cambios. Véase la
 [validación](validation/dexcom-g7-receiver-intake-failure-2026-10-11.md).
 
