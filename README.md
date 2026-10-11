@@ -143,6 +143,9 @@ con duplicados y conflictos explícitos, sin el identificador del transmisor en
 claro. Nada lo usa todavía. Véanse el
 [ADR 0020](docs/adr/0020-dexcom-g7-observation-log.md) y la
 [validación](docs/validation/dexcom-g7-observation-log-2026-10-11.md).
+Diagnóstico muestra ese registro como recuentos y estado, sin valores de
+glucosa. Véanse el [ADR 0021](docs/adr/0021-dexcom-log-diagnostics-view.md) y
+la [validación](docs/validation/dexcom-log-diagnostics-2026-10-11.md).
 Se ha verificado el flujo en la pantalla interior del Pixel 10 Pro Fold, además
 de layouts anchos vertical/horizontal con texto ampliado. Pausar y reanudar los
 editores conserva sus campos, foco y posición de desplazamiento.

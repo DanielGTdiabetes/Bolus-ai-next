@@ -119,4 +119,7 @@
     <string name="settings_detail">La edición y persistencia de ajustes aún no están disponibles. No se han cargado parámetros predeterminados.</string>
     <string name="save_profile_disabled">Guardar perfil · pendiente</string>
     <string name="technical_details">Detalles del bloqueo</string>
+    <string name="dexcom_log_title">Registro Dexcom</string>
+    <string name="dexcom_log_detail">Solo recuentos de lo recibido. No contiene lecturas de glucosa utilizables.</string>
+    <string name="dexcom_log_toggle">Detalles del registro Dexcom</string>
 </resources>

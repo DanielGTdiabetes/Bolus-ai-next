@@ -25,6 +25,9 @@ import org.bolusai.meals.MealKind
  */
 internal class BlockingView(val lines: List<String>, val open: Boolean, val toggled: (Boolean) -> Unit)
 
+/** Diagnóstico view of the Dexcom observation log (ADR 0021): technical lines composed by [DexcomLogBlock]. */
+internal class DexcomLogView(val lines: List<String>, val open: Boolean, val toggled: (Boolean) -> Unit)
+
 /** Renders status and navigation only; has no calculation, persistence or integration port. */
 internal class ScreenRenderer(
     private val context: Context,
@@ -140,7 +143,7 @@ internal class ScreenRenderer(
     }
 
     fun render(destination: Destination, state: UnavailableOverview, settings: SettingsSection,
-               blocking: BlockingView? = null) {
+               blocking: BlockingView? = null, dexcomLog: DexcomLogView? = null) {
         check(!state.allowsCalculation && !state.allowsTreatment)
         content.removeAllViews()
         when (destination) {
@@ -208,6 +211,7 @@ internal class ScreenRenderer(
                 glucose(state)
                 info(R.string.diagnostics, R.string.sync_detail)
                 details(blocking)
+                dexcomLog(requireNotNull(dexcomLog) { "dexcom_log.missing" })
             }
             Destination.MOBILE_SETTINGS -> {
                 info(R.string.dexcom, R.string.external_detail)
@@ -351,6 +355,20 @@ internal class ScreenRenderer(
                 link(Destination.DIAGNOSTICS)
             }
             SettingsSection.VISION, SettingsSection.BOT -> info(selected.title, R.string.external_detail)
+        }
+    }
+
+    /** Folded technical counts of the Dexcom log (ADR 0021, F3). No glucose value is ever shown here. */
+    private fun dexcomLog(view: DexcomLogView) {
+        check(view.lines.isNotEmpty()) { "dexcom_log.empty" }
+        card().also { text(it, R.string.dexcom_log_title, 17f, true); text(it, R.string.dexcom_log_detail, ink = R.color.secondary_text) }
+        val lines = text(content, view.lines.joinToString("\n"), 12f, ink = R.color.secondary_text)
+        lines.isVisible = view.open
+        lines.tag = "dexcom_log_lines"
+        lines.setTextIsSelectable(true)
+        button(content, R.string.dexcom_log_toggle, "dexcom_log_toggle") {
+            lines.isVisible = !lines.isVisible
+            view.toggled(lines.isVisible)
         }
     }
 

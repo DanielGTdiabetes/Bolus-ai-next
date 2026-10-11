@@ -27,6 +27,11 @@ import org.bolusai.next.navigation.AppNavigation
 import org.bolusai.next.navigation.Destination
 import org.bolusai.next.ui.BlockingDetails
 import org.bolusai.next.ui.BlockingView
+import org.bolusai.next.ui.DexcomLogBlock
+import org.bolusai.next.ui.DexcomLogModel
+import org.bolusai.next.ui.DexcomLogView
+import org.bolusai.next.glucose.dexcom.storage.readDexcomObservationLog
+import org.bolusai.dexcomg7.ObservationRead
 import org.bolusai.next.ui.ScreenRenderer
 import org.bolusai.next.ui.SettingsSection
 import org.bolusai.next.ui.MealDraftModel
@@ -62,6 +67,9 @@ class MainActivity : ComponentActivity() {
      */
     private var blockingDetailsOpen = false
     private var blockingDetailsDestination: Destination? = null
+    private lateinit var dexcomLog: DexcomLogModel
+    /** Folded Dexcom log block of Diagnóstico; not saved, folds on another destination and after recreation (F3). */
+    private var dexcomLogOpen = false
     private val overview = ReadOverview(ReadLocalGlucoseStatus(PendingDexcomSource))
     private val backCallback = object : OnBackPressedCallback(false) {
         override fun handleOnBackPressed() = goBack()
@@ -99,6 +107,14 @@ class MainActivity : ComponentActivity() {
                     repository, restoredProfile, profileOperationIds ?: AndroidOperationIds) as T
             }
         })[ClinicalProfileModel::class.java]
+        dexcomLog = ViewModelProvider(this, object : ViewModelProvider.Factory {
+            @Suppress("UNCHECKED_CAST")
+            override fun <T : ViewModel> create(modelClass: Class<T>): T {
+                val reader = dexcomLogReader ?: { readDexcomObservationLog(applicationContext) }
+                return DexcomLogModel(reader) as T
+            }
+        })[DexcomLogModel::class.java]
+        dexcomLog.changed = { if (navigation.current == Destination.DIAGNOSTICS) { rememberScroll(); render() } }
         renderer = ScreenRenderer(this, findViewById(R.id.screen_content), ::open,
             { settingsSection = it; profileDetailsOpen = false; render() }, ::renderMeals, ::renderSelection, ::renderProfile)
         meals.changed = { render() }
@@ -189,6 +205,7 @@ class MainActivity : ComponentActivity() {
         meals.changed = null
         meals.selectionChanged = null
         profile.changed = null
+        dexcomLog.changed = null
         super.onDestroy()
     }
 
@@ -216,6 +233,12 @@ class MainActivity : ComponentActivity() {
         return BlockingView(BlockingDetails.lines(state, profile.unavailability), blockingDetailsOpen) {
             blockingDetailsOpen = it
         }
+    }
+
+    private fun dexcomLogView(destination: Destination): DexcomLogView? {
+        if (destination != Destination.DIAGNOSTICS) return null
+        val lines = DexcomLogBlock.lines(checkNotNull(dexcomLog.state))
+        return DexcomLogView(lines, dexcomLogOpen) { dexcomLogOpen = it }
     }
 
     /** Audit metadata only: application build, no device identifier or personal data. */
@@ -251,10 +274,14 @@ class MainActivity : ComponentActivity() {
         findViewById<Button>(R.id.back_button).visibility = if (canGoBack) View.VISIBLE else View.GONE
         if (destination != blockingDetailsDestination) {
             blockingDetailsOpen = false
+            dexcomLogOpen = false
             blockingDetailsDestination = destination
+            // ADR 0021, F2: each entry into Diagnóstico reads the log afresh; no other screen reads it.
+            if (destination == Destination.DIAGNOSTICS) dexcomLog.load()
         }
+        if (destination == Destination.DIAGNOSTICS && dexcomLog.state == null) dexcomLog.load()
         val state = overview.execute()
-        renderer.render(destination, state, settingsSection, blockingView(destination, state))
+        renderer.render(destination, state, settingsSection, blockingView(destination, state), dexcomLogView(destination))
         val bar = findViewById<LinearLayout>(R.id.bottom_navigation)
         bar.removeAllViews()
         Destination.primary.forEach { tab ->
@@ -288,5 +315,7 @@ class MainActivity : ComponentActivity() {
         var profileClock: ProfileClock? = null
         var profileTimeZoneRules: TimeZoneRules? = null
         var profileOperationIds: OperationIds? = null
+        /** Process-local test seam for the Dexcom log of Diagnóstico (ADR 0021); production reads the app database. */
+        var dexcomLogReader: (() -> ObservationRead)? = null
     }
 }

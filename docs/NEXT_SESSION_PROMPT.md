@@ -263,16 +263,53 @@ append-only, índice único parcial y trigger de conflicto). JVM 18 pruebas
 nuevas; `SqliteDexcomObservationStoreDeviceTest` (8) pendiente de ejecutar en
 el Pixel. Véase docs/validation/dexcom-g7-observation-log-2026-10-11.md.
 
+ADR 0021 — REGISTRO DEXCOM EN DIAGNÓSTICO (implementado)
+docs/adr/0021-dexcom-log-diagnostics-view.md, aceptado el 2026-10-11 con F1
+(solo recuentos y estado, nunca valores de glucosa) y F2 (solo Diagnóstico,
+relectura en cada entrada). F3 y F4 técnicas: bloque plegado sin guardar,
+lectura fuera del hilo principal, y la lectura de producción no crea el
+fichero si no existe. `ObservationSummary` (común), `ui/DexcomLogBlock`,
+`ui/DexcomLogModel`, `DexcomLogReader` y la costura
+`MainActivity.dexcomLogReader`. `verify.ps1` impide que `ScreenRenderer`
+conozca el registro. JVM 6 pruebas nuevas; `DexcomLogDiagnosticsDeviceTest`
+(3) pendiente en el Pixel. Véase
+docs/validation/dexcom-log-diagnostics-2026-10-11.md.
+
+PENDIENTE DEL PROPIETARIO (ADR 0018 a 0021)
+- `verify.ps1 -DeviceTests` en el Pixel: `DexcomBundleExtrasDeviceTest` (3),
+  `SqliteDexcomObservationStoreDeviceTest` (8) y
+  `DexcomLogDiagnosticsDeviceTest` (3) nunca se han ejecutado en dispositivo.
+  Si alguna falla, corregir antes de cualquier otro incremento.
+- Revisar las decisiones técnicas T1 a T6 (ADR 0019), E5 a E9 (ADR 0020) y F3
+  a F4 (ADR 0021).
+- Para el receiver productivo: archivar release reproducible de la app Dexcom
+  modificada, activar `setShareIdentityEnabled(true)` en el productor y
+  aprobar anclas (paquete, versionCode, SHA-256 de firmantes).
+
+FLUJO DE TRABAJO ACORDADO (2026-10-11)
+El propietario pide avanzar por incrementos: ADR con sus decisiones (preguntar
+con opciones y una recomendada), implementación, PR a `main`, revisión
+automática de Codex en la PR, corregir cada hallazgo válido con una prueba de
+regresión, responder y resolver el hilo, y fusionar cuando el CI «Verify»
+(Windows) esté en verde. En sesiones cloud sin SDK: instalar Android SDK 36
+(commandlinetools + `platforms;android-36`, `build-tools;36.0.0`) en el
+directorio temporal y exportar `ANDROID_HOME`; PowerShell 7 portátil sirve para
+probar bloques de `verify.ps1` con rutas Linux. Maven Central puede devolver
+429: reintentar Gradle. No hay KVM: las pruebas de dispositivo solo las ejecuta
+el propietario.
+
 SIGUIENTE PASO
-Los ADR 0014, 0015, 0017, 0018, 0019 y 0020 y la opción A del ADR 0016 están
+Los ADR 0014, 0015, 0017, 0018, 0019, 0020 y 0021 y la opción A del ADR 0016 están
 implementados. No hay ningún incremento funcional ni clínico autorizado. El
 ADR 0019 y 0020 componen autenticación, extras, parser y registro local sin
 receiver. Antes del receiver productivo, el propietario debe ejecutar
 `verify.ps1 -DeviceTests` (pruebas de `Bundle` y SQLite pendientes), archivar
 la release reproducible, activar el opt-in de identidad y aprobar las anclas.
-Sin esas puertas, lo siguiente seguro es un ADR de presentación en solo
-lectura del registro en Diagnóstico, siempre marcado como no utilizable, o el
-ADR de retención (E4).
+Sin esas puertas, siguen abiertos sin bloqueo externo: el receiver productivo
+detrás de un interruptor desactivado por defecto (ADR propio; sin anclas
+aprobadas la política sigue `Pending` y todo se rechaza), el ADR de retención
+(E4) y, fuera de Dexcom, P4 (franjas en cambios de hora) y P6
+(exportación/importación de copias) del ADR 0012.
 Cualquier capacidad nueva necesita antes un ADR que defina su alcance y sus
 decisiones pendientes, y la aprobación explícita del propietario. Conectar el traductor con `ReadOverview`, el motor u
 otro consumidor exige su propio ADR. Siguen

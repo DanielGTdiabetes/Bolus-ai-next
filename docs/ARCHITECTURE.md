@@ -173,6 +173,10 @@ lecturas con la huella SHA-256 del transmisor. Los duplicados se cuentan y los
 conflictos se enlazan a la primera observación sin sobrescribir. Un fallo de
 escritura bloquea como `persistence_failed`. La política es común en
 `ObservationLog.kt`. Véase el [ADR 0020](adr/0020-dexcom-g7-observation-log.md).
+Diagnóstico es la única pantalla que lee ese registro: muestra en un bloque
+plegado solo recuentos, rechazos por código, última recepción y emisor, nunca
+valores de glucosa. Leer no crea el fichero. Véase el
+[ADR 0021](adr/0021-dexcom-log-diagnostics-view.md).
 
 ## Presentación Android local
 
