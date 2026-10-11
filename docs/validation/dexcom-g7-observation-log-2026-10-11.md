@@ -25,6 +25,12 @@ sigue devolviendo `policy_not_approved`.
 | `DexcomG7RecorderTest` (JVM Android) | 5 | ejecutada, 0 fallos |
 | `SqliteDexcomObservationStoreDeviceTest` (dispositivo) | 8 | compilada; **pendiente de ejecutar** en el Pixel |
 
+Recuento posterior: la PR #47 (ADR 0021, commit `4557c7e`) añadió
+`storageSummaryEqualsTheReferenceWithoutLoadingTheHistory` a esta clase. Desde
+entonces existen 9 pruebas en `SqliteDexcomObservationStoreDeviceTest`. Las 8 de
+la tabla son las de esta entrega. Ninguna consta aún como ejecutada en
+dispositivo.
+
 ## Comandos y resultados (contenedor Linux de la sesión)
 
 Android SDK 36 en el directorio temporal de la sesión y PowerShell 7.4.6
