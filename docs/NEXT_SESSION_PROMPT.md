@@ -337,10 +337,9 @@ almacén ni reloj. `accept` recibe una fábrica de la fuente
 (`DexcomG7Receiver.senderEvidence`) y `DexcomG7Reception` el parser. T3 sin
 cambios. Los `Error` (incluido `StackOverflowError` en extras, solo provocable
 por un emisor autenticado) siguen cerrando el proceso: riesgo aceptado.
-`goAsync()` y `writer.execute` fuera de R11. Rama
-`claude/zealous-lamport-8buvya`, PR pendiente de la prueba en el Pixel y del CI
-de Windows. JVM `DexcomG7IntakeTest` 24/24 en el contenedor, y
-`DexcomG7ReceiverDeviceTest` (11) compiladas, sin ejecutar. Véase
+`goAsync()` y `writer.execute` fuera de R11. JVM `DexcomG7IntakeTest` 24/24
+en el contenedor. `DexcomG7ReceiverDeviceTest` 11/11 en el Pixel sobre
+`d1708f4`, con la instrumentación completa en `OK (165 tests)`. Véase
 docs/validation/dexcom-g7-receiver-intake-failure-2026-10-11.md.
 Toda prueba que active el receiver debe restaurar
 `COMPONENT_ENABLED_STATE_DEFAULT` y toda subclase de prueba debe abrir una base
@@ -349,8 +348,6 @@ sintética: `DexcomStorageGuard` rechaza la real.
 PENDIENTE DEL PROPIETARIO (ADR 0018 a 0022)
 - Decidir si Diagnóstico muestra un contador duradero de fallos del receiver
   (almacenamiento R10 y fase síncrona R11).
-- Ejecutar en el Pixel `DexcomG7ReceiverDeviceTest` (11, una nueva de R11) e
-  integrar la PR de R11 tras el CI de Windows.
 - Revisar las decisiones técnicas T1 a T6 (ADR 0019), E5 a E9 (ADR 0020), F3
   a F5 (ADR 0021) y R4 a R9 (ADR 0022).
 - Para el receiver productivo: archivar release reproducible de la app Dexcom
@@ -371,7 +368,7 @@ el propietario.
 
 SIGUIENTE PASO
 Los ADR 0014, 0015, 0017 a 0022 (con R10 y R11) y la opción A del ADR 0016
-están implementados. R11 queda en PR hasta la prueba en el Pixel. No hay ningún incremento funcional ni clínico autorizado. El
+están implementados. No hay ningún incremento funcional ni clínico autorizado. El
 receiver existe desactivado y con política `Pending` (ADR 0022). Antes de la
 validación con Dexcom real, el propietario debe archivar la release
 reproducible, activar el opt-in de identidad y aprobar las anclas; esa

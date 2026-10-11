@@ -80,7 +80,7 @@ y `no receipt makes glucose available` con la excepción escapando.
 |---|---|---|
 | `DexcomG7IntakeTest` (JVM Android) | 24 | 9 nuevas (1 de la revisión de Codex) y 1 ampliada, ejecutadas, 0 fallos |
 | Resto de `org.bolusai.next.glucose.dexcom.*` y `DexcomLogBlockTest` (JVM Android) | 42 | ejecutadas, 0 fallos |
-| `DexcomG7ReceiverDeviceTest` (dispositivo) | 11 | 1 nueva. **Compiladas, sin ejecutar**: las ejecuta el propietario en el Pixel |
+| `DexcomG7ReceiverDeviceTest` (dispositivo) | 11 | 1 nueva, 11 ejecutadas en el Pixel sobre `d1708f4`, 0 fallos |
 
 Pruebas nuevas en JVM:
 
@@ -142,9 +142,22 @@ las rutas traducidas a Linux: en verde, y en negativo una subclase de producció
 `Rogue : DexcomG7Receiver()` provocó el rechazo de R6. Los ficheros tocados ya
 estaban en la lista cerrada.
 
+## Ejecución en dispositivo (2026-10-11)
+
+- SHA probado: `d1708f45ba0ae5008aa49bcbd8465e1353720d50` (rama
+  `claude/zealous-lamport-8buvya`; solo documentación cambia después).
+- Dispositivo: Pixel 10 Pro Fold (`rango`), Android 17, API 37, build
+  `CP3A.260905.009`, único dispositivo autorizado en `adb`.
+- Comando: `.\scripts\verify.ps1 -DeviceTests` en Windows, código de salida 0.
+  Compilación, pruebas JVM, lint y aislamiento de instrumentación en verde.
+- Instrumentación completa: `OK (165 tests)`, sin fallos.
+- `DexcomG7ReceiverDeviceTest` 11/11 (incluida la nueva de R11),
+  `AndroidDexcomSenderEvidenceTest` 8/8 y `DexcomLogDiagnosticsDeviceTest`
+  3/3.
+- Las APK sintéticas `org.bolusai.next.senderfixture` y
+  `org.bolusai.next.test` se desinstalaron al terminar.
+
 ## Pendiente
 
-- Ejecución en el Pixel de `DexcomG7ReceiverDeviceTest` (11) con
-  `.\scripts\verify.ps1 -DeviceTests`.
 - Decidir si Diagnóstico muestra un contador duradero de fallos del receiver
   (R10 y R11).
