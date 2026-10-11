@@ -1,5 +1,21 @@
 Trabaja en E:\projects\Bolus-ai-next y continúa desde origin/main actualizado.
 
+CONTINUACIÓN ACTIVA — 2026-10-11
+El propietario pide reducir fricción y entregar capacidades completas. Aplica
+docs/EXECUTION_PLAN.md §3.3: decisiones técnicas reversibles autónomas, ADR solo
+cuando corresponda, preguntas necesarias agrupadas y evidencia sin duplicación.
+Se mantienen los controles clínicos y las pruebas obligatorias.
+
+La PR #53 (ADR 0022 R11) ya está integrada en `origin/main` mediante
+`740af25`; no reabrir su trabajo como un paso pendiente. Comprobar el CI del
+SHA integrado al continuar. Priorizar ahora una entrega completa de
+recepción local Dexcom y presentación offline con cálculo bloqueado, reuniendo
+las decisiones pendientes en una sola propuesta. No encadenar nuevas PR de
+diagnóstico o endurecimiento sin un hallazgo o riesgo concreto.
+
+El detalle que sigue conserva antecedentes de entregas; el estado de integración
+se comprueba en GitHub y origin/main, no se deduce de esos antecedentes.
+
 OBJETIVO DEL PROYECTO
 Recrear Bolus AI en móvil con cálculo, perfil, IOB, comidas e historial locales.
 El camino crítico debe funcionar sin NAS ni Render. Seguridad > consistencia >
@@ -49,8 +65,8 @@ docs/adr/0014-clinical-profile-confirmation-eligibility.md,
 docs/validation/profile-segment-editor-2026-09-28.md,
 docs/validation/profile-confirmation-domain-2026-10-03.md y
 docs/validation/profile-confirmation-ui-2026-10-03.md.
-Comprueba el CI del SHA exacto integrado antes de empezar. La última
-integración de código es la PR #42, implementación del ADR 0017 (merge commit
+Comprueba el CI del SHA exacto integrado antes de empezar. Como antecedente,
+la PR #42 integró la implementación del ADR 0017 (merge commit
 929d5c137feb2329dd3792d33f3653f6a05ff3cb, Verify 37901021591 en verde),
 aprobada por el propietario el 2026-10-09 en el HEAD
 779b9f25bac31d56ce5594bf8c31403499dc616c. Su registro documental llega en una
@@ -354,31 +370,38 @@ PENDIENTE DEL PROPIETARIO (ADR 0018 a 0022)
   modificada, activar `setShareIdentityEnabled(true)` en el productor y
   aprobar anclas (paquete, versionCode, SHA-256 de firmantes).
 
-FLUJO DE TRABAJO ACORDADO (2026-10-11)
-El propietario pide avanzar por incrementos: ADR con sus decisiones (preguntar
-con opciones y una recomendada), implementación, PR a `main`, revisión
-automática de Codex en la PR, corregir cada hallazgo válido con una prueba de
-regresión, responder y resolver el hilo, y fusionar cuando el CI «Verify»
-(Windows) esté en verde. En sesiones cloud sin SDK: instalar Android SDK 36
+FLUJO DE TRABAJO SIMPLIFICADO (2026-10-11)
+El propietario sustituye el paso obligatorio «ADR + preguntas + aprobación»
+para cada incremento técnico por entregas funcionales revisables según
+docs/EXECUTION_PLAN.md §3.3. Un ADR breve cubre cambios estructurales o de
+seguridad relevantes; las decisiones rutinarias dentro del alcance autorizado
+se resuelven durante la implementación. Preguntar juntos los puntos clínicos
+o de alcance pendientes y aprovechar aprobaciones ya registradas.
+Conservar PR a `main`, revisión automática de Codex, corrección y regresión de
+hallazgos válidos, respuesta y resolución de hilos, y CI «Verify» (Windows)
+en verde antes de fusionar. No repetir rondas sin cambios o motivos pendientes.
+En sesiones cloud sin SDK: instalar Android SDK 36
 (commandlinetools + `platforms;android-36`, `build-tools;36.0.0`) en el
 directorio temporal y exportar `ANDROID_HOME`; PowerShell 7 portátil sirve para
 probar bloques de `verify.ps1` con rutas Linux. Maven Central puede devolver
 429: reintentar Gradle. No hay KVM: las pruebas de dispositivo solo las ejecuta
 el propietario.
 
-SIGUIENTE PASO
+ANTECEDENTES DE ALCANCE (la prioridad actual está al inicio)
 Los ADR 0014, 0015, 0017 a 0022 (con R10 y R11) y la opción A del ADR 0016
-están implementados. No hay ningún incremento funcional ni clínico autorizado. El
+están implementados. La recepción real y el uso clínico requieren todavía sus
+decisiones específicas; el ajuste de flujo no las aprueba. El
 receiver existe desactivado y con política `Pending` (ADR 0022). Antes de la
 validación con Dexcom real, el propietario debe archivar la release
 reproducible, activar el opt-in de identidad y aprobar las anclas; esa
-validación necesita su propio ADR (permiso del productor, anclas, prueba en
-modo avión).
+validación necesita su ADR de alcance (permiso del productor, anclas y prueba
+offline sin cortar el Bluetooth del sensor, según el ADR 0022).
 Sin esas puertas, siguen abiertos sin bloqueo externo: el ADR de retención
 (E4) y, fuera de Dexcom, P4 (franjas en cambios de hora) y P6
 (exportación/importación de copias) del ADR 0012.
-Cualquier capacidad nueva necesita antes un ADR que defina su alcance y sus
-decisiones pendientes, y la aprobación explícita del propietario. Conectar el traductor con `ReadOverview`, el motor u
+La falta de autorización clínica no bloquea trabajo técnico independiente
+dentro del objetivo autorizado. Solo decisiones de alcance, clínicas o de
+seguridad pendientes requieren aprobación específica. Conectar el traductor con `ReadOverview`, el motor u
 otro consumidor exige su propio ADR. Siguen
 abiertas como decisiones del propietario, y cualquier avance clínico necesita
 antes su ADR: límites clínicos, vigencia (sin política aprobada), resolución de
@@ -390,17 +413,22 @@ TRABAJO
    verifica Git/CI y crea una rama corta desde origin/main.
 2. Si necesitas Legacy, consulta primero el mapa de fuentes y fija el SHA
    remoto; acceso exclusivamente de lectura.
-3. Redacta el ADR antes de programar. Declara incógnitas como decisiones
-   pendientes del propietario; no inventes límites.
-4. Mantén UI, caso de uso y SQLite separados. No añadas red, Dexcom, MFP, NAS,
-   Render, sync ni autoridad de tratamiento.
-5. Prueba ausencia frente a cero, franjas incompletas, solapadas o que cruzan
-   medianoche, unidad sin reinterpretación, conflicto, reintento idéntico,
+3. Define una capacidad completa y sus criterios. Redacta o amplía un ADR si
+   cambia arquitectura, contrato relevante o seguridad; agrupa las incógnitas
+   que requieran al propietario. No inventes límites ni reabras aprobaciones.
+4. Mantén UI, caso de uso y SQLite separados. Conecta Dexcom solo dentro del
+   alcance y las puertas aprobadas para el hito. No añadas red, MFP, NAS,
+   Render, sync ni autoridad de tratamiento fuera del alcance autorizado.
+5. Según el cambio, prueba ausencia frente a cero, franjas incompletas,
+   solapadas o que cruzan medianoche, unidad sin reinterpretación, conflicto, reintento idéntico,
    reinicio, fallo de escritura y migraciones si cambian.
-6. Ejecuta scripts/verify.ps1 -DeviceTests con un único dispositivo autorizado;
-   usa repositorios sintéticos aislados, sin datos personales ni cambios de red.
+6. Ejecuta scripts/verify.ps1 al cerrar la entrega. Añade -DeviceTests cuando
+   el comportamiento Android lo requiera, avisando antes de usar el único
+   dispositivo autorizado. Usa repositorios sintéticos aislados y no cortes
+   la recepción del sensor. No exigir USB para cambios solo documentales.
 7. Actualiza documentación, publica mediante PR, integra y verifica CI del SHA
    exacto, ancestralidad en origin/main y árbol limpio.
-8. Actualiza este prompt con el estado real y el siguiente incremento directo.
+8. Actualiza la continuación activa con el estado real y el siguiente objetivo,
+   enlazando la evidencia sin volver a copiar todo el historial de la entrega.
 
 No repitas auditorías ni copies catálogos.
