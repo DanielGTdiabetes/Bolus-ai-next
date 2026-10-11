@@ -39,6 +39,10 @@ El propietario ya identificó `com.wtachtsugar`: es su app del reloj para ver
 glucosa Dexcom G7; también permite conexión directa al sensor sin Dexcom y
 está previsto que retransmita hacia Next. Conservar su permiso y proponerla
 como miembro del conjunto; no volver a pedir qué app es. La retransmisión
+del reloj es de respaldo: según el propietario, solo emite cuando falla la
+app Dexcom, sin emisión simultánea prevista desde ambas apps. No inventar
+criterios de fallo ni tiempos para el cambio de fuente.
+La integración
 futura requiere contrato y validación propios, sin bloquear el hito Dexcom
 actual ni atribuir al productor Dexcom los mensajes de la app del reloj.
 Esta aclaración no aprueba L2, I-4, uso clínico ni cambios en esa app.

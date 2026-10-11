@@ -18,7 +18,10 @@ uso clínico.
 
 `com.wtachtsugar` es su app del reloj para ver la glucosa de Dexcom G7. El
 propietario indica que también permite conectar directamente el sensor sin
-la app Dexcom y que está previsto que retransmita glucosa hacia Next. Esto
+la app Dexcom y que está previsto que retransmita glucosa hacia Next. Precisa
+que el reloj solo emite cuando falla la app Dexcom: es una fuente de respaldo,
+sin emisión simultánea prevista desde ambas apps. Ese comportamiento y el
+cambio de fuente no fueron probados por este inventario. Esto
 aclara su función y la necesidad de conservar su permiso; no es una capacidad
 probada en este inventario ni aprueba anclas, riesgos o recepción de sus
 futuros mensajes. Esa integración requiere contrato y validación propios y

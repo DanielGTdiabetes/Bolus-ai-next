@@ -127,7 +127,7 @@ no se promete detección instantánea de cada concesión o revocación.
 | Cambio detectado sin un mensaje nuevo | El estado visible se actualiza al ejecutar comprobaciones; no hay garantía de vigilancia continua ni de aviso de mensajes que Android descarta antes de invocar Next |
 
 | Clave de firma compartida por apps del propietario | Legacy, Next y `com.wtachtsugar` comparten certificado (`1d1f25bf…`, inventario L1). Quien tenga esa clave puede firmar una app nueva. Con el ancla por paquete, UID y versión, esa app cambia el conjunto y bloquea; sin anclar la versión, una actualización firmada con la misma clave pasaría sin revisión. No se sabe qué almacén es ni quién lo custodia |
-| Mensajes de la app del reloj indistinguibles de los de Dexcom | La app del reloj tiene el permiso y puede conectarse al sensor sin Dexcom. Si envía la misma acción con la misma forma, Next no sabe cuál de los dos la emitió: la política solo prueba pertenencia al conjunto. Dos fuentes pueden registrar la misma lectura (duplicado) o versiones distintas con el mismo `timestamp` (conflicto E2, mostrado sin valor según C2). Hoy no consta que el reloj envíe esa acción; hasta su contrato propio, todo mensaje aceptado se presenta como «emisor del conjunto aprobado», nunca «Dexcom» |
+| Identidad del emisor durante la contingencia del reloj | El propietario indica que el reloj solo emite cuando falla la app Dexcom: es un respaldo, no dos fuentes previstas emitiendo en paralelo. Si ese respaldo usa la misma acción y forma, la política por permiso no distingue al emisor. La contingencia no convierte esa evidencia en identidad Dexcom. El inventario no comprobó la emisión del reloj ni el cambio de fuente. Si llegan repeticiones, el ADR 0020 solo las clasifica dentro de una misma clave (transmisor y `timestamp`): contenido idéntico es duplicado; contenido distinto es conflicto E2, mostrado sin valor según C2. Todo mensaje aceptado por esta política se presenta como «emisor del conjunto aprobado» |
 | Instalación lateral | Los cuatro paquetes tienen instalador `null`: ninguna tienda aporta garantía de origen. La confianza descansa solo en las anclas aprobadas |
 
 Ninguno de estos riesgos queda aceptado por este borrador.
@@ -150,7 +150,9 @@ cuarto titular.
 **Función de `com.wtachtsugar`, confirmada por el propietario — 2026-10-11.**
 Es la app del reloj que utiliza para ver la glucosa de Dexcom G7. Según el
 propietario, también permite conectar el sensor directamente sin la app
-Dexcom, y está previsto que retransmita glucosa hacia Next. Su identidad y la
+Dexcom, y está previsto que retransmita glucosa hacia Next. El propietario
+precisa que el reloj solo emite cuando falla la app Dexcom: su papel es de
+respaldo, sin emisión simultánea prevista desde ambas apps. Su identidad y la
 necesidad de conservar el permiso quedan aclaradas; no tratarla como una app
 desconocida ni proponer retirarle el permiso para completar este hito.
 Estas capacidades proceden de la declaración del propietario, no de una
@@ -161,7 +163,10 @@ La futura retransmisión desde el reloj es una integración prevista, pendiente
 de contrato de payload, procedencia y validación. No atribuir sus mensajes a
 Dexcom por tener el permiso, ni asumir que implementa el transporte Dexcom
 observado. Puede existir un origen directo del sensor mediante la app del
-reloj; Next debe conservar esa distinción. Este trabajo futuro no bloquea el
+reloj; Next debe conservar esa distinción y el papel de contingencia indicado
+por el propietario. La definición verificable de fallo de Dexcom y del cambio
+de fuente queda para ese contrato; no inventar tiempos, umbrales ni mecanismos
+de detección. Este trabajo futuro no bloquea el
 hito actual con la Dexcom instalada ni autoriza modificar la app del reloj.
 
 | Miembro propuesto | Paquete | UID | `versionCode` | SHA-256 del firmante | Ancla propuesta |
