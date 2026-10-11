@@ -114,6 +114,10 @@ try {
         "android\app\src\test\java\org\bolusai\next\glucose\dexcom\storage\DexcomG7RecorderTest.kt",
         "android\app\src\androidTest\java\org\bolusai\next\glucose\dexcom\storage\SqliteDexcomObservationStoreDeviceTest.kt",
         "android\app\src\main\java\org\bolusai\next\glucose\dexcom\storage\DexcomLogReader.kt",
+        "android\app\src\main\java\org\bolusai\next\glucose\dexcom\storage\DexcomStorageGuard.kt",
+        "android\app\src\androidTest\java\org\bolusai\next\glucose\dexcom\storage\DexcomLogIsolationDeviceTest.kt",
+        "android\app\src\androidTest\java\org\bolusai\next\SyntheticDexcomLog.kt",
+        "android\app\src\androidTest\java\org\bolusai\next\ProfileIsolationTestRunner.kt",
         "android\app\src\main\java\org\bolusai\next\ui\DexcomLogBlock.kt",
         "android\app\src\main\java\org\bolusai\next\ui\DexcomLogModel.kt",
         "android\app\src\main\java\org\bolusai\next\MainActivity.kt",
@@ -219,6 +223,32 @@ try {
     if (-not (Select-String -LiteralPath (Join-Path $mainSources "java\org\bolusai\next\profile\SqliteClinicalProfileRepository.kt") -SimpleMatch -Quiet `
             -Pattern 'init { ProfileStorageGuard.checkDatabase(context.applicationContext, name) }')) {
         throw "The profile repository must check the instrumentation barrier before opening its file (ADR 0017)"
+    }
+    # ADR 0021, follow-up to the 2026-10-11 review: the same barrier protects the app's own dexcom-observations.db. The
+    # runner activates it, the store and the Diagnostico reader check it before touching the file, the reader only
+    # summarises an existing log after checking it read-only, and every test that visits Diagnostico injects a synthetic
+    # reader.
+    $dexcomStorageSources = Join-Path $mainSources "java\org\bolusai\next\glucose\dexcom\storage"
+    if (-not (Select-String -LiteralPath (Join-Path $repositoryRoot "android\app\src\androidTest\java\org\bolusai\next\ProfileIsolationTestRunner.kt") -SimpleMatch -Quiet `
+            -Pattern 'DexcomStorageGuard.activateForInstrumentation()')) {
+        throw "The instrumentation runner must activate the Dexcom storage barrier (ADR 0021)"
+    }
+    if (-not (Select-String -LiteralPath (Join-Path $dexcomStorageSources "SqliteDexcomObservationStore.kt") -SimpleMatch -Quiet `
+            -Pattern 'init { DexcomStorageGuard.checkDatabase(context.applicationContext, name) }')) {
+        throw "The Dexcom observation store must check the instrumentation barrier before opening its file (ADR 0021)"
+    }
+    $dexcomLogReaderSource = Join-Path $dexcomStorageSources "DexcomLogReader.kt"
+    if (-not (Select-String -LiteralPath $dexcomLogReaderSource -SimpleMatch -Quiet -Pattern 'DexcomStorageGuard.checkDatabase(context.applicationContext, name)') -or
+            -not (Select-String -LiteralPath $dexcomLogReaderSource -SimpleMatch -Quiet -Pattern '.use { it.summaryOfExisting() }') -or
+            (Select-String -LiteralPath $dexcomLogReaderSource -Pattern '\.summary\(\)|\.read\(\)|\.record\(' -Quiet)) {
+        throw "Diagnostico must read the Dexcom log only through the guarded read-only summary of an existing file (ADR 0021, F4)"
+    }
+    $unisolatedDiagnostics = @(Get-ChildItem -LiteralPath (Join-Path $repositoryRoot "android\app\src\androidTest") -Recurse -File -Include *.kt |
+        Where-Object { (Select-String -LiteralPath $_.FullName -Pattern 'ActivityScenario\.launch\(MainActivity' -Quiet) -and
+            (Select-String -LiteralPath $_.FullName -Pattern 'native/diagnostics|Destination\.DIAGNOSTICS|Destination\.entries' -Quiet) -and
+            -not (Select-String -LiteralPath $_.FullName -Pattern 'dexcomLogReader\s*=\s*\{' -Quiet) })
+    if ($unisolatedDiagnostics.Count -gt 0) {
+        throw "Instrumentation visiting Diagnostico must inject a synthetic Dexcom log reader (ADR 0021): $($unisolatedDiagnostics.FullName -join ', ')"
     }
     $blockingDetailsSource = Join-Path $mainSources "java\org\bolusai\next\ui\BlockingDetails.kt"
     $expectedDestinations = 'setOf(Destination.BOLUS, Destination.MANUAL, Destination.OFFLINE_BOLUS, Destination.DIAGNOSTICS)'
@@ -347,7 +377,7 @@ jobs:
             }
             # Direct instrumentation avoids collecting unrelated device logcat or clinical data.
             $instrumentation = @(adb shell am instrument -w -r `
-                -e class org.bolusai.next.glucose.dexcom.AndroidDexcomSenderEvidenceTest,org.bolusai.next.NavigationDeviceTest,org.bolusai.next.MealDraftDeviceTest,org.bolusai.next.MealHistoryDeviceTest,org.bolusai.next.MealRestoreDeviceTest,org.bolusai.next.meals.SqliteMealRepositoryDeviceTest,org.bolusai.next.DarkThemeDeviceTest,org.bolusai.next.profile.SqliteClinicalProfileRepositoryDeviceTest,org.bolusai.next.profile.ClinicalProfileConfirmationDeviceTest,org.bolusai.next.ClinicalProfileDeviceTest,org.bolusai.next.ClinicalProfileConfirmationUiDeviceTest,org.bolusai.next.ClinicalProfileUnavailabilityDeviceTest,org.bolusai.next.BolusProfileDetailsDeviceTest,org.bolusai.next.ProfileStorageGuardDeviceTest,org.bolusai.next.glucose.dexcom.DexcomBundleExtrasDeviceTest,org.bolusai.next.glucose.dexcom.storage.SqliteDexcomObservationStoreDeviceTest,org.bolusai.next.DexcomLogDiagnosticsDeviceTest `
+                -e class org.bolusai.next.glucose.dexcom.AndroidDexcomSenderEvidenceTest,org.bolusai.next.NavigationDeviceTest,org.bolusai.next.MealDraftDeviceTest,org.bolusai.next.MealHistoryDeviceTest,org.bolusai.next.MealRestoreDeviceTest,org.bolusai.next.meals.SqliteMealRepositoryDeviceTest,org.bolusai.next.DarkThemeDeviceTest,org.bolusai.next.profile.SqliteClinicalProfileRepositoryDeviceTest,org.bolusai.next.profile.ClinicalProfileConfirmationDeviceTest,org.bolusai.next.ClinicalProfileDeviceTest,org.bolusai.next.ClinicalProfileConfirmationUiDeviceTest,org.bolusai.next.ClinicalProfileUnavailabilityDeviceTest,org.bolusai.next.BolusProfileDetailsDeviceTest,org.bolusai.next.ProfileStorageGuardDeviceTest,org.bolusai.next.glucose.dexcom.DexcomBundleExtrasDeviceTest,org.bolusai.next.glucose.dexcom.storage.SqliteDexcomObservationStoreDeviceTest,org.bolusai.next.DexcomLogDiagnosticsDeviceTest,org.bolusai.next.glucose.dexcom.storage.DexcomLogIsolationDeviceTest `
                 "$testPackage/$isolationRunner")
             $instrumentationExit = $LASTEXITCODE
             $instrumentation | Write-Output

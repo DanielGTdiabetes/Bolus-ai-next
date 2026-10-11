@@ -82,7 +82,11 @@ Toda prueba que lance `MainActivity` (Bolo y Diagnóstico leen el perfil desde
 el ADR 0017) o abra Ajustes → Cálculo debe inyectar
 `MainActivity.profileRepositoryFactory` en memoria o sobre un fichero sintético
 (la fábrica devuelve `ClosableProfileRepository`; `ControlledProfileRepository`
-de androidTest falla lecturas o escrituras y retiene escrituras).
+de androidTest falla lecturas o escrituras y retiene escrituras). Toda prueba
+que visite Diagnóstico debe inyectar además `MainActivity.dexcomLogReader`
+(`emptyDexcomLog` de androidTest): `DexcomStorageGuard` rechaza
+`dexcom-observations.db` de la app durante la instrumentación y `verify.ps1`
+exige la inyección.
 `profileTimeZoneRules` y `profileOperationIds` permiten zonas retiradas y
 operaciones contadas en pruebas. Una base con un trigger sintético añadido no
 supera la verificación de esquema al abrirse de nuevo: cuenta filas en crudo.
@@ -277,6 +281,13 @@ fichero si no existe. `ObservationSummary` (común), `ui/DexcomLogBlock`,
 conozca el registro. JVM 6 pruebas nuevas; `DexcomLogDiagnosticsDeviceTest`
 (3) superadas 3/3 en el Pixel el 2026-10-11. Véase
 docs/validation/dexcom-log-diagnostics-2026-10-11.md.
+Seguimiento de la revisión independiente de Codex del 2026-10-11 (sección del
+ADR 0021 y docs/validation/dexcom-log-read-isolation-2026-10-11.md):
+Diagnóstico lee con `summaryOfExisting()`, que comprueba versión y esquema en
+una conexión de solo lectura. Así un fichero vacío o v0 ya no se inicializa: da
+`unsupported_schema` y conserva sus bytes. `DexcomStorageGuard` aísla
+`dexcom-observations.db` en la instrumentación. `DexcomLogIsolationDeviceTest`
+(8) está en la lista de `verify.ps1`.
 
 EJECUCIÓN EN DISPOSITIVO DE LOS ADR 0019 A 0021 (2026-10-11)
 `.\scripts\verify.ps1 -DeviceTests` sobre
@@ -290,6 +301,9 @@ Pro Fold (`rango`, Android 17, API 37, build `CP3A.260905.009`), único en
 (ADR 0019).
 
 PENDIENTE DEL PROPIETARIO (ADR 0018 a 0021)
+- `verify.ps1 -DeviceTests` en el Pixel para `DexcomLogIsolationDeviceTest` (8
+  existentes, ninguna ejecutada todavía) y para las clases modificadas
+  `NavigationDeviceTest` y `BolusProfileDetailsDeviceTest`.
 - Revisar las decisiones técnicas T1 a T6 (ADR 0019), E5 a E9 (ADR 0020) y F3
   a F5 (ADR 0021).
 - Para el receiver productivo: archivar release reproducible de la app Dexcom

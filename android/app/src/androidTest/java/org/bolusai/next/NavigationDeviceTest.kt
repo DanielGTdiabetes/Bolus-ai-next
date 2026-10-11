@@ -42,6 +42,8 @@ class NavigationDeviceTest {
         MainActivity.mealRepositoryFactory = { SqliteMealRepository(it, null) }
         // Settings → Cálculo reads the clinical profile; keep it in memory, never the app's file.
         MainActivity.profileRepositoryFactory = { org.bolusai.next.profile.SqliteClinicalProfileRepository(it, null) }
+        // Diagnóstico reads the Dexcom log (ADR 0021); the visit of every destination uses a synthetic one.
+        MainActivity.dexcomLogReader = { emptyDexcomLog }
         return ActivityScenario.launch(MainActivity::class.java).also { scenario ->
             scenario.onActivity { activity ->
                 // Test window only: no device settings, keyguard dismissal or production behavior change.
@@ -58,6 +60,7 @@ class NavigationDeviceTest {
     @After fun clearTestStorageFactory() {
         MainActivity.mealRepositoryFactory = null
         MainActivity.profileRepositoryFactory = null
+        MainActivity.dexcomLogReader = null
     }
 
     private fun views(root: View): List<View> = listOf(root) + if (root is ViewGroup) {
