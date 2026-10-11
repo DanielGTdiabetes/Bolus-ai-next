@@ -120,6 +120,11 @@ sync ni uso clínico. Cálculo y tratamiento siguen bloqueados.
   sintético y una política sintética, el mensaje autenticado se guarda en una
   base sintética y sigue bloqueado, sin identidad compartida se rechaza sin
   abrir el almacén y un payload mal formado se guarda solo como rechazo.
+- Sin red por construcción: la app no declara `android.permission.INTERNET`,
+  `verify.ps1` lo impide y `DexcomG7ReceiverDeviceTest` lo comprueba en el
+  dispositivo. Las pruebas no activan el modo avión: el propietario lo descartó
+  el 2026-10-11 porque desactiva el Bluetooth y corta la recepción del sensor G7
+  real en su teléfono (revisión de Codex en la PR #51).
 - `verify.ps1`: forma exacta del receiver en los manifiestos de depuración y
   release, ningún permiso `com.dexcom.`, política de producción `Pending`, sin
   subclases ni anclas en producción y lista cerrada de usuarios del registro.

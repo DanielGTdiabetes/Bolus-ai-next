@@ -57,11 +57,16 @@ mensaje del ADR 0022. Política distinta de `Pending`, subclase del receiver y
   mensaje autenticado, y `record` usa ese instante fijo. Regresión:
   `the reception instant is captured on accept, not when a queued write runs`.
   Las pruebas de ignorado y rechazo usan un reloj que falla si se lee.
-- P1, prueba en modo avión: pendiente de decisión del propietario. Ver la PR.
+- P1, prueba en modo avión: descartada por el propietario. El modo avión
+  desactiva el Bluetooth y cortaría la recepción del sensor G7 real en su
+  teléfono. El camino receptor → SQLite no usa red por construcción: la app no
+  tiene permiso de Internet, `verify.ps1` lo exige y
+  `manifestDeclaresOneDisabledExportedReceiverForTheObservedActionOnly` lo
+  comprueba en el dispositivo.
 
 ## Pendiente
 
 - Ejecutar `.\scripts\verify.ps1 -DeviceTests` en el Pixel (propietario).
 - Revisar R4 a R9 (propietario).
 - Para la validación real: release reproducible, opt-in de identidad, anclas
-  aprobadas, permiso del productor y prueba en modo avión, con su propio ADR.
+  aprobadas y permiso del productor, con su propio ADR.
