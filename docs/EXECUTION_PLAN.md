@@ -55,12 +55,44 @@ qué falta y el motor debe devolver un bloqueo estable y comprobable.
 - Una diferencia no se oculta ajustando un esperado; se clasifica y resuelve.
 - Los datos reales se minimizan/anonimizan antes de crear fixtures.
 
-### 3.3 Entrega incremental
+### 3.3 Entregas funcionales y ejecución proporcionada — 2026-10-11
 
-Cada fase produce un cambio pequeño en una rama corta, revisión, verificación y
-merge. No se empieza lógica clínica de una fase si su puerta de entrada no está
-cumplida. Sí puede adelantarse infraestructura segura que no dependa de una
-decisión clínica pendiente.
+Por petición del propietario, avanzar por capacidades completas y revisables.
+Una entrega puede reunir dominio, persistencia, adaptador, UI y pruebas de un
+mismo objetivo. Las fases organizan requisitos; no obligan a una PR por capa,
+estado, método o decisión técnica. Separar trabajo sin relación y cambios
+clínicos de refactors, dependencias o formato.
+
+- Elegir un resultado observable y criterios de aceptación antes de programar.
+  Resolver autónomamente decisiones técnicas reversibles dentro del alcance
+  autorizado y de los contratos vigentes.
+- Crear un ADR breve cuando cambie la arquitectura, un contrato relevante o una
+  decisión de seguridad. Ampliar el ADR existente cuando corresponda; no exigir
+  otro ADR ni una ronda de aprobación por cada paso técnico rutinario.
+- Agrupar las preguntas clínicas o de alcance que sí necesiten al propietario,
+  con opciones concretas. Reutilizar aprobaciones registradas; una petición de
+  simplificar el proceso no aprueba reglas clínicas ni amplía autoridad.
+- Mientras falte una decisión, bloquear solo la capacidad que dependa de ella y
+  seguir con trabajo seguro del objetivo. No sustituir el objetivo por nuevas
+  mejoras de diagnóstico o endurecimiento sin un defecto concreto, un riesgo
+  identificado o un criterio de aceptación que las justifique.
+- Ejecutar pruebas específicas durante el desarrollo y `scripts/verify.ps1`
+  sobre la versión final antes de publicar. Repetir lo afectado si hay cambios,
+  fallos o nueva evidencia; no repetir auditorías o suites sobre el mismo estado
+  sin motivo. Las pruebas de dispositivo se aplican a cambios de Android que
+  las requieran, no automáticamente a documentación.
+- Mantener una sola evidencia por entrega: alcance, decisiones, comandos y
+  resultados, riesgos y pendientes en el informe o PR correspondiente. El
+  archivo de continuación enlaza esa evidencia y resume el siguiente objetivo;
+  no necesita duplicar el informe en cada documento.
+- Conservar revisión de PR, corrección de hallazgos válidos y CI aplicable antes
+  de integrar. Una revisión adicional debe responder a un cambio, hallazgo o
+  riesgo pendiente, sin abrir ciclos indefinidos por preferencias de estilo.
+
+Siguen siendo obligatorios procedencia y aprobación de reglas clínicas,
+fail-closed, pruebas de cálculo/persistencia/sincronización, aislamiento de
+Legacy y autoridad única de tratamiento. No se empieza lógica clínica si su
+puerta de entrada no está cumplida.
 
 ### 3.4 Artefactos estándar
 
@@ -677,7 +709,8 @@ lógica clínica sin cambios. Véase la
 
 ### Secuencia de capacidades
 
-No intentar construir toda una fase en un solo cambio. Secuencia inicial:
+La secuencia inicial siguiente queda como referencia de dependencias, no como
+una lista que deba reiniciarse ni una obligación de dividir cada capacidad:
 
 1. Gobierno: `AGENTS.md`, plan, ADR/risk templates.
 2. Toolchain: ADR del motor compartido y esqueleto mínimo compilable.
@@ -689,6 +722,28 @@ No intentar construir toda una fase en un solo cambio. Secuencia inicial:
 8. Android: persistencia mínima; después adaptador Dexcom local.
 
 Cada cambio debe indicar fase, criterio cubierto, pruebas, riesgos y pendientes.
+
+### Prioridad de continuación — 2026-10-11
+
+La [PR #53](https://github.com/DanielGTdiabetes/Bolus-ai-next/pull/53)
+(ADR 0022 R11) quedó integrada en `origin/main` mediante `740af25` durante
+este ajuste. No queda pendiente de fusión; comprobar el CI del SHA integrado.
+
+1. Concentrar la siguiente entrega funcional en el primer hito Android: recepción
+   local Dexcom, persistencia y presentación con origen, hora y estado, sin
+   habilitar cálculo. Reunir en una sola propuesta las decisiones pendientes de
+   release reproducible, opt-in de identidad, anclas, permiso y presentación;
+   implementar después el recorrido completo dentro del alcance aprobado.
+2. Si faltan esas decisiones o artefactos, dejar explícito qué bloquean y avanzar
+   solo con preparativos independientes del mismo hito. Retención, contadores,
+   exportación y refinamientos visuales quedan fuera de la ruta inmediata salvo
+   que sean necesarios para un riesgo concreto o los priorice el propietario.
+
+La recepción y presentación con Dexcom real conservan las puertas de los ADR
+vigentes. No aprobar por inferencia unidad, timestamps, vigencia ni uso clínico.
+La validación offline debe preservar la recepción del sensor: según la decisión
+registrada en el ADR 0022, no activar el modo avión que corta su Bluetooth;
+documentar y probar la ausencia de dependencia de Internet sin interrumpirlo.
 
 ## 7. Comandos iniciales para Codex
 
@@ -717,7 +772,7 @@ Para iniciar una rama cuando proceda:
 ```powershell
 git switch main
 git pull --ff-only origin main
-git switch -c feature/<fase>-<descripcion-corta>
+git switch -c codex/<capacidad>-<descripcion-corta>
 ```
 
 No ejecutar `pull`, cambio de rama o rebase sobre cambios locales no entendidos.
