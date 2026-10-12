@@ -110,9 +110,10 @@ siguiente:
   que la presentación muestra con número (ADR 0023). En ese caso conserva su
   origen, instante de recepción y hora de medida no verificada;
 - IOB: manual. Vacío significa desconocido;
-- paso, bolo máximo y corrección máxima: parámetros de prueba que se introducen
-  en cada cálculo y no se guardan en el perfil (el esquema 1 del perfil no los
-  incluye).
+- paso, bolo máximo y corrección máxima: **sustituido por el
+  [ADR 0025](0025-profile-calculation-limits.md)**. Ahora proceden de la versión
+  del perfil (esquema de contenido 2) y no se teclean en cada cálculo. Una versión
+  de esquema 1 los deja desconocidos y bloquea solo los pasos que los necesitan.
 
 La pantalla muestra «PRUEBA · NO UTILIZAR PARA TRATAMIENTO», el total o su
 bloqueo, cada paso con sus hechos o causas, los avisos, las reglas no aplicadas,
@@ -129,9 +130,8 @@ perfil y la ruta terapéutica permanece bloqueada.
 - **Implementar solo componentes sin total.** Descartada: la autorización pide
   resultados de prueba completos cuando hay datos, y el bloqueo por componente ya
   impide un total con entradas ausentes.
-- **Ampliar ahora el esquema del perfil con límites.** Pospuesta: exige una
-  migración de `clinical-profile.db`, otra pantalla y una decisión de valores
-  aprobados. Por eso son parámetros de prueba por cálculo.
+- **Ampliar ahora el esquema del perfil con límites.** Pospuesta en esta entrega
+  y resuelta después en el ADR 0025, sin valores por defecto.
 - **Fijar a mano los valores esperados.** Descartada por AGENTS.md §9: se
   capturan de Legacy en el SHA fijado.
 

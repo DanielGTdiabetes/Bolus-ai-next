@@ -315,6 +315,8 @@ internal class ClinicalProfileScreen(
             Setting.NotConfigured -> context.getString(R.string.profile_not_configured)
             is Setting.Declared -> zone.value.id
         }), "profile:review:zone")
+        heading(context.getString(R.string.profile_limits_title), "profile:review:limits")
+        ProfileLimit.entries.forEach { label(limitText(body, it), "profile:review:limit:${it.code}") }
         body.schedules.forEach { schedule ->
             val parameter = schedule.parameter
             heading(parameter.unitLabel(body.glucoseUnit)?.let {
@@ -346,6 +348,19 @@ internal class ClinicalProfileScreen(
     })
 
     private fun minutes(value: Int) = ProfileTimes.format(value)
+
+    private fun limitName(limit: ProfileLimit): String = context.getString(when (limit) {
+        ProfileLimit.ROUND_STEP -> R.string.profile_limit_round_step
+        ProfileLimit.MAX_BOLUS -> R.string.profile_limit_max_bolus
+        ProfileLimit.MAX_CORRECTION -> R.string.profile_limit_max_correction
+    })
+
+    /** A schema 1 version has no limits: "unknown", never "not configured" and never a value from another version. */
+    private fun limitText(body: ProfileContent, limit: ProfileLimit): String =
+        context.getString(R.string.profile_param_value, limitName(limit), when (val value = body.limit(limit)) {
+            null -> context.getString(R.string.profile_limit_not_in_schema)
+            else -> valueText(value, limit.unitLabel)
+        })
 
     private fun valueText(value: ProfileValue, unit: String?): String = when (value) {
         ProfileValue.NotConfigured -> context.getString(R.string.profile_not_configured)
@@ -387,6 +402,7 @@ internal class ClinicalProfileScreen(
             label(context.getString(R.string.profile_param_value, parameterName(schedule.parameter),
                 scheduleText(schedule, body.glucoseUnit)), "$prefix:${schedule.parameter.code}")
         }
+        ProfileLimit.entries.forEach { label(limitText(body, it), "$prefix:limit:${it.code}", 14f) }
         label(context.getString(R.string.profile_writer, version.writer), "$prefix:writer", 13f)
         label(context.getString(R.string.profile_fingerprint, version.contentSha256.take(16)), "$prefix:sha", 13f)
     }
@@ -451,6 +467,7 @@ internal class ClinicalProfileScreen(
             }
         }
         editor.content.schedules.forEach { schedule -> schedule(editor, schedule, ::refresh) }
+        limits(editor, ::refresh)
 
         save.apply {
             text = context.getString(R.string.profile_save, editor.nextVersion)
@@ -616,6 +633,23 @@ internal class ClinicalProfileScreen(
         update()
     }
 
+    /**
+     * Profile-wide limits (ADR 0025), in insulin units and independent of the glucose unit. Empty means not configured;
+     * a version saved before limits existed shows them as unknown until the user types a value, which creates the new
+     * content schema. They are confirmed together with the rest of the version.
+     */
+    private fun limits(editor: ProfileEditor, refresh: () -> Unit) {
+        heading(context.getString(R.string.profile_limits_title), "profile:limits")
+        notice(context.getString(R.string.profile_limits_explanation), "profile:limits:explanation")
+        if (editor.start.limit(ProfileLimit.ROUND_STEP) == null) {
+            notice(context.getString(R.string.profile_limits_not_in_schema_notice), "profile:limits:not_in_schema")
+        }
+        ProfileLimit.entries.forEach { limit ->
+            field(ProfileEditorField.Limit(limit), context.getString(R.string.profile_param_with_unit, limitName(limit),
+                limit.unitLabel), true, refresh)
+        }
+    }
+
     private fun scheduleLines(schedule: ParameterSchedule, unit: Setting<GlucoseUnit>): String {
         val label = schedule.parameter.unitLabel(unit)
         return schedule.segments.joinToString("\n") {
@@ -630,6 +664,9 @@ internal class ClinicalProfileScreen(
         data class Value(val parameter: ProfileParameter, val segment: SegmentRef) : ProfileEditorField {
             override val key = ClinicalProfileModel.valueKey(parameter, segment)
         }
+        data class Limit(val limit: ProfileLimit) : ProfileEditorField {
+            override val key = ClinicalProfileModel.limitKey(limit)
+        }
     }
 
     private fun field(field: ProfileEditorField, caption: String, enabled: Boolean, refresh: () -> Unit, hint: String? = null) {
@@ -637,7 +674,11 @@ internal class ClinicalProfileScreen(
         val preview = label("", "profile:preview:${field.key}", 14f)
         val input = EditText(context).apply {
             id = View.generateViewId()
-            tag = if (field is ProfileEditorField.Zone) "profile:time_zone" else "profile:value:${field.key}"
+            tag = when (field) {
+                ProfileEditorField.Zone -> "profile:time_zone"
+                is ProfileEditorField.Limit -> "profile:limit:${field.limit.code}"
+                is ProfileEditorField.Value -> "profile:value:${field.key}"
+            }
             // Text input on purpose: the shared parser decides; no locale keyboard coercion.
             inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
             importantForAutofill = View.IMPORTANT_FOR_AUTOFILL_NO
@@ -674,6 +715,12 @@ internal class ClinicalProfileScreen(
                 is ProfileValue.Entered -> context.getString(R.string.profile_preview_value,
                     valueText(value, field.parameter.unitLabel(editor.content.glucoseUnit)))
                 else -> context.getString(R.string.profile_preview_missing)
+            }
+            is ProfileEditorField.Limit -> when (val value = editor.content.limit(field.limit)) {
+                is ProfileValue.Entered -> context.getString(R.string.profile_preview_value,
+                    valueText(value, field.limit.unitLabel))
+                ProfileValue.NotConfigured -> context.getString(R.string.profile_preview_missing)
+                null -> context.getString(R.string.profile_preview_unknown)
             }
         }
     }

@@ -104,6 +104,13 @@ public object CandidateEngine {
             }
         }
 
+        /** A profile-wide limit of the confirmed version; the producer's cause travels unchanged when it is absent. */
+        fun limit(select: (ProfileSnapshot) -> Input<Quantity>): Input<Quantity> = when (profile) {
+            is Input.Unavailable -> profile
+            is Input.Provided ->
+                if (!profile.value.dataConfirmed) Input.Unavailable("profile.unconfirmed") else select(profile.value)
+        }
+
         val carbRatio = parameter("carb_ratio") { it.carbRatio }
         val sensitivity = parameter("sensitivity") { it.sensitivity }
         val target = parameter("target") { it.target }
@@ -122,9 +129,9 @@ public object CandidateEngine {
             if (glucose.value.origin == GlucoseOrigin.DEXCOM_PERMISSION_SET) warnings += Warnings.DEXCOM_NOT_ATTRIBUTED
         }
         if (request.iob is Input.Provided) warnings += Warnings.MANUAL_IOB
-        if (listOf(request.roundStep, request.maxBolus, request.maxCorrection).any { it is Input.Provided }) {
-            warnings += Warnings.TEST_PARAMETERS
-        }
+        val roundStep = limit { it.roundStep }
+        val maxBolus = limit { it.maxBolus }
+        val maxCorrection = limit { it.maxCorrection }
 
         val steps = mutableListOf<StepResult>()
 
@@ -177,7 +184,7 @@ public object CandidateEngine {
         steps += StepResult(CandidateStep.CORRECTION, correction)
 
         val limited: StepOutcome = after(correction, CandidateStep.CORRECTION) { raw ->
-            val limit = when (val m = request.maxCorrection) {
+            val limit = when (val m = maxCorrection) {
                 is Input.Unavailable -> return@after blocked(m.cause)
                 is Input.Provided -> m.value.value
             }
@@ -210,7 +217,7 @@ public object CandidateEngine {
 
         // 6) Rounding. Kotlin round() is half-even, like Python round() in Legacy.
         val rounded: StepOutcome = after(upfront, CandidateStep.IOB) { value ->
-            val step = when (val s = request.roundStep) {
+            val step = when (val s = roundStep) {
                 is Input.Unavailable -> return@after blocked(s.cause)
                 is Input.Provided -> s.value.value
             }
@@ -220,7 +227,7 @@ public object CandidateEngine {
         steps += StepResult(CandidateStep.ROUNDING, rounded)
 
         val capped: StepOutcome = after(rounded, CandidateStep.ROUNDING) { value ->
-            val limit = when (val m = request.maxBolus) {
+            val limit = when (val m = maxBolus) {
                 is Input.Unavailable -> return@after blocked(m.cause)
                 is Input.Provided -> m.value.value
             }
@@ -279,7 +286,6 @@ public object Warnings {
     public const val MEASUREMENT_TIME_UNVERIFIED: String = "glucose.measurement_time_unverified"
     public const val DEXCOM_NOT_ATTRIBUTED: String = "glucose.sender_not_attributed_to_dexcom"
     public const val MANUAL_IOB: String = "iob.manual_entry_unverified"
-    public const val TEST_PARAMETERS: String = "limits.entered_for_test_not_in_profile"
     public const val MAX_BOLUS_LIMITED: String = "max_bolus.limited"
     public const val BELOW_HYPO_STOP: String = "glucose.below_legacy_hypo_stop"
 }
@@ -297,7 +303,7 @@ public object CandidateCodec {
         fun segments(key: String, list: List<SegmentValue>) = list.forEach { segment ->
             input("$key.${segment.startMinute}-${segment.endMinute}", segment.value) { it.text }
         }
-        line("codec", "bolus-ai-next/candidate-request/v1")
+        line("codec", "bolus-ai-next/candidate-request/v2")
         line("engine", EngineIdentity.VERSION)
         line("rule_set", CandidateRuleSet.ID)
         line("calculation_at_ms", request.calculationAtEpochMs.toString())
@@ -309,6 +315,9 @@ public object CandidateCodec {
             segments("profile.carb_ratio", profile.carbRatio)
             segments("profile.sensitivity", profile.sensitivity)
             segments("profile.target", profile.target)
+            input("profile.round_step", profile.roundStep) { it.text }
+            input("profile.max_bolus", profile.maxBolus) { it.text }
+            input("profile.max_correction", profile.maxCorrection) { it.text }
         }
         input("carbs", request.carbs) { "${it.grams.text}:${it.origin.code}" }
         input("glucose", request.glucose) {
@@ -316,8 +325,5 @@ public object CandidateCodec {
                 ":source=${it.sourceReference}"
         }
         input("iob", request.iob) { "${it.units.text}:${it.origin}" }
-        input("round_step", request.roundStep) { it.text }
-        input("max_bolus", request.maxBolus) { it.text }
-        input("max_correction", request.maxCorrection) { it.text }
     }
 }

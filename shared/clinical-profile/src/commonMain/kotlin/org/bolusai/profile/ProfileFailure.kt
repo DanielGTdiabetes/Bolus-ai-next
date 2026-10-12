@@ -19,6 +19,8 @@ enum class ProfileFailure(val code: String) {
     UNIT_CHANGE_WITH_VALUES("profile.edit.unit_change_with_values"),
     INVALID_ORIGIN("profile.edit.invalid_origin"),
     ORIGIN_NOT_ENABLED("profile.origin.not_enabled"),
+    /** A manual version may not use an older content schema than the version it started from (ADR 0025). */
+    SCHEMA_DOWNGRADE("profile.edit.schema_downgrade"),
     /** Reserved (ADR 0012 P5, superseded by ADR 0013). Never produced again and never reused. */
     SEGMENTS_UI_UNAVAILABLE("profile.edit.segments_ui_unavailable"),
     SPLIT_OUT_OF_RANGE("profile.edit.split_out_of_range"),

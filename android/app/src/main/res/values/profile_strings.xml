@@ -41,6 +41,15 @@
     <string name="profile_device_zone">Usar la zona del dispositivo · %1$s</string>
     <string name="profile_preview_value">Se guardará: %1$s</string>
     <string name="profile_preview_missing">Se guardará: sin configurar</string>
+    <string name="profile_preview_unknown">Se guardará: desconocido (versión sin límites)</string>
+    <!-- ADR 0025: profile-wide limits used by the test calculation. No value is suggested or filled in. -->
+    <string name="profile_limits_title">Límites del cálculo</string>
+    <string name="profile_limits_explanation">Paso de redondeo, bolo máximo y corrección máxima, en unidades de insulina. Vacío = sin configurar: bloquea el paso del cálculo que lo necesita. Se confirman con el resto de la versión.</string>
+    <string name="profile_limits_not_in_schema_notice">La versión de partida no tiene límites: siguen desconocidos hasta que introduzcas alguno. Nada se rellena automáticamente.</string>
+    <string name="profile_limit_round_step">Paso de redondeo</string>
+    <string name="profile_limit_max_bolus">Bolo máximo</string>
+    <string name="profile_limit_max_correction">Corrección máxima</string>
+    <string name="profile_limit_not_in_schema">desconocido (versión sin límites)</string>
     <string name="profile_preview_error">No válido · %1$s</string>
     <string name="profile_segment_range">%1$s–%2$s</string>
     <string name="profile_segment_value">Valor de %1$s</string>

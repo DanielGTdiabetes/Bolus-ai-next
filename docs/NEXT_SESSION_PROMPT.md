@@ -1,14 +1,33 @@
 Trabaja en E:\projects\Bolus-ai-next y continúa desde origin/main actualizado.
 
-ENTREGA 2026-10-12 — RECEPCIÓN POR PERMISO Y CÁLCULO DE PRUEBA
-Implementados los pasos 1 a 6 del ADR 0023 y el ADR 0024 (motor candidato
-`legacy-backend-core-candidate-v1`, paridad exacta con 12 vectores de Legacy
-`bcac891`, cálculo de prueba en Bolo). Evidencia y comprobaciones pendientes del
-Pixel P1 a P6 en docs/validation/dexcom-permission-reception-and-test-calculation-2026-10-12.md.
-Siguiente: P1 (`verify.ps1 -DeviceTests`) y P2 (prueba I-3 de visibilidad con
-las líneas `dexcom_reception.*` de Diagnóstico). Sin `QUERY_ALL_PACKAGES` la
-puerta queda en `visibility_unproven` y no se registran mensajes reales. Si P2
-demuestra que hace falta, añadirlo en una PR pequeña y seguir con P3 a P6.
+ESTADO EN MAIN — 2026-10-12
+Existen y están integrados: recepción Dexcom por permiso con presentación en
+Inicio y Bolo (ADR 0023), motor candidato único `0.3.0-candidate` con cálculo de
+prueba en Bolo y paridad exacta en 12 vectores de Legacy `bcac891` (ADR 0024) y
+límites del cálculo en el perfil versionado (ADR 0025). Ningún resultado es
+utilizable para tratamiento. La recepción real y todas las pruebas instrumentadas
+siguen sin ejecutarse en el Pixel.
+
+ENTREGA 2026-10-12 — LÍMITES DEL CÁLCULO EN EL PERFIL (ADR 0025)
+Paso de redondeo, bolo máximo y corrección máxima son límites del perfil en el
+esquema de contenido 2. Se introducen una vez en Ajustes → Cálculo, se versionan,
+se confirman con la versión y el cálculo de prueba los toma de ella. Ya no se
+teclean en Bolo. `clinical-profile.db` v3 (`profile_limits`) migra desde v1 y v2
+sin rellenar nada. Las versiones de esquema 1 los dejan desconocidos
+(`profile.<código>.not_in_schema`) y bloquean solo B2, D y E. Evidencia y
+comprobaciones P1, P6 y P7 del Pixel en docs/validation/profile-limits-2026-10-12.md.
+
+SIGUIENTE
+- Teléfono, cuando haya acceso: P1 a P6 de
+  docs/validation/dexcom-permission-reception-and-test-calculation-2026-10-12.md,
+  más P1, P6 y P7 de la validación de límites. P2 (I-3) decide si hace falta
+  `QUERY_ALL_PACKAGES`: sin esa evidencia no se añade. B1 sigue pendiente de
+  validación real y aprobación del informe. Prueba offline con Bluetooth activo,
+  Wi-Fi y datos móviles apagados y sin modo avión.
+- Sin teléfono: siguiente regla candidata trazada a Legacy en el motor único.
+  Candidatas: historial local de insulina e IOB calculado (LC-004, LC-005), que
+  sustituye el IOB manual, y fibra/Warsaw (LC-008). Resolver y registrar el SHA
+  remoto de Legacy antes de usarlo.
 No repetir las decisiones ya aprobadas.
 
 CONTINUACIÓN ACTIVA — 2026-10-12
@@ -54,10 +73,10 @@ El propietario confirma que Dexcom ya está modificada, funciona y la utiliza
 No pedir cambios, recompilación, reinstalación ni `setShareIdentityEnabled(true)`
 en Dexcom. La adaptación corresponde a Next. Identificar y archivar la APK
 instalada es una operación de solo lectura, no una obligación de reconstruirla.
-Revisar en el ADR 0022 la política de recepción de Next: la implementada hoy
-exige identidad compartida y todavía no es compatible con el envío existente.
-No simular esa identidad ni llamar autenticación por mensaje a verificar una
-APK instalada. Este cambio de alcance no habilita cálculo ni tratamiento.
+La política de recepción de Next ya no exige identidad compartida: el ADR 0023
+la sustituyó por la puerta del conjunto de permiso aprobado. No simular esa
+identidad ni llamar autenticación por mensaje a verificar una APK instalada.
+Este cambio de alcance no habilita tratamiento.
 
 RECEPCIÓN Y PRESENTACIÓN TÉCNICA APROBADAS — 2026-10-12
 El propietario respondió «sí» al paquete de decisiones del ADR 0023
@@ -100,17 +119,9 @@ futura requiere contrato y validación propios, sin bloquear el hito Dexcom
 actual ni atribuir al productor Dexcom los mensajes de la app del reloj.
 La aprobación del 2026-10-12 no autoriza cambios en la app del reloj ni uso
 clínico de sus futuras retransmisiones.
-Siguiente paso: implementar el plan aceptado de recepción y presentación y
-avanzar con el cálculo de prueba autorizado, en entregas funcionales completas.
-La aprobación no equivale a implementación
-ni a recepción real verificada; el código actual continúa con Pending.
-
-La PR #53 (ADR 0022 R11) ya está integrada en `origin/main` mediante
-`740af25`; no reabrir su trabajo como un paso pendiente. Comprobar el CI del
-SHA integrado al continuar. Priorizar ahora una entrega completa de
-recepción local Dexcom y presentación offline con cálculo bloqueado, aplicando
-el ADR 0023 aceptado. No encadenar nuevas PR de
-diagnóstico o endurecimiento sin un hallazgo o riesgo concreto.
+El plan aceptado de recepción y presentación está implementado (ADR 0023,
+pasos 1 a 6). Falta la recepción real verificada en el Pixel. No encadenar
+nuevas PR de diagnóstico o endurecimiento sin un hallazgo o riesgo concreto.
 
 El detalle que sigue conserva antecedentes de entregas; el estado de integración
 se comprueba en GitHub y origin/main, no se deduce de esos antecedentes.
@@ -129,8 +140,8 @@ sigue en v3 (ADR 0008 a 0011).
 
 Ajustes → Cálculo captura el perfil clínico local (ADR 0012, aceptado con las
 ocho recomendaciones de su sección 12 y la regla de unidades 4.4). Módulo
-`shared/clinical-profile` y base propia `clinical-profile.db` v2 (parte 1 del
-ADR 0014, migrada desde v1): versiones append-only con triggers, huella
+`shared/clinical-profile` y base propia `clinical-profile.db` v3 (v2 en la
+parte 1 del ADR 0014; v3 añade los límites del ADR 0025): versiones append-only con triggers, huella
 SHA-256 canónica revalidada al leer, origen `manual`/`restored` (`system_proposal_accepted` reservado y rechazado), fecha y
 escritor. Unidad de glucosa (mg/dL o mmol/L) y zona IANA declaradas por versión.
 `carb_ratio` (g/U), `insulin_sensitivity` y `glucose_target` por franjas
@@ -175,19 +186,21 @@ continúa fijada en f5417721d8019a9831126f4d843edfc4de87653d; no afirmes que ese
 SHA sigue siendo el main remoto sin comprobarlo si necesitas nueva evidencia.
 
 LÍMITES
-El perfil es captura. La confirmación de datos existe en dominio, base local
-(parte 1 del ADR 0014) y pantalla (parte 2). No aprueba uso clínico: no
-alimenta motor, Bolo, IOB ni recomendación, y cálculo y tratamiento siguen
-bloqueados en todos los estados. Bolo muestra «Perfil · no se usa para
-calcular». Desde el ADR 0017 sus detalles técnicos y los de Diagnóstico leen el
+La confirmación de datos existe en dominio, base local (parte 1 del ADR 0014) y
+pantalla (parte 2). No aprueba uso clínico. Desde el ADR 0024 el cálculo de
+prueba de Bolo usa la última versión, y solo si está confirmada, con sus límites
+del ADR 0025. `ReadOverview`, IOB, recomendación y tratamiento siguen sin usar el
+perfil. Desde el ADR 0017 sus detalles técnicos y los de Diagnóstico leen el
 perfil solo para mostrar sus causas, sin modificar versiones, franjas ni
-eventos (la apertura de SQLite puede crear o migrar el esquema). No hay
-límites clínicos, DIA, curva, redondeo, conversión de unidades, propuestas del
-sistema, aprendizaje, exportación/importación, sync ni perfiles alternativos. La
+eventos (la apertura de SQLite puede crear o migrar el esquema). Los límites
+del ADR 0025 los introduce el usuario, sin rangos aprobados. No hay DIA, curva,
+conversión de unidades, propuestas del sistema, aprendizaje,
+exportación/importación, sync ni perfiles alternativos. La
 resolución de franjas en cambios de hora queda para el ADR del motor. Los macros
-de comida son textos sin validar/convertir; ausencia nunca equivale a cero. No
-hay recepción Dexcom, IOB local, catálogo ni historial clínico. iOS sigue
-pendiente de verificación. Cálculo y confirmación clínica siguen bloqueados.
+de comida son textos sin validar/convertir; ausencia nunca equivale a cero. La
+recepción Dexcom existe (ADR 0023), pero no se ha verificado con el sensor real.
+No hay IOB local, catálogo ni historial clínico. iOS sigue pendiente de
+verificación. El tratamiento y la aprobación clínica siguen bloqueados.
 Avisa al propietario antes de usar el móvil: otro proceso puede estar probando
 en él, y `verify.ps1` exige un único dispositivo en adb. Las pruebas USB necesitan el Pixel desbloqueado y con la pantalla encendida
 durante toda la ejecución. Enviar `adb shell input keyevent KEYCODE_WAKEUP` cada
@@ -255,7 +268,8 @@ docs/validation/profile-confirmation-ui-2026-10-03.md:
   anterior antes de leer; regresiones de escritura fallida, estado guardado,
   recreación, lectura fallida y recuperación para confirmar y retirar.
   `verify.ps1` comprueba también que `ScreenRenderer` no referencia el perfil.
-Ni Bolo, `ReadOverview` ni el motor leen el perfil. La traducción del estado
+En aquella entrega ni Bolo, `ReadOverview` ni el motor leían el perfil. Desde el
+ADR 0024 el cálculo de prueba de Bolo lo traduce a entradas explícitas del motor. La traducción del estado
 del perfil a `input.profile.*` existe solo en el módulo del ADR 0015, sin
 consumidores. Sin cambios de esquema, serialización ni huellas.
 

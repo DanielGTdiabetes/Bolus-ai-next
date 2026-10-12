@@ -72,6 +72,18 @@ como migrada, aprobada o segura de retirar en este lote.
 | LF-029 | Historial y gráficos | `HistoryPage.jsx`, `MainGlucoseChart.jsx`, `BasalGlucoseChart.jsx` | retención, fuentes, timezone y tratamientos | lectura local auditable | inventariada; contrato pendiente |
 | LF-030 | Salud operativa, jobs, cambios y estado | `api/health.py`, `api/db.py`, `api/changes.py`, `StatusPage.jsx` | despliegue, DB, scheduler y disponibilidad remota | diagnóstico local + estado específico por integración | inventariada; diseño pendiente |
 
+## Cobertura Next registrada por entrega
+
+Estado de lo implementado en Next frente a cada `LF-*`. «Parcial» significa que
+el caso de uso completo aún no está cubierto. Ninguna fila declara aprobación
+clínica ni uso terapéutico.
+
+| ID | Fuente Legacy y SHA | Caso de uso cubierto | Alternativa Next | Estado | Prueba |
+|---|---|---|---|---|---|
+| LF-005 | `android-companion/.../dexcom/GlucoseReceiver.kt` y manifest en `f5417721` (ADR 0023) | recibir la glucosa local de la Dexcom G7 instalada y mostrarla | receptor por permiso, registro v2 y presentación en Inicio y Bolo ([ADR 0023](../adr/0023-dexcom-existing-transport-trust.md)) | parcial: recepción real pendiente de P1 a P6 en el Pixel e I-3 | pruebas JVM y de dispositivo del ADR 0023; [validación](../validation/dexcom-permission-reception-and-test-calculation-2026-10-12.md) |
+| LF-006 | `backend/app/services/bolus_engine.py::_calculate_core` en `bcac891` | cálculo con comida, corrección, límite de corrección, IOB, redondeo, bolo máximo y parada | motor candidato único y cálculo de prueba en Bolo ([ADR 0024](../adr/0024-candidate-engine-test-calculation.md)) | parcial: reglas candidatas, IOB manual y sin fibra, Warsaw, ejercicio, autosens, Techne, dual ni techo de IOB | `CandidateEngineTest` con 12 vectores de Legacy; `TestCalculationTest` |
+| LF-002 | `backend/app/models/settings.py::UserSettings` (`round_step_u`, `max_bolus_u`, `max_correction_u`) en `bcac891` | guardar paso de redondeo, bolo máximo y corrección máxima una sola vez y usarlos en cada cálculo | límites de perfil en el esquema de contenido 2, versionados y confirmables, sin defaults ([ADR 0025](../adr/0025-profile-calculation-limits.md)) | parcial: cubiertos estos tres campos. Faltan `max_iob_u`, `min_bolus_interval_min`, DIA/curva, fibra, Warsaw, ejercicio e importación | `ProfileLimitsTest`, `TestCalculationTest`, `ClinicalProfileSchemaTextTest`; pruebas de dispositivo pendientes en el Pixel |
+
 ## Cobertura que aún falta demostrar
 
 La matriz evita omisiones por categoría, pero no permite afirmar todavía que no

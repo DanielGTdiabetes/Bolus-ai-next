@@ -166,6 +166,60 @@ class ClinicalProfileDeviceTest {
         assertTrue(v1.writer.startsWith("android/"))
     }
 
+    @Test fun limitsAreTypedOnceSavedInANewVersionAndOlderVersionsStayUnknown() {
+        seed(ProfileWrite(0, content(), ProfileOrigin.MANUAL, null))
+        val unknown = s(R.string.profile_param_value, s(R.string.profile_limit_max_bolus), s(R.string.profile_limit_not_in_schema))
+        launch().use { scenario ->
+            openProfile(scenario)
+            awaitView(scenario, "profile:current:limit:max_bolus", unknown)
+            click(scenario, "profile:edit")
+            awaitView(scenario, "profile:limit:round_step")
+            scenario.onActivity {
+                assertNotNull(viewOrNull(it, "profile:limits:not_in_schema"))
+                ProfileLimit.entries.forEach { limit -> assertEquals("", text(it, "profile:limit:${limit.code}")) }
+                assertEquals(s(R.string.profile_preview_unknown), text(it, "profile:preview:limit:round_step"))
+                assertFalse(view(it, "profile:save").isEnabled)
+                type(it, "profile:limit:round_step", "0,5")
+                assertEquals(s(R.string.profile_preview_value, "0.5 U"), text(it, "profile:preview:limit:round_step"))
+                // The other limits of the new schema start not configured, never copied or suggested.
+                assertEquals(s(R.string.profile_preview_missing), text(it, "profile:preview:limit:max_bolus"))
+                type(it, "profile:limit:max_bolus", "1.234,5")
+                assertEquals(s(R.string.profile_preview_error, ProfileFailure.AMBIGUOUS_DECIMAL.code),
+                    text(it, "profile:preview:limit:max_bolus"))
+                assertFalse(view(it, "profile:save").isEnabled)
+                type(it, "profile:limit:max_bolus", "8")
+            }
+            scenario.recreate()
+            awaitView(scenario, "profile:limit:max_bolus")
+            scenario.onActivity {
+                assertEquals("0,5", text(it, "profile:limit:round_step"))
+                assertEquals("8", text(it, "profile:limit:max_bolus"))
+                assertTrue(view(it, "profile:save").isEnabled)
+            }
+            click(scenario, "profile:save")
+            awaitView(scenario, "profile:saved", s(R.string.profile_saved, 2))
+            awaitView(scenario, "profile:current:limit:round_step",
+                s(R.string.profile_param_value, s(R.string.profile_limit_round_step), "0.5 U"))
+            scenario.onActivity {
+                assertEquals(s(R.string.profile_param_value, s(R.string.profile_limit_max_correction),
+                    s(R.string.profile_not_configured)), text(it, "profile:current:limit:max_correction"))
+            }
+            // Editing again shows the stored limits: nothing has to be typed for the next version.
+            click(scenario, "profile:edit")
+            awaitView(scenario, "profile:limit:max_bolus")
+            scenario.onActivity {
+                assertEquals("8", text(it, "profile:limit:max_bolus"))
+                assertNull(viewOrNull(it, "profile:limits:not_in_schema"))
+            }
+        }
+        val (v1, v2) = stored()
+        ProfileLimit.entries.forEach { assertNull(v1.content.limit(it)) }
+        assertEquals(2, v2.content.schemaVersion)
+        assertEquals(ProfileValue.Entered(CanonicalDecimal("0.5")), v2.content.limit(ProfileLimit.ROUND_STEP))
+        assertEquals(ProfileValue.Entered(CanonicalDecimal("8")), v2.content.limit(ProfileLimit.MAX_BOLUS))
+        assertEquals(ProfileValue.NotConfigured, v2.content.limit(ProfileLimit.MAX_CORRECTION))
+    }
+
     @Test fun unitChangeIsSavedAloneAndOlderValuesKeepTheirOriginalUnit() {
         val (v1) = seed(ProfileWrite(0, content(), ProfileOrigin.MANUAL, null))
         launch().use { scenario ->

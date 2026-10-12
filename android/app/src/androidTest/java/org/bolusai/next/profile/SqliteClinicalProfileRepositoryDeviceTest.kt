@@ -56,7 +56,7 @@ class SqliteClinicalProfileRepositoryDeviceTest {
         triggers.forEach { execSQL("DROP TRIGGER $it") }
         change(this)
         triggers.forEach { trigger ->
-            execSQL(ClinicalProfileSchema.SCHEMA_V2.single { it.startsWith("CREATE TRIGGER $trigger ") })
+            execSQL(ClinicalProfileSchema.SCHEMA_V3.single { it.startsWith("CREATE TRIGGER $trigger ") })
         }
     }
 
@@ -375,11 +375,11 @@ class SqliteClinicalProfileRepositoryDeviceTest {
         }
         withDatabase { name ->
             SqliteClinicalProfileRepository(context, name).use { it.saved(write(0, content())) }
-            raw(name) { it.version = 3 }
+            raw(name) { it.version = 4 }
             SqliteClinicalProfileRepository(context, name).use {
                 assertEquals(ProfileRead.Failed(ProfileFailure.UNSUPPORTED_SCHEMA), it.readVersions())
             }
-            raw(name) { assertEquals(3, it.version) }
+            raw(name) { assertEquals(4, it.version) }
         }
     }
 

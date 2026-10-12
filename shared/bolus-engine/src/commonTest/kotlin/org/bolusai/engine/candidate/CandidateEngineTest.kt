@@ -20,6 +20,9 @@ internal fun profile(
     unit: GlucoseUnitCode? = GlucoseUnitCode.MG_DL,
     confirmed: Boolean = true,
     carbRatioSegments: List<SegmentValue>? = null,
+    roundStep: String? = "0.1",
+    maxBolus: String? = "15",
+    maxCorrection: String? = "5",
 ) = ProfileSnapshot(
     version = 3,
     fingerprintSha256 = FINGERPRINT,
@@ -29,18 +32,23 @@ internal fun profile(
     carbRatio = carbRatioSegments ?: allDay(carbRatio),
     sensitivity = allDay(sensitivity),
     target = allDay(target),
+    roundStep = if (roundStep == null) Input.Unavailable("profile.round_step.not_configured") else Input.Provided(q(roundStep)),
+    maxBolus = if (maxBolus == null) Input.Unavailable("profile.max_bolus.not_configured") else Input.Provided(q(maxBolus)),
+    maxCorrection = if (maxCorrection == null) Input.Unavailable("profile.max_correction.not_configured") else
+        Input.Provided(q(maxCorrection)),
 )
 
 internal fun request(
-    profile: Input<ProfileSnapshot> = Input.Provided(profile()),
+    roundStep: String? = "0.1",
+    maxBolus: String? = "15",
+    maxCorrection: String? = "5",
+    profile: Input<ProfileSnapshot> = Input.Provided(profile(roundStep = roundStep, maxBolus = maxBolus,
+        maxCorrection = maxCorrection)),
     minute: Input<Int> = Input.Provided(600),
     carbs: String? = "60",
     glucose: Input<GlucoseValue> = Input.Provided(GlucoseValue(q("190"), GlucoseUnitCode.MG_DL,
         GlucoseOrigin.MANUAL_ENTRY, 1_000L, measurementTimeVerified = false, sourceReference = "manual")),
     iob: String? = "0",
-    roundStep: String? = "0.1",
-    maxBolus: String? = "15",
-    maxCorrection: String? = "5",
 ) = CandidateRequest(
     calculationAtEpochMs = 2_000L,
     localMinuteOfDay = minute,
@@ -49,10 +57,6 @@ internal fun request(
         Input.Provided(CarbsValue(q(carbs), CarbsOrigin.MANUAL_ENTRY)),
     glucose = glucose,
     iob = if (iob == null) Input.Unavailable("iob.unknown") else Input.Provided(IobValue(q(iob))),
-    roundStep = if (roundStep == null) Input.Unavailable("limits.round_step.missing") else Input.Provided(q(roundStep)),
-    maxBolus = if (maxBolus == null) Input.Unavailable("limits.max_bolus.missing") else Input.Provided(q(maxBolus)),
-    maxCorrection = if (maxCorrection == null) Input.Unavailable("limits.max_correction.missing") else
-        Input.Provided(q(maxCorrection)),
 )
 
 private fun units(outcome: StepOutcome): Double = (outcome as StepOutcome.Computed).units
@@ -65,12 +69,12 @@ class CandidateEngineTest {
         assertTrue(LEGACY_VECTORS.size >= 10)
         for (vector in LEGACY_VECTORS) {
             val result = CandidateEngine.calculate(request(
-                profile = Input.Provided(profile(vector.carbRatio, vector.sensitivity, vector.target)),
+                profile = Input.Provided(profile(vector.carbRatio, vector.sensitivity, vector.target,
+                    roundStep = vector.roundStep, maxBolus = vector.maxBolus, maxCorrection = vector.maxCorrection)),
                 carbs = vector.carbs,
                 glucose = Input.Provided(GlucoseValue(q(vector.glucose), GlucoseUnitCode.MG_DL,
                     GlucoseOrigin.MANUAL_ENTRY, 0L, false, "manual")),
-                iob = vector.iob, roundStep = vector.roundStep, maxBolus = vector.maxBolus,
-                maxCorrection = vector.maxCorrection,
+                iob = vector.iob,
             ))
             assertEquals(vector.mealU, units(result.step(CandidateStep.MEAL)), vector.name)
             assertEquals(vector.correctionU, units(result.step(CandidateStep.CORRECTION_LIMIT)), vector.name)
@@ -131,15 +135,33 @@ class CandidateEngineTest {
 
     @Test
     fun eachMissingLimitBlocksItsOwnStep() {
-        assertEquals(listOf("limits.max_correction.missing"),
+        assertEquals(listOf("profile.max_correction.not_configured"),
             causes(CandidateEngine.calculate(request(maxCorrection = null)).step(CandidateStep.CORRECTION_LIMIT)))
         val noStep = CandidateEngine.calculate(request(roundStep = null))
         assertEquals(8.0, units(noStep.step(CandidateStep.IOB)))
-        assertEquals(listOf("limits.round_step.missing"), causes(noStep.step(CandidateStep.ROUNDING)))
-        assertEquals(listOf("limits.max_bolus.missing"),
+        assertEquals(listOf("profile.round_step.not_configured"), causes(noStep.step(CandidateStep.ROUNDING)))
+        assertEquals(listOf("profile.max_bolus.not_configured"),
             causes(CandidateEngine.calculate(request(maxBolus = null)).step(CandidateStep.MAX_BOLUS)))
         assertEquals(listOf("round_step.not_positive"),
             causes(CandidateEngine.calculate(request(roundStep = "0")).step(CandidateStep.ROUNDING)))
+    }
+
+    @Test
+    fun limitsComeOnlyFromTheProfileAndKeepTheProducerCause() {
+        val schemaOne = CandidateEngine.calculate(request(profile = Input.Provided(profile(
+            roundStep = null, maxBolus = null, maxCorrection = null).copy(
+            roundStep = Input.Unavailable("profile.round_step.not_in_schema"),
+            maxBolus = Input.Unavailable("profile.max_bolus.not_in_schema"),
+            maxCorrection = Input.Unavailable("profile.max_correction.not_in_schema")))))
+        assertEquals(listOf("profile.max_correction.not_in_schema"), causes(schemaOne.step(CandidateStep.CORRECTION_LIMIT)))
+        assertEquals(6.0, units(schemaOne.step(CandidateStep.MEAL)))
+        assertEquals(listOf("depends_on.correction_limit"), causes(schemaOne.step(CandidateStep.IOB)))
+        val missing = CandidateEngine.calculate(request(profile = Input.Unavailable("profile.missing")))
+        assertEquals(listOf("depends_on.correction"), causes(missing.step(CandidateStep.CORRECTION_LIMIT)))
+        assertTrue(CandidateCodec.encode(request()).lines().containsAll(listOf("profile.round_step=0.1",
+            "profile.max_bolus=15", "profile.max_correction=5")))
+        assertTrue(CandidateCodec.encode(request(profile = Input.Unavailable("profile.missing"))).lines()
+            .none { it.startsWith("profile.round_step") })
     }
 
     @Test

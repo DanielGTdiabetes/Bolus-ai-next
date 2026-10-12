@@ -37,32 +37,38 @@ internal class SqliteClinicalProfileRepository(context: Context, name: String? =
                 "name NOT LIKE 'sqlite_%' AND name != 'android_metadata'", null).use {
                 if (it.moveToFirst()) throw UnsupportedProfileSchema()
             }
-            ClinicalProfileSchema.SCHEMA_V2.forEach(db::execSQL)
-            ClinicalProfileSchema.verify(db, ClinicalProfileSchema.V2)
+            ClinicalProfileSchema.SCHEMA_V3.forEach(db::execSQL)
+            ClinicalProfileSchema.verify(db, ClinicalProfileSchema.V3)
         }
 
         /**
-         * v1 -> v2 inside the helper's transaction (ADR 0014, section 8.4). Any exception rolls back: the file stays at
-         * v1 exactly as it was and the next start retries from the same state. No row is rewritten, repaired or deleted,
-         * and no confirmation is created.
+         * v1 or v2 -> v3 inside the helper's transaction (ADR 0014, section 8.4, and ADR 0025). Any exception rolls
+         * back: the file stays at its version exactly as it was and the next start retries from the same state. No row
+         * is rewritten, repaired or deleted, no confirmation is created and no limit is filled in: schema 1 versions
+         * keep their limits unknown. Versions are proven again with the v3 reader before committing.
          */
         override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
-            if (oldVersion != ClinicalProfileSchema.V1 || newVersion != ClinicalProfileSchema.V2) throw UnsupportedProfileSchema()
-            ClinicalProfileSchema.verify(db, ClinicalProfileSchema.V1)
+            if (newVersion != ClinicalProfileSchema.V3 || oldVersion !in ClinicalProfileSchema.V1..ClinicalProfileSchema.V2) {
+                throw UnsupportedProfileSchema()
+            }
+            ClinicalProfileSchema.verify(db, oldVersion)
             db.rawQuery("PRAGMA foreign_key_check", null).use { if (it.moveToFirst()) throw CorruptStorage() }
             db.rawQuery("PRAGMA quick_check", null).use {
                 if (!it.moveToFirst() || it.getString(0) != "ok" || it.moveToNext()) throw CorruptStorage()
             }
+            if (oldVersion == ClinicalProfileSchema.V1) ClinicalProfileSchema.V2_ADDITIONS.forEach(db::execSQL)
+            ClinicalProfileSchema.V3_ADDITIONS.forEach(db::execSQL)
+            ClinicalProfileSchema.verify(db, ClinicalProfileSchema.V3)
+            // Versions are proven with the v3 reader. Events are not touched here: a damaged event history keeps failing
+            // every read with its own stable reason, as it did before the migration.
             val versions = ClinicalProfileRows.readVersions(db)
             if (versions.isNotEmpty()) ProfileHistory.Loaded(versions.sortedByDescending { it.version })
-            ClinicalProfileSchema.V2_ADDITIONS.forEach(db::execSQL)
-            ClinicalProfileSchema.verify(db, ClinicalProfileSchema.V2)
         }
 
         override fun onDowngrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) { throw UnsupportedProfileSchema() }
 
-        /** Every opening compares definitions with the frozen v2 text; a mismatch closes the file untouched. */
-        override fun onOpen(db: SQLiteDatabase) { ClinicalProfileSchema.verify(db, ClinicalProfileSchema.V2) }
+        /** Every opening compares definitions with the frozen v3 text; a mismatch closes the file untouched. */
+        override fun onOpen(db: SQLiteDatabase) { ClinicalProfileSchema.verify(db, ClinicalProfileSchema.V3) }
     }
 
     override fun readVersions(): ProfileRead = when (val read = readRecord()) {
@@ -158,7 +164,7 @@ internal class SqliteClinicalProfileRepository(context: Context, name: String? =
 
     internal companion object {
         const val DATABASE_NAME = "clinical-profile.db"
-        const val SCHEMA_VERSION = ClinicalProfileSchema.V2
+        const val SCHEMA_VERSION = ClinicalProfileSchema.V3
     }
 }
 
