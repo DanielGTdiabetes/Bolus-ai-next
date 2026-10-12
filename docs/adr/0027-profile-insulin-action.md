@@ -136,11 +136,15 @@ revisión muestran la curva, la DIA y el pico, «Sin configurar» o «desconocid
   dependen del esquema actual (perfil nuevo en esquema 3 y primer esquema
   desconocido 4). El resto de reglas del ADR 0025 sigue igual.
 - `ClinicalProfileSchemaTextTest`: texto v4 congelado sin tocar v1 a v3.
-- Pruebas instrumentadas, pendientes de ejecutar en el Pixel:
+- Pruebas instrumentadas ejecutadas en el Pixel (A1–A3):
   `ClinicalProfileInsulinActionDeviceTest` (migraciones v1, v2 y v3 → v4 con
   confirmación, persistencia y reinicio, triggers, filas manipuladas) y
   `ClinicalProfileDeviceTest.insulinActionIsDeclaredOnceWithoutDefaultsAndOlderVersionsStayUnknown`.
-  Se actualizaron las existentes que esperaban v3.
+  Se actualizaron las existentes que esperaban v3. La verificación completa
+  de Windows pasó con 401 pruebas JVM y 181 instrumentadas, sin fallos.
+  La actualización real disponible fue sobre una base v2 vacía; A4 con un
+  perfil real v3 confirmado sigue pendiente. Evidencia y correcciones del
+  arnés en la [validación](../validation/profile-insulin-action-2026-10-12.md).
 
 ## Condiciones para revisar este ADR
 

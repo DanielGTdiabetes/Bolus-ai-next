@@ -2,7 +2,7 @@ Trabaja en E:\projects\Bolus-ai-next y continúa desde origin/main actualizado.
 
 ESTADO EN MAIN — 2026-10-12
 Existen y están integrados: recepción Dexcom por permiso con presentación en
-Inicio y Bolo (ADR 0023), motor candidato único (ahora `0.4.0-candidate`) con cálculo de
+Inicio y Bolo (ADR 0023), motor candidato único `0.3.0-candidate` con cálculo de
 prueba en Bolo y paridad exacta en 12 vectores de Legacy `bcac891` (ADR 0024) y
 límites del cálculo en el perfil versionado (ADR 0025). Ningún resultado es
 utilizable para tratamiento. La recepción real offline ya pasó en el Pixel antes
@@ -23,7 +23,7 @@ sin rellenar nada. Las versiones de esquema 1 los dejan desconocidos
 (`profile.<código>.not_in_schema`) y bloquean solo B2, D y E. Evidencia y
 comprobaciones P1, P6 y P7 del Pixel en docs/validation/profile-limits-2026-10-12.md.
 
-ENTREGA 2026-10-12 — IOB CANDIDATO EN EL MOTOR (ADR 0026)
+PR #60, AÚN SIN INTEGRAR — IOB CANDIDATO EN EL MOTOR (ADR 0026)
 `org.bolusai.engine.iob.CandidateIob` calcula el IOB desde un historial de dosis
 explícito con las curvas de Legacy `bcac891` y el bolo extendido. Paridad exacta
 en 19 vectores capturados con scripts/legacy-vectors/capture_iob_vectors.py.
@@ -34,11 +34,18 @@ IOB manual. Paridad de Walsh en iOS sin comprobar (exp de la plataforma).
 La ventana usa la duración efectiva de las tablas sin estirar (regresión del
 falso cero con DIA 4,99 h). verify.ps1 y la CI reproducen los vectores de Legacy.
 
-ENTREGA 2026-10-12 — ACCIÓN DE LA INSULINA EN EL PERFIL (ADR 0027)
+PR #60, AÚN SIN INTEGRAR — ACCIÓN DE LA INSULINA EN EL PERFIL (ADR 0027)
 DIA (h), curva y pico (min enteros) en el esquema de contenido 3, sin defaults
 ni rangos. `clinical-profile.db` v4 migra desde v1 a v3 sin rellenar nada. Las
 versiones anteriores la dejan desconocida. Aún no se traduce a `InsulinAction`.
-Pendiente en el Pixel: A1 a A4 de docs/validation/profile-insulin-action-2026-10-12.md.
+A1–A3 pasaron en el Pixel: `verify.ps1 -DeviceTests`, 401 pruebas JVM y 181
+instrumentadas, sin fallos, tras corregir dos pruebas en `ff6c2f0`.
+La base real era v2 vacía, no un perfil v3 confirmado: copia verificada y
+actualización v2 → v4 correctas, sin relleno ni cambios de filas. A4 con perfil
+real confirmado sigue pendiente. Receptor de Next restaurado a habilitado y
+permiso conservado; Legacy y Dexcom sin cambios. Evidencia y límites en
+docs/validation/profile-insulin-action-2026-10-12.md. Falta revisión explícita
+del propietario e integración de la PR #60; no presentarla como entregada.
 
 SIGUIENTE
 - Teléfono: cálculo con perfil real confirmado (P6) y actualización sobre un

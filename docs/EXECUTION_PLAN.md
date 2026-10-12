@@ -811,7 +811,10 @@ confirmables con el resto de la versión. `clinical-profile.db` v4
 (`profile_insulin_curve`) migra desde v1, v2 y v3 sin rellenar nada. Las
 versiones anteriores dejan la acción desconocida. Aún no se traduce a
 `InsulinAction`: Bolo sigue con IOB manual hasta que exista el historial.
-Comprobaciones del Pixel A1 a A4 en la
+Pruebas del Pixel A1–A3 superadas (401 JVM y 181 instrumentadas en la
+verificación completa). La base real era v2 vacía: actualización a v4
+verificada sin relleno; A4 con perfil real v3 confirmado sigue pendiente.
+Evidencia y límites en la
 [validación](validation/profile-insulin-action-2026-10-12.md).
 
 ### Secuencia de capacidades
