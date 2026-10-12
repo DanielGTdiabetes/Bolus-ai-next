@@ -130,13 +130,24 @@ public object CandidateIob {
             if (history.coveredFromEpochMs > history.coveredUntilEpochMs) causes += "iob.history.coverage_invalid"
             if (history.coveredUntilEpochMs < now) causes += "iob.history.not_current"
             if (durationMs != null && durationMs > 0L) {
-                requiredFrom = now - durationMs - history.maxExtendedMinutes * MS_PER_MINUTE
-                if (history.coveredFromEpochMs > requiredFrom) causes += "iob.history.insufficient_window"
+                // Both terms are non-negative and far below Long.MAX_VALUE; only the subtraction from now can wrap.
+                val lookback = durationMs + history.maxExtendedMinutes * MS_PER_MINUTE
+                if (now < Long.MIN_VALUE + lookback) {
+                    // The window start is not representable: never let it wrap into a later instant.
+                    causes += "iob.request.instant_out_of_range"
+                } else {
+                    requiredFrom = now - lookback
+                    if (history.coveredFromEpochMs > requiredFrom) causes += "iob.history.insufficient_window"
+                }
             }
             val ids = HashSet<String>()
             for (dose in history.doses) {
                 if (!ids.add(dose.id)) causes += "iob.history.duplicate_identity"
                 if (dose.administeredAtEpochMs > now) causes += "iob.history.future_dose"
+                // The elapsed time now - administeredAt must not wrap either.
+                if (dose.administeredAtEpochMs < 0 && now > Long.MAX_VALUE + dose.administeredAtEpochMs) {
+                    causes += "iob.request.instant_out_of_range"
+                }
                 if (dose.administeredAtEpochMs < history.coveredFromEpochMs ||
                     dose.administeredAtEpochMs > history.coveredUntilEpochMs
                 ) causes += "iob.history.dose_outside_coverage"

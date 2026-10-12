@@ -180,6 +180,26 @@ class CandidateIobTest {
     }
 
     @Test
+    fun anInstantWhoseWindowCannotBeRepresentedBlocksInsteadOfWrapping() {
+        // Regression (review of fed1837): near Long.MIN_VALUE the window start wrapped to a large positive instant, so an
+        // empty history with no prior coverage gave a known 0 U.
+        val start = Long.MIN_VALUE
+        val result = calculate(Input.Provided(action()),
+            Input.Provided(DoseHistory("next-local-history:v1", start, start, 0, emptyList())), now = start)
+        assertEquals(listOf("iob.request.instant_out_of_range"), causes(result))
+        // The first instant whose whole window fits still computes.
+        val first = Long.MIN_VALUE + 4 * HOUR
+        val fits = calculate(Input.Provided(action()),
+            Input.Provided(DoseHistory("next-local-history:v1", Long.MIN_VALUE, first, 0, emptyList())), now = first)
+        assertEquals(Long.MIN_VALUE, (fits.outcome as IobOutcome.Computed).requiredCoverageFromEpochMs)
+        // A dose so old that its elapsed time would wrap blocks too.
+        val ancient = InsulinDose("a", Long.MIN_VALUE, Quantity("1"), 0)
+        val wrapped = calculate(Input.Provided(action()),
+            Input.Provided(DoseHistory("next-local-history:v1", Long.MIN_VALUE, NOW, 0, listOf(ancient))))
+        assertEquals(listOf("iob.request.instant_out_of_range"), causes(wrapped))
+    }
+
+    @Test
     fun anomalousDosesBlock() {
         val a = Input.Provided(action())
         assertEquals(listOf("iob.history.duplicate_identity"),

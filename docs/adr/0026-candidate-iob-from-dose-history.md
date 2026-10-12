@@ -115,6 +115,10 @@ El cálculo del IOB no cambia y la paridad con Legacy se mantiene. La regresión
 motor anterior (`a4daa93`), que devolvía `Computed(units=0.0)`, y pasa con la
 corrección.
 
+Un instante de cálculo cuya ventana no cabe en un `Long`, o una dosis cuyo
+tiempo transcurrido desbordaría, bloquea con `iob.request.instant_out_of_range`
+en lugar de dar la vuelta y producir un falso `0 U` (revisión de `fed1837`).
+
 Una dosis fuera del intervalo declarado (`iob.history.dose_outside_coverage`) o
 más larga que la duración extendida declarada
 (`iob.history.extended_beyond_declared_maximum`) también bloquea. Un perfil sin
@@ -176,9 +180,9 @@ golden vectors clínicos.
 
 ## Seguridad y pruebas
 
-- `CandidateIobTest` (15 pruebas): paridad exacta con los 19 vectores; ventana
+- `CandidateIobTest` (16 pruebas): paridad exacta con los 19 vectores; ventana
   con la duración efectiva de las tablas sin estirar y nunca menor que la DIA
-  (§3.1, regresión); resultado
+  (§3.1, regresión); instantes cuya aritmética desbordaría; resultado
   no utilizable; lista vacía como único cero; historial ausente, acción ausente,
   sin confirmar, pico ausente y DIA cero; pico no positivo, al final y Walsh
   incompatible; aviso de pico ignorado; ventana exacta, insuficiente y ampliada
