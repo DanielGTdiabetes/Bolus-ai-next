@@ -899,7 +899,9 @@ class ClinicalProfileConfirmationUiDeviceTest {
                 val all = texts(activity.findViewById(R.id.screen_content))
                 assertEquals("Perfil · no se usa para calcular", activity.getString(R.string.profile_absent))
                 assertTrue(all.contains(activity.getString(R.string.profile_absent)))
-                assertFalse(all.any { it.contains("confirmad", ignoreCase = true) })
+                // ADR 0025 shows confirmation in the separate, non-actionable trial calculation limits.
+                assertNotNull(activity.findViewById<View>(R.id.screen_content)
+                    .findViewWithTag<View>("test_calc:limits"))
                 assertFalse(descendants(activity.findViewById(R.id.screen_content))
                     .any { (it.tag as? String)?.startsWith("profile:") == true })
                 assertFalse(view(activity, "blocked:calculate").isEnabled)

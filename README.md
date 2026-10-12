@@ -223,10 +223,10 @@ técnica en el [ADR 0023](docs/adr/0023-dexcom-existing-transport-trust.md)
 desde el 2026-10-12. La entrega del 2026-10-12 implementa esa política: receiver protegido por el
 permiso, conjunto exacto con anclas I-2b, bloqueo durable, registro v2 con
 procedencia y última lectura en Inicio y Bolo, con antigüedad desde la recepción,
-hora de medida no verificada y vigencia sin política. Mientras la prueba I-3 del
-Pixel no demuestre la visibilidad, la recepción real queda cerrada como
-`visibility_unproven`. Véase la
-[validación](docs/validation/dexcom-permission-reception-and-test-calculation-2026-10-12.md).
+hora de medida no verificada y vigencia sin política. I-3 demostró en el Pixel
+que hace falta `QUERY_ALL_PACKAGES`, ya declarado. La recepción real se probó
+sin Internet antes y después de reiniciar; B1 sigue sin aprobarse. Véase la
+[validación actual](docs/validation/pixel-dexcom-and-calculation-2026-10-12.md).
 
 El motor único `shared/bolus-engine` incluye un conjunto candidato trazado al
 núcleo backend de Legacy (`bcac891`), con paridad exacta en 12 vectores

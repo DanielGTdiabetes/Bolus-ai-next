@@ -1,11 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
     <!--
         ADR 0023 I-6: requested so the producer discovers Next as a holder. During validation it is granted with
-        `adb shell pm grant`; a button arrives when the milestone closes. QUERY_ALL_PACKAGES is not requested until the
-        Pixel test of I-3 shows it is needed; meanwhile the gate stays closed as visibility_unproven.
+        `adb shell pm grant`; a button arrives when the milestone closes. Pixel I-3 on 2026-10-12 proved that without
+        QUERY_ALL_PACKAGES Next cannot see Legacy and the watch, although both hold the permission.
     -->
     <uses-permission android:name="com.dexcom.cgm.EXTERNAL_PERMISSION" />
+    <!-- ADR 0023 I-3: exact known-package queries cannot detect an unexpected permission holder. Pixel evidence:
+         docs/validation/pixel-dexcom-and-calculation-2026-10-12.md. This exception applies to this permission only. -->
+    <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES"
+        tools:ignore="QueryAllPackagesPermission" />
     <application
         android:allowBackup="false"
         android:dataExtractionRules="@xml/data_extraction_rules"
@@ -25,9 +30,10 @@
             </intent-filter>
         </activity>
         <!--
-            ADR 0022 R1 and ADR 0023 I-7: disabled by default; only `adb shell pm enable` turns it on until the real
-            validation is approved. ADR 0023, part I, point 1: Android delivers only from senders holding the Dexcom
-            permission. That proves membership of the holders, not the sender: the permission gate compares the
+            ADR 0022 R1 and ADR 0023 I-7: disabled by default; `adb shell run-as org.bolusai.next pm enable`
+            turns it on during validation on the Pixel, whose Android build rejects shell-UID component changes.
+            ADR 0023, part I, point 1: Android checks the Dexcom permission for senders in another UID.
+            That proves membership of the holders, not the sender: the permission gate compares the
             holders with the approved set before any extra is read.
         -->
         <receiver

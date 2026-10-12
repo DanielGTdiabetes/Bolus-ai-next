@@ -164,9 +164,9 @@ class SqliteDexcomObservationStoreDeviceTest {
         SQLiteDatabase.openDatabase(context.getDatabasePath(name).path, null, SQLiteDatabase.OPEN_READWRITE).use { db ->
             db.execSQL("INSERT INTO dexcom_messages (message_id, received_at_ms, outcome, contract, rejection_code, " +
                 "new_readings, duplicate_readings, conflicting_readings, collapsed_in_message, unknown_top_level, " +
-                "unknown_reading, unreportable_unknown, sender_package, sender_version_code, sender_signers_sha256) " +
+                "unknown_reading, unreportable_unknown, sender_package, sender_version_code, sender_signers_sha256, provenance) " +
                 "VALUES ('raw', 1, 'payload_rejected', " +
-                "'modified-dexcom-g7-broadcast-observed-v1', 'dexcom_g7.payload.invented', 0, 0, 0, 0, '', '', 0, 'example.sender', 42, '" + "a".repeat(64) + "')")
+                "'modified-dexcom-g7-broadcast-observed-v1', 'dexcom_g7.payload.invented', 0, 0, 0, 0, '', '', 0, 'example.sender', 42, '" + "a".repeat(64) + "', 'authenticated_sender')")
         }
         store().use { s ->
             assertEquals(ObservationRead.Failed(ObservationFailure.CORRUPT_STORAGE), s.read())

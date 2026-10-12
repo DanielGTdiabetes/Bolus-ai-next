@@ -68,8 +68,8 @@ internal class AndroidHolderSnapshotSource(private val context: Context) : () ->
 
     /**
      * Package visibility filtering exists from Android 11. There, only `QUERY_ALL_PACKAGES` proves that no holder is
-     * hidden from Next (ADR 0023, I-3). The manifest does not request it until the Pixel test shows it is needed, so
-     * the gate stays closed as `visibility_unproven` until then.
+     * hidden from Next (ADR 0023, I-3). The Pixel test on 2026-10-12 showed that Legacy and the watch were hidden
+     * without it, so the manifest now requests it. Missing coverage still closes the gate as `visibility_unproven`.
      */
     private fun fullVisibility(): Boolean = Build.VERSION.SDK_INT < 30 ||
         context.checkSelfPermission(Manifest.permission.QUERY_ALL_PACKAGES) == PackageManager.PERMISSION_GRANTED

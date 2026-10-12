@@ -311,7 +311,7 @@ class SqliteClinicalProfileRepositoryDeviceTest {
         forged({ it.execSQL("UPDATE profile_segments SET end_minute = 600 WHERE parameter = 'carb_ratio'") }, ProfileFailure.INVALID_RECORD)
         forged({ it.execSQL("UPDATE profile_versions SET content_sha256 = '${"0".repeat(64)}'") }, ProfileFailure.INVALID_RECORD)
         // A content schema this build does not know is not guessed.
-        forged({ it.execSQL("UPDATE profile_versions SET schema_version = 2") }, ProfileFailure.UNSUPPORTED_SCHEMA)
+        forged({ it.execSQL("UPDATE profile_versions SET schema_version = ${ProfileCatalog.CURRENT_SCHEMA + 1}") }, ProfileFailure.UNSUPPORTED_SCHEMA)
     }
 
     @Test fun saveRefusesToAppendToAnUnprovableHistory() {

@@ -48,9 +48,9 @@ try {
     }
     # ADR 0022 R1 and ADR 0023: the only receiver is the Dexcom one, declared disabled and exported, guarded by the
     # producer's permission (ADR 0023, part I, point 1), with a single intent filter holding only the observed action.
-    # Next requests that permission and nothing else of Dexcom (I-6), and never QUERY_ALL_PACKAGES until the Pixel test
-    # of I-3 shows it is needed: the com.dexcom. values of the merged manifest are exactly action, receiver permission
-    # and the requested permission.
+    # Next requests that permission and nothing else of Dexcom (I-6). Pixel I-3 on 2026-10-12 demonstrated that
+    # QUERY_ALL_PACKAGES is necessary: without it Legacy and the watch were hidden. The com.dexcom. values stay
+    # exactly action, receiver permission and requested permission.
     foreach ($manifest in @($mergedManifest, $releaseManifest)) {
         [xml]$manifestXml = Get-Content -Raw -LiteralPath $manifest
         $androidNs = "http://schemas.android.com/apk/res/android"
@@ -72,9 +72,9 @@ try {
                 $filterChildren[0].GetAttribute("name", $androidNs) -cne "com.dexcom.cgm.EXTERNAL_BROADCAST" -or
                 $dexcomRequests.Count -ne 1 -or
                 $dexcomRequests[0].GetAttribute("name", $androidNs) -cne "com.dexcom.cgm.EXTERNAL_PERMISSION" -or
-                $queryAll.Count -ne 0 -or
+                $queryAll.Count -ne 1 -or
                 $dexcomValues.Count -ne 3) {
-            throw "The only receiver must be the disabled Dexcom receiver for the observed action, guarded by the Dexcom permission that Next requests, without QUERY_ALL_PACKAGES (ADR 0022, ADR 0023): $manifest"
+            throw "The only receiver must be the disabled Dexcom receiver for the observed action, guarded by the requested Dexcom permission, with QUERY_ALL_PACKAGES justified by Pixel I-3 (ADR 0023): $manifest"
         }
     }
     foreach ($manifest in @($mergedManifest, $releaseManifest)) {
@@ -162,7 +162,8 @@ try {
         "android\app\src\main\java\org\bolusai\next\application\TestCalculation.kt",
         "android\app\src\test\java\org\bolusai\next\glucose\dexcom\DexcomPermissionGateTest.kt",
         "android\app\src\test\java\org\bolusai\next\DexcomReadingBlockTest.kt",
-        "android\app\src\test\java\org\bolusai\next\TestCalculationTest.kt"
+        "android\app\src\test\java\org\bolusai\next\TestCalculationTest.kt",
+        "android\app\src\androidTest\java\org\bolusai\next\TestCalculationDeviceTest.kt"
     ) | ForEach-Object { Join-Path $repositoryRoot $_ }
     $dexcomParserConsumers = @(Get-ChildItem -LiteralPath (Join-Path $repositoryRoot "android"), (Join-Path $repositoryRoot "shared") -Recurse -File |
         Where-Object { $_.FullName -notmatch '\\build\\' -and -not $_.FullName.StartsWith($dexcomParserRoot + [IO.Path]::DirectorySeparatorChar) } |
@@ -471,9 +472,13 @@ jobs:
                 if ($LASTEXITCODE -ne 0) { throw "Synthetic test APK installation failed" }
                 $installedTestPackages.Add($testApk.Package)
             }
+            # Wake the display without dismissing the keyguard or changing device settings. The test activity uses
+            # its own show-when-locked/keep-screen-on window; a dozing Pixel otherwise skips the screenshot frames.
+            adb shell input keyevent KEYCODE_WAKEUP
+            if ($LASTEXITCODE -ne 0) { throw "Could not wake the display for UI instrumentation" }
             # Direct instrumentation avoids collecting unrelated device logcat or clinical data.
             $instrumentation = @(adb shell am instrument -w -r `
-                -e class org.bolusai.next.glucose.dexcom.AndroidDexcomSenderEvidenceTest,org.bolusai.next.NavigationDeviceTest,org.bolusai.next.MealDraftDeviceTest,org.bolusai.next.MealHistoryDeviceTest,org.bolusai.next.MealRestoreDeviceTest,org.bolusai.next.meals.SqliteMealRepositoryDeviceTest,org.bolusai.next.DarkThemeDeviceTest,org.bolusai.next.profile.SqliteClinicalProfileRepositoryDeviceTest,org.bolusai.next.profile.ClinicalProfileConfirmationDeviceTest,org.bolusai.next.profile.ClinicalProfileLimitsDeviceTest,org.bolusai.next.ClinicalProfileDeviceTest,org.bolusai.next.ClinicalProfileConfirmationUiDeviceTest,org.bolusai.next.ClinicalProfileUnavailabilityDeviceTest,org.bolusai.next.BolusProfileDetailsDeviceTest,org.bolusai.next.ProfileStorageGuardDeviceTest,org.bolusai.next.glucose.dexcom.DexcomBundleExtrasDeviceTest,org.bolusai.next.glucose.dexcom.storage.SqliteDexcomObservationStoreDeviceTest,org.bolusai.next.DexcomLogDiagnosticsDeviceTest,org.bolusai.next.glucose.dexcom.storage.DexcomLogIsolationDeviceTest,org.bolusai.next.glucose.dexcom.DexcomG7ReceiverDeviceTest `
+                -e class org.bolusai.next.glucose.dexcom.AndroidDexcomSenderEvidenceTest,org.bolusai.next.NavigationDeviceTest,org.bolusai.next.MealDraftDeviceTest,org.bolusai.next.MealHistoryDeviceTest,org.bolusai.next.MealRestoreDeviceTest,org.bolusai.next.meals.SqliteMealRepositoryDeviceTest,org.bolusai.next.DarkThemeDeviceTest,org.bolusai.next.TestCalculationDeviceTest,org.bolusai.next.profile.SqliteClinicalProfileRepositoryDeviceTest,org.bolusai.next.profile.ClinicalProfileConfirmationDeviceTest,org.bolusai.next.profile.ClinicalProfileLimitsDeviceTest,org.bolusai.next.ClinicalProfileDeviceTest,org.bolusai.next.ClinicalProfileConfirmationUiDeviceTest,org.bolusai.next.ClinicalProfileUnavailabilityDeviceTest,org.bolusai.next.BolusProfileDetailsDeviceTest,org.bolusai.next.ProfileStorageGuardDeviceTest,org.bolusai.next.glucose.dexcom.DexcomBundleExtrasDeviceTest,org.bolusai.next.glucose.dexcom.storage.SqliteDexcomObservationStoreDeviceTest,org.bolusai.next.DexcomLogDiagnosticsDeviceTest,org.bolusai.next.glucose.dexcom.storage.DexcomLogIsolationDeviceTest,org.bolusai.next.glucose.dexcom.DexcomG7ReceiverDeviceTest `
                 "$testPackage/$isolationRunner")
             $instrumentationExit = $LASTEXITCODE
             $instrumentation | Write-Output

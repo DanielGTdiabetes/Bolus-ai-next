@@ -15,6 +15,7 @@ import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.core.graphics.createBitmap
+import androidx.core.view.isNotEmpty
 import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
@@ -71,15 +72,22 @@ class NavigationDeviceTest {
         val drawn = CountDownLatch(1)
         var pendingRoot: View? = null
         var pendingListener: ViewTreeObserver.OnPreDrawListener? = null
+        var unstableControls = emptyList<String>()
+        var drawnFrames = 0
         scenario.onActivity { activity ->
             activity.findViewById<View>(R.id.app_shell).apply {
                 val root = this
                 var stableFrames = 0
                 val listener = object : ViewTreeObserver.OnPreDrawListener {
                     override fun onPreDraw(): Boolean {
-                        val ready = views(root).filter { it.isShown }.all {
-                            it.isLaidOut && !it.isLayoutRequested && it.width > 0 && it.height > 0
+                        drawnFrames++
+                        // The test result container intentionally has no children or height before a calculation.
+                        // Empty structural containers are not visible controls; all actual controls still need layout.
+                        val unstable = views(root).filter { it.isShown && (it !is ViewGroup || it.isNotEmpty()) }.filter {
+                            !it.isLaidOut || it.isLayoutRequested || it.width <= 0 || it.height <= 0
                         }
+                        unstableControls = unstable.map { "${it.javaClass.simpleName}:${it.tag}:${it.width}x${it.height}:requested=${it.isLayoutRequested}" }
+                        val ready = unstable.isEmpty()
                         stableFrames = if (ready) stableFrames + 1 else 0
                         if (stableFrames >= 2) {
                             viewTreeObserver.removeOnPreDrawListener(this)
@@ -99,7 +107,9 @@ class NavigationDeviceTest {
         }
         val completed = drawn.await(5, TimeUnit.SECONDS)
         scenario.onActivity { pendingRoot?.viewTreeObserver?.removeOnPreDrawListener(pendingListener) }
-        assertTrue("Next did not finish laying out and drawing its visible controls", completed)
+        val root = pendingRoot
+        assertTrue("Next did not finish laying out and drawing its visible controls: frames=$drawnFrames, " +
+            "attached=${root?.isAttachedToWindow}, shown=${root?.isShown}, display=${root?.display?.state}, $unstableControls", completed)
         instrumentation.waitForIdleSync()
     }
 

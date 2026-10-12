@@ -12,7 +12,9 @@
   teléfono, de Dexcom ni de Legacy
 - Implementación: pasos 1 a 6 del plan en la entrega del 2026-10-12
   ([validación](../validation/dexcom-permission-reception-and-test-calculation-2026-10-12.md)).
-  El paso 7 (validación real), la prueba I-3 y B1 siguen pendientes
+  I-3 y recepción real offline antes y después de reiniciar ejecutadas en el
+  [Pixel](../validation/pixel-dexcom-and-calculation-2026-10-12.md).
+  B1 tiene evidencia preliminar y sigue pendiente de aprobación del informe
 
 Este ADR unifica dos borradores del 2026-10-11: la evaluación de recepción por
 permiso de la PR #55 y la propuesta de presentación de la rama
@@ -369,11 +371,12 @@ Presentación:
 
 L1 está hecho y L2, I-1 a I-8, B1 a B5, C1 a C7 y D2 están aprobados con las
 opciones y condiciones del registro del 2026-10-12. D1 ya estaba decidida.
-No quedan esas preguntas pendientes del propietario. Quedan implementación,
-prueba de visibilidad I-3, validación real y aprobación del informe B1; sin
-esta última, la hora de medida sigue no verificada. Tampoco está aprobado un
-umbral de vigencia ni el uso para calcular. Hasta implementar la entrega, el
-receiver sigue desactivado y la política en `Pending`.
+No quedan esas preguntas pendientes del propietario. Implementación, I-3 y
+recepción real offline antes y después de reiniciar constan en la
+[validación del Pixel](../validation/pixel-dexcom-and-calculation-2026-10-12.md).
+Queda aprobar el informe B1; hasta entonces la hora de medida sigue no
+verificada. No hay umbral clínico de vigencia ni autoridad de tratamiento.
+El cálculo de prueba tiene su autorización separada (ADR 0024).
 
 ## Estado de implementación — 2026-10-12
 
@@ -382,8 +385,8 @@ técnicas, sin nuevas decisiones clínicas:
 
 - La visibilidad se comprueba antes que el conjunto. Sin `QUERY_ALL_PACKAGES` en
   Android 11 o posterior, la puerta se cierra como `visibility_unproven`, que no
-  es durable. El permiso no se declara hasta que la prueba I-3 en el Pixel
-  demuestre que es necesario. Mientras tanto no se registran mensajes reales.
+  es durable. I-3 demostró en el Pixel que sin él se ocultaban Legacy y reloj;
+  ahora se declara y la puerta abre con los cuatro titulares aprobados.
 - `dexcom-observations.db` pasa a v2. Solo se migra un v1 exacto y vacío; un v1
   con filas queda intacto como `unsupported_schema`. Los bloqueos durables viven
   en una tabla append-only y se aplican por versión de política. Solo una
