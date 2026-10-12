@@ -12,10 +12,7 @@
     <string name="test_calc_glucose_dexcom">Usar la última lectura Dexcom mostrada</string>
     <string name="test_calc_glucose">Glucosa (mg/dL)</string>
     <string name="test_calc_iob">IOB manual (U). Vacío = desconocido, nunca 0</string>
-    <string name="test_calc_limits">Parámetros de prueba, no guardados en el perfil</string>
-    <string name="test_calc_round_step">Paso de redondeo (U)</string>
-    <string name="test_calc_max_bolus">Bolo máximo (U)</string>
-    <string name="test_calc_max_correction">Corrección máxima (U)</string>
+    <string name="test_calc_limits">Límites del perfil (se editan y confirman en Perfil)</string>
     <string name="test_calc_run">Calcular prueba</string>
     <string name="test_calc_invalidated">Los datos cambiaron: el resultado anterior se ha descartado</string>
     <string name="test_calc_total">Total de prueba: %1$s U</string>

@@ -12,6 +12,9 @@ import android.widget.TextView
 import androidx.lifecycle.ViewModel
 import org.bolusai.engine.candidate.CandidateResult
 import org.bolusai.engine.candidate.CandidateStep
+import org.bolusai.engine.candidate.Input
+import org.bolusai.engine.candidate.ProfileSnapshot
+import org.bolusai.engine.candidate.Quantity
 import org.bolusai.engine.candidate.StepOutcome
 import org.bolusai.engine.candidate.Warnings
 import org.bolusai.next.R
@@ -84,8 +87,7 @@ internal object TestCalculationText {
         Warnings.MEASUREMENT_TIME_UNVERIFIED to "Hora de medida de la glucosa no verificada",
         Warnings.DEXCOM_NOT_ATTRIBUTED to "Glucosa recibida del conjunto aprobado, no atribuida a Dexcom",
         Warnings.MANUAL_IOB to "IOB introducido a mano, sin verificar",
-        Warnings.TEST_PARAMETERS to "Límites introducidos para esta prueba, no guardados en el perfil",
-        Warnings.MAX_BOLUS_LIMITED to "Total limitado por el bolo máximo de prueba",
+        Warnings.MAX_BOLUS_LIMITED to "Total limitado por el bolo máximo del perfil",
         Warnings.BELOW_HYPO_STOP to "Glucosa por debajo de la parada de Legacy (70 mg/dL)",
     )
 
@@ -96,6 +98,27 @@ internal object TestCalculationText {
     /** Display only: the engine value with at most three decimals, half-even, Spanish comma. Not a clinical rounding. */
     fun units(value: Double): String =
         BigDecimal(value).setScale(3, RoundingMode.HALF_EVEN).stripTrailingZeros().toPlainString().replace('.', ',')
+
+    /**
+     * Read-only lines with the limits of the profile version used, so the user sees where they come from. They are
+     * edited only in the profile; an unconfirmed version is shown but the engine blocks the steps that need it.
+     */
+    fun limits(profile: Input<ProfileSnapshot>): String = when (profile) {
+        is Input.Unavailable -> "Límites del perfil no disponibles (${profile.cause})"
+        is Input.Provided -> {
+            val snapshot = profile.value
+            fun line(name: String, value: Input<Quantity>) = "$name: " + when (value) {
+                is Input.Provided -> "${value.value.text.replace('.', ',')} U"
+                is Input.Unavailable -> "desconocido (${value.cause})"
+            }
+            listOf(
+                "Perfil v${snapshot.version}" + if (snapshot.dataConfirmed) " confirmado" else " sin confirmar (profile.unconfirmed)",
+                line("Paso de redondeo", snapshot.roundStep),
+                line("Bolo máximo", snapshot.maxBolus),
+                line("Corrección máxima", snapshot.maxCorrection),
+            ).joinToString("\n")
+        }
+    }
 
     fun outcome(outcome: StepOutcome): String = when (outcome) {
         is StepOutcome.Computed -> units(outcome.units)
@@ -109,6 +132,8 @@ internal class TestCalculationScreen(
     private val content: LinearLayout,
     private val model: TestCalculationModel,
     private val dexcomShowsValue: Boolean,
+    /** The profile version the calculation will use, as the engine receives it; only its limits are shown. */
+    private val profile: Input<ProfileSnapshot>,
     private val mealAvailable: Boolean,
     private val now: () -> Long,
     private val calculate: () -> Unit,
@@ -195,11 +220,7 @@ internal class TestCalculationScreen(
         }
         field(R.string.test_calc_iob, "test_calc:iob", form.iobUnits, result) { model.form.copy(iobUnits = it) }
         label(content, context.getString(R.string.test_calc_limits), bold = true)
-        field(R.string.test_calc_round_step, "test_calc:round_step", form.roundStep, result) { model.form.copy(roundStep = it) }
-        field(R.string.test_calc_max_bolus, "test_calc:max_bolus", form.maxBolus, result) { model.form.copy(maxBolus = it) }
-        field(R.string.test_calc_max_correction, "test_calc:max_correction", form.maxCorrection, result) {
-            model.form.copy(maxCorrection = it)
-        }
+        label(content, TestCalculationText.limits(profile), "test_calc:limits", 13f)
         Button(context).apply {
             setText(R.string.test_calc_run)
             tag = "test_calc:run"

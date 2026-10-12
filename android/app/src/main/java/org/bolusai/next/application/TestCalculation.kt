@@ -23,7 +23,9 @@ import org.bolusai.profile.DecimalInput
 import org.bolusai.profile.DecimalInputs
 import org.bolusai.profile.GlucoseUnit
 import org.bolusai.profile.ParameterSchedule
+import org.bolusai.profile.ProfileContent
 import org.bolusai.profile.ProfileGateState
+import org.bolusai.profile.ProfileLimit
 import org.bolusai.profile.ProfileParameter
 import org.bolusai.profile.ProfileValue
 import org.bolusai.profile.Setting
@@ -32,7 +34,11 @@ import java.time.DateTimeException
 import java.time.Instant
 import java.time.ZoneId
 
-/** External inputs a result depends on; equality decides whether a stored result is still current. */
+/**
+ * External inputs a result depends on; equality decides whether a stored result is still current. The profile
+ * snapshot carries version, fingerprint, confirmation and the limits of that version, so a new version, a revocation
+ * or another limit discards the result.
+ */
 internal data class TestCalculationDependencies(
     val profile: Input<ProfileSnapshot>,
     /** Null when the form does not take carbohydrates from the meal selection. */
@@ -56,14 +62,12 @@ internal data class TestCalculationForm(
     /** When the manual glucose text was last edited; part of the input, never replaced by the calculation time. */
     val glucoseEnteredAtEpochMs: Long? = null,
     val iobUnits: String = "",
-    val roundStep: String = "",
-    val maxBolus: String = "",
-    val maxCorrection: String = "",
 )
 
 /**
  * Builds the explicit engine request of a test calculation (ADR 0024) from the local profile, the meal selection, the
- * latest Dexcom presentation and the form. It only translates: every absent or invalid input becomes
+ * latest Dexcom presentation and the form. Rounding step and both maximums come from the profile version used
+ * (ADR 0025); they are never typed per calculation. It only translates: every absent or invalid input becomes
  * [Input.Unavailable] with a stable cause, and the engine blocks what depends on it. Nothing here calculates.
  */
 internal object TestCalculation {
@@ -86,9 +90,6 @@ internal object TestCalculation {
             GlucoseChoice.DEXCOM -> dexcomGlucose(dexcom)
         },
         iob = quantity(form.iobUnits, "iob.manual", absent = "iob.unknown").map { IobValue(it) },
-        roundStep = quantity(form.roundStep, "limits.round_step"),
-        maxBolus = quantity(form.maxBolus, "limits.max_bolus"),
-        maxCorrection = quantity(form.maxCorrection, "limits.max_correction"),
     )
 
     fun calculate(request: CandidateRequest): CandidateResult = CandidateEngine.calculate(request)
@@ -143,6 +144,9 @@ internal object TestCalculation {
                 carbRatio = segments(content.schedule(ProfileParameter.CARB_RATIO)),
                 sensitivity = segments(content.schedule(ProfileParameter.INSULIN_SENSITIVITY)),
                 target = segments(content.schedule(ProfileParameter.GLUCOSE_TARGET)),
+                roundStep = limit(content, ProfileLimit.ROUND_STEP),
+                maxBolus = limit(content, ProfileLimit.MAX_BOLUS),
+                maxCorrection = limit(content, ProfileLimit.MAX_CORRECTION),
             ))
         }
     }
@@ -189,6 +193,13 @@ internal object TestCalculation {
         null -> Input.Unavailable("meal.selection.read_pending")
         MealSelection.Missing -> Input.Unavailable("meal.selection.missing")
         is MealSelection.Failed -> Input.Unavailable("meal.selection.unreadable")
+    }
+
+    /** A schema 1 version has no limits: unknown, never filled in from another version or a default. */
+    private fun limit(content: ProfileContent, limit: ProfileLimit): Input<Quantity> = when (val value = content.limit(limit)) {
+        null -> Input.Unavailable("profile.${limit.code}.not_in_schema")
+        ProfileValue.NotConfigured -> Input.Unavailable("profile.${limit.code}.not_configured")
+        is ProfileValue.Entered -> Input.Provided(Quantity(value.decimal.text))
     }
 
     private fun segments(schedule: ParameterSchedule): List<SegmentValue> = schedule.segments.map {

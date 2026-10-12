@@ -83,6 +83,8 @@ object ProfileRules {
             ProfileOrigin.SYSTEM_PROPOSAL_ACCEPTED -> return ProfileFailure.ORIGIN_NOT_ENABLED
         }
         val start = source ?: previous
+        // A manual edit never drops the limits of a newer schema by going back to an older one.
+        if (start != null && content.schemaVersion < start.content.schemaVersion) return ProfileFailure.SCHEMA_DOWNGRADE
         val startUnit = start?.content?.glucoseUnit
         if (startUnit is Setting.Declared && content.glucoseUnit != startUnit && content.hasGlucoseDependentValues) {
             return ProfileFailure.UNIT_CHANGE_WITH_VALUES

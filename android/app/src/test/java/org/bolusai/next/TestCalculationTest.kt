@@ -32,6 +32,7 @@ import org.bolusai.profile.ProfileCatalog
 import org.bolusai.profile.ProfileCodec
 import org.bolusai.profile.ProfileContent
 import org.bolusai.profile.ProfileGateState
+import org.bolusai.profile.ProfileLimit
 import org.bolusai.profile.ProfileOrigin
 import org.bolusai.profile.ProfileParameter
 import org.bolusai.profile.ProfileRecord
@@ -47,19 +48,24 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** ADR 0024: the test calculation only translates explicit inputs; synthetic profile and readings only. */
+/** ADR 0024 and ADR 0025: the test calculation only translates explicit inputs; synthetic profile and readings only. */
 class TestCalculationTest {
     /** 2026-10-12T08:30:00Z is 10:30 in Europe/Madrid (CEST). */
     private val at = 1_791_793_800_000L
 
-    private fun content(unit: GlucoseUnit = GlucoseUnit.MG_DL, zone: String? = "Europe/Madrid") = ProfileContent(
-        ProfileCatalog.CURRENT_SCHEMA, Setting.Declared(unit),
+    private fun value(text: String?) = if (text == null) ProfileValue.NotConfigured else ProfileValue.Entered(CanonicalDecimal(text))
+
+    private fun content(unit: GlucoseUnit = GlucoseUnit.MG_DL, zone: String? = "Europe/Madrid", schema: Int = 2,
+                        roundStep: String? = "0.1", maxBolus: String? = "15", maxCorrection: String? = "5") = ProfileContent(
+        schema, Setting.Declared(unit),
         if (zone == null) Setting.NotConfigured else Setting.Declared(ProfileTimeZone(zone)),
         listOf(
             ParameterSchedule.allDay(ProfileParameter.CARB_RATIO, ProfileValue.Entered(CanonicalDecimal("10"))),
             ParameterSchedule.allDay(ProfileParameter.INSULIN_SENSITIVITY, ProfileValue.Entered(CanonicalDecimal("40"))),
             ParameterSchedule.allDay(ProfileParameter.GLUCOSE_TARGET, ProfileValue.Entered(CanonicalDecimal("110"))),
         ),
+        if (schema == 1) emptyMap() else mapOf(ProfileLimit.ROUND_STEP to value(roundStep),
+            ProfileLimit.MAX_BOLUS to value(maxBolus), ProfileLimit.MAX_CORRECTION to value(maxCorrection)),
     )
 
     private fun state(confirmed: Boolean = true, content: ProfileContent = content()): ProfileGateState {
@@ -72,7 +78,7 @@ class TestCalculationTest {
     }
 
     private val form = TestCalculationForm(carbs = "60", glucoseMgDl = "190", glucoseEnteredAtEpochMs = at - 60_000,
-        iobUnits = "0", roundStep = "0,1", maxBolus = "15", maxCorrection = "5")
+        iobUnits = "0")
 
     private fun reading(value: Int = 190) = LatestReadingPresentation.Reading(value, at - 120_000, 120_000,
         ApprovedPermissionSet("adr0023-i2b-2026-10-12", "c".repeat(64)), "ab12cd34", "SYNTHETIC_TREND")
@@ -104,7 +110,53 @@ class TestCalculationTest {
         assertEquals(Input.Unavailable("meal.carbs.invalid"), request.carbs)
         assertEquals(Input.Unavailable("glucose.manual.missing"), request.glucose)
         assertEquals(Input.Unavailable("iob.unknown"), request.iob)
-        assertEquals(Input.Unavailable("limits.round_step.missing"), request.roundStep)
+    }
+
+    @Test fun limitsComeFromTheProfileVersionWithoutBeingTypedAgain() {
+        val snapshot = (TestCalculation.request(at, state(), null, null, form).profile as Input.Provided).value
+        assertEquals("0.1", (snapshot.roundStep as Input.Provided).value.text)
+        assertEquals("15", (snapshot.maxBolus as Input.Provided).value.text)
+        assertEquals("5", (snapshot.maxCorrection as Input.Provided).value.text)
+        // Two calculations with the same form reuse the stored limits.
+        val again = TestCalculation.calculate(TestCalculation.request(at + 1, state(), null, null, form))
+        assertEquals(8.0, (again.total as StepOutcome.Computed).units, 0.0)
+    }
+
+    @Test fun aSchemaOneVersionKeepsItsLimitsUnknownAndBlocksOnlyWhatNeedsThem() {
+        val old = state(content = content(schema = 1))
+        val snapshot = (TestCalculation.profile(old) as Input.Provided).value
+        assertEquals(Input.Unavailable("profile.round_step.not_in_schema"), snapshot.roundStep)
+        assertEquals(Input.Unavailable("profile.max_bolus.not_in_schema"), snapshot.maxBolus)
+        assertEquals(Input.Unavailable("profile.max_correction.not_in_schema"), snapshot.maxCorrection)
+        val result = TestCalculation.calculate(TestCalculation.request(at, old, null, null, form))
+        assertEquals(6.0, (result.step(CandidateStep.MEAL) as StepOutcome.Computed).units, 0.0)
+        assertEquals(2.0, (result.step(CandidateStep.CORRECTION) as StepOutcome.Computed).units, 0.0)
+        assertEquals(listOf("profile.max_correction.not_in_schema"),
+            (result.step(CandidateStep.CORRECTION_LIMIT) as StepOutcome.Blocked).causes)
+        assertTrue(result.total is StepOutcome.Blocked)
+    }
+
+    @Test fun anUnconfiguredLimitBlocksOnlyItsOwnStep() {
+        val result = TestCalculation.calculate(TestCalculation.request(at, state(content = content(maxBolus = null)),
+            null, null, form))
+        assertEquals(8.0, (result.step(CandidateStep.ROUNDING) as StepOutcome.Computed).units, 0.0)
+        assertEquals(listOf("profile.max_bolus.not_configured"),
+            (result.step(CandidateStep.MAX_BOLUS) as StepOutcome.Blocked).causes)
+        val zeroStep = TestCalculation.calculate(TestCalculation.request(at, state(content = content(roundStep = "0")),
+            null, null, form))
+        assertEquals(listOf("round_step.not_positive"), (zeroStep.step(CandidateStep.ROUNDING) as StepOutcome.Blocked).causes)
+    }
+
+    @Test fun limitsAreReadOnlyHereAndShowTheirOrigin() {
+        assertEquals("Perfil v1 confirmado\nPaso de redondeo: 0,1 U\nBolo máximo: 15 U\nCorrección máxima: 5 U",
+            TestCalculationText.limits(TestCalculation.profile(state())))
+        assertEquals("Perfil v1 sin confirmar (profile.unconfirmed)\n" +
+            "Paso de redondeo: desconocido (profile.round_step.not_in_schema)\n" +
+            "Bolo máximo: desconocido (profile.max_bolus.not_in_schema)\n" +
+            "Corrección máxima: desconocido (profile.max_correction.not_in_schema)",
+            TestCalculationText.limits(TestCalculation.profile(state(confirmed = false, content = content(schema = 1)))))
+        assertEquals("Límites del perfil no disponibles (profile.missing)",
+            TestCalculationText.limits(Input.Unavailable("profile.missing")))
     }
 
     @Test fun dexcomGlucoseIsUsedOnlyWhenTheNumberIsShownAndKeepsItsLimitations() {
@@ -178,6 +230,25 @@ class TestCalculationTest {
             TestCalculation.dependencies(state(), null, reading(), dexcomForm))
         model.invalidateIfChanged(TestCalculation.dependencies(state(confirmed = false), null, reading(), dexcomForm))
         assertNull(model.result)
+    }
+
+    @Test fun anotherLimitInTheProfileDiscardsTheResultAndChangesTheFingerprint() {
+        val model = TestCalculationModel()
+        model.update(form)
+        val base = TestCalculation.calculate(TestCalculation.request(at, state(), null, null, form))
+        model.store(base, at, TestCalculation.dependencies(state(), null, null, form))
+        model.invalidateIfChanged(TestCalculation.dependencies(state(), null, null, form))
+        assertTrue(model.result != null)
+        listOf(content(roundStep = "0.5"), content(maxBolus = "14"), content(maxCorrection = null), content(schema = 1))
+            .forEach { changed ->
+                val other = state(content = changed)
+                assertTrue(base.inputFingerprintSha256 != TestCalculation.calculate(
+                    TestCalculation.request(at, other, null, null, form)).inputFingerprintSha256)
+                model.store(base, at, TestCalculation.dependencies(state(), null, null, form))
+                model.invalidateIfChanged(TestCalculation.dependencies(other, null, null, form))
+                assertNull(model.result)
+                assertTrue(model.invalidated)
+            }
     }
 
     @Test fun changingTheFormDiscardsTheResult() {

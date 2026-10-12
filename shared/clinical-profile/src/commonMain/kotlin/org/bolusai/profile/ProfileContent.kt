@@ -43,14 +43,43 @@ enum class ProfileParameter(val code: String, val glucoseDependent: Boolean) {
     }
 }
 
-/** Content schema catalogs. A new parameter is a new content schema, never a change to schema 1. */
+/**
+ * Profile-wide insulin limits of content schema 2 (ADR 0025). Legacy keeps them as single values in
+ * `UserSettings` (`round_step_u`, `max_bolus_u`, `max_correction_u`), not per time segment, so they are not schedules.
+ * They are always in insulin units and never depend on the glucose unit. No range is checked here.
+ */
+enum class ProfileLimit(val code: String) {
+    ROUND_STEP("round_step"), MAX_BOLUS("max_bolus"), MAX_CORRECTION("max_correction");
+
+    val unitLabel: String get() = "U"
+
+    companion object {
+        fun fromCode(code: String): ProfileLimit? = entries.firstOrNull { it.code == code }
+    }
+}
+
+/**
+ * Content schema catalogs. A new parameter or limit is a new content schema, never a change to an earlier one:
+ * schema 1 has no limits, so a schema 1 version keeps them unknown forever and is never filled in.
+ */
 object ProfileCatalog {
-    const val CURRENT_SCHEMA = 1
+    const val CURRENT_SCHEMA = 2
     const val MINUTES_PER_DAY = 1440
     private val schema1 = listOf(ProfileParameter.CARB_RATIO, ProfileParameter.INSULIN_SENSITIVITY,
         ProfileParameter.GLUCOSE_TARGET)
+    private val limits2 = listOf(ProfileLimit.ROUND_STEP, ProfileLimit.MAX_BOLUS, ProfileLimit.MAX_CORRECTION)
 
-    fun parameters(schemaVersion: Int): List<ProfileParameter>? = if (schemaVersion == 1) schema1 else null
+    fun parameters(schemaVersion: Int): List<ProfileParameter>? = if (schemaVersion in 1..2) schema1 else null
+
+    fun limits(schemaVersion: Int): List<ProfileLimit>? = when (schemaVersion) {
+        1 -> emptyList()
+        2 -> limits2
+        else -> null
+    }
+
+    /** Every limit of [schemaVersion] explicitly not configured; empty for a schema without limits. */
+    fun unconfiguredLimits(schemaVersion: Int): Map<ProfileLimit, ProfileValue> =
+        limits(schemaVersion).orEmpty().associateWith { ProfileValue.NotConfigured }
 }
 
 sealed interface ProfileValue {
@@ -80,6 +109,7 @@ data class ParameterSchedule(val parameter: ProfileParameter, val segments: List
 /**
  * Content of one profile version. Construction enforces the structural invariants of ADR 0012:
  * catalog complete and ordered, full-day contiguous segments, and no unit-dependent value without a unit.
+ * [limits] holds exactly the limits of the schema (none in schema 1); the default marks them not configured.
  * No clinical range is checked.
  */
 data class ProfileContent(
@@ -87,13 +117,35 @@ data class ProfileContent(
     val glucoseUnit: Setting<GlucoseUnit>,
     val timeZone: Setting<ProfileTimeZone>,
     val schedules: List<ParameterSchedule>,
+    val limits: Map<ProfileLimit, ProfileValue> = ProfileCatalog.unconfiguredLimits(schemaVersion),
 ) {
     init {
         val problem = problem(schemaVersion, glucoseUnit, schedules)
         require(problem == null) { problem?.code ?: "" }
+        require(limits.keys == ProfileCatalog.limits(schemaVersion).orEmpty().toSet()) {
+            ProfileFailure.INVALID_PARAMETERS.code
+        }
     }
 
     fun schedule(parameter: ProfileParameter): ParameterSchedule = schedules.first { it.parameter == parameter }
+
+    /** The stored value of [limit]; null when this version's schema has no such field, so it is unknown. */
+    fun limit(limit: ProfileLimit): ProfileValue? = limits[limit]
+
+    /**
+     * Sets one limit. A schema 1 content becomes schema 2 only when a value is entered: its other limits start not
+     * configured, nothing is copied from elsewhere. Clearing a limit of a schema 1 content changes nothing.
+     */
+    fun withLimit(limit: ProfileLimit, value: ProfileValue): ProfileContent = when {
+        limit in limits -> copy(limits = limits + (limit to value))
+        value is ProfileValue.NotConfigured -> this
+        else -> {
+            val schema = ProfileCatalog.CURRENT_SCHEMA
+            require(limit in ProfileCatalog.limits(schema).orEmpty())
+            ProfileContent(schema, glucoseUnit, timeZone, schedules,
+                ProfileCatalog.unconfiguredLimits(schema) + (limit to value))
+        }
+    }
 
     val hasGlucoseDependentValues: Boolean
         get() = schedules.any { it.parameter.glucoseDependent && it.hasEnteredValue }

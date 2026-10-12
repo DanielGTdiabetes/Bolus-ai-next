@@ -15,7 +15,7 @@ import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 
 /**
- * ADR 0014 on SQLite: schema v2, migration v1 -> v2 verified by definition, prior-copy tests and append-only,
+ * ADR 0014 on SQLite, now at schema v3 (ADR 0025): migration v1 -> v3 verified by definition, prior-copy tests and append-only,
  * idempotent confirmation events. Synthetic, isolated database files only; the app's clinical-profile.db is never
  * opened, nothing touches the network and calculation stays blocked in every state.
  */
@@ -125,12 +125,12 @@ class ClinicalProfileConfirmationDeviceTest {
             v1File(migrated)
             SqliteClinicalProfileRepository(context, migrated).use { assertEquals(VersionlessEmpty, it.readRecord().shape()) }
             assertEquals(schema(created), schema(migrated))
-            assertEquals(2, userVersion(created))
-            assertEquals(2, userVersion(migrated))
-            listOf(created, migrated).forEach { name -> raw(name) { ClinicalProfileSchema.verify(it, ClinicalProfileSchema.V2) } }
-            // The stored definitions are byte-for-byte the frozen v2 text.
+            assertEquals(3, userVersion(created))
+            assertEquals(3, userVersion(migrated))
+            listOf(created, migrated).forEach { name -> raw(name) { ClinicalProfileSchema.verify(it, ClinicalProfileSchema.V3) } }
+            // The stored definitions are byte-for-byte the frozen v3 text.
             val sql = schema(created).map { it.substringAfterLast("|") }
-            ClinicalProfileSchema.SCHEMA_V2.forEach { assertTrue(it, it in sql) }
+            ClinicalProfileSchema.SCHEMA_V3.forEach { assertTrue(it, it in sql) }
         }
     }
 
@@ -148,7 +148,7 @@ class ClinicalProfileConfirmationDeviceTest {
             assertTrue(state.canConfirm)
         }
         assertEquals(before, rows(name))
-        assertEquals(2, userVersion(name))
+        assertEquals(3, userVersion(name))
         // Fingerprints are unchanged: re-deriving them from the stored content gives the stored values.
         versions.forEach { assertEquals(ProfileCodec.sha256(it.content), it.contentSha256) }
     }
@@ -159,7 +159,7 @@ class ClinicalProfileConfirmationDeviceTest {
             val versions = v1File(name, history)
             path(name).copyTo(path(copy))
             SqliteClinicalProfileRepository(context, name).use { assertEquals(ProfileRead.Loaded(versions), it.readVersions()) }
-            assertEquals(2, userVersion(name))
+            assertEquals(3, userVersion(name))
             assertEquals(ProfileRead.Loaded(versions), FrozenV1ProfileReader.read(path(copy).path))
             assertEquals(1, userVersion(copy))
             // The migrated original is not a v1 file any more and the frozen v1 reader refuses it.
@@ -242,7 +242,7 @@ class ClinicalProfileConfirmationDeviceTest {
         altered { db -> ClinicalProfileSchema.V2_ADDITIONS.forEach(db::execSQL) }
     }
 
-    @Test fun alteredV2DefinitionsAreRejectedOnOpenAndFutureVersionsAreUnsupported() {
+    @Test fun alteredV3DefinitionsAreRejectedOnOpenAndFutureVersionsAreUnsupported() {
         fun altered(change: (SQLiteDatabase) -> Unit) = withDatabase { name ->
             SqliteClinicalProfileRepository(context, name).use { it.readRecord() }
             raw(name, change)
@@ -260,7 +260,13 @@ class ClinicalProfileConfirmationDeviceTest {
         }
         altered { it.execSQL("DROP INDEX profile_confirmation_one_revocation") }
         altered { it.execSQL("CREATE INDEX extra_index ON profile_confirmation_events(kind)") }
-        altered { it.version = 3 }
+        altered {
+            it.execSQL("DROP TRIGGER profile_limits_immutable_update")
+            it.execSQL("CREATE TRIGGER profile_limits_immutable_update BEFORE UPDATE ON profile_limits BEGIN SELECT 1; END")
+        }
+        altered { it.execSQL("DROP TRIGGER profile_limits_latest_only") }
+        altered { it.version = 4 }
+        altered { it.version = 2 }
         altered { it.version = 1 }
     }
 

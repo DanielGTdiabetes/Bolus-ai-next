@@ -55,7 +55,7 @@ internal class ClinicalProfileModel(
 
     var editor: ProfileEditor? = null
         private set
-    /** Raw text per field key ("time_zone" or [valueKey]). Invalid text never reaches the editor content. */
+    /** Raw text per field key ("time_zone", [valueKey] or [limitKey]). Invalid text never reaches the editor content. */
     private val inputs = mutableMapOf<String, String>()
     private val errors = mutableMapOf<String, ProfileFailure>()
 
@@ -226,6 +226,8 @@ internal class ClinicalProfileModel(
         next.content.schedules.forEach { schedule ->
             schedule.segments.forEach { inputs[valueKey(schedule.parameter, SegmentRef.of(it))] = canonicalText(it.value) }
         }
+        // A schema 1 version has no limits: its fields start empty and stay unknown unless the user types a value.
+        ProfileLimit.entries.forEach { inputs[limitKey(it)] = canonicalText(next.content.limit(it) ?: ProfileValue.NotConfigured) }
         failure = null
         lastSaved = null
         historyOpen = false
@@ -404,6 +406,14 @@ internal class ClinicalProfileModel(
             when (val zone = useCases.parseTimeZone(text)) {
                 is TimeZoneInput.Invalid -> errors[key] = zone.reason
                 is TimeZoneInput.Valid -> editor = current.copy(content = current.content.withTimeZone(zone.zone))
+            }
+            return
+        }
+        parseLimitKey(key)?.let { limit ->
+            when (val parsed = DecimalInputs.parse(text)) {
+                DecimalInput.Blank -> editor = current.withLimit(limit, ProfileValue.NotConfigured)
+                is DecimalInput.Valid -> editor = current.withLimit(limit, ProfileValue.Entered(parsed.value))
+                is DecimalInput.Invalid -> errors[key] = parsed.reason
             }
             return
         }
@@ -793,7 +803,7 @@ internal class ClinicalProfileModel(
         val saved = bundle.getBundle("inputs") ?: Bundle()
         val keys = listOf(TIME_ZONE) + content!!.schedules.flatMap { schedule ->
             schedule.segments.map { valueKey(schedule.parameter, SegmentRef.of(it)) }
-        }
+        } + ProfileLimit.entries.map { limitKey(it) }
         if (saved.keySet().any { it !in keys }) editFailure = ProfileFailure.STALE_SEGMENT
         // A missing key shows the stored value; it never turns into "not configured".
         keys.forEach { key -> inputs[key] = saved.getString(key) ?: canonicalFor(content, key) }
@@ -816,6 +826,7 @@ internal class ClinicalProfileModel(
     }
 
     private fun canonicalFor(content: ProfileContent, key: String): String {
+        parseLimitKey(key)?.let { return canonicalText(content.limit(it) ?: ProfileValue.NotConfigured) }
         val (parameter, segment) = parseKey(key) ?: return (content.timeZone as? Setting.Declared)?.value?.id.orEmpty()
         return content.schedule(parameter).segments.firstOrNull { SegmentRef.of(it) == segment }?.let { canonicalText(it.value) }.orEmpty()
     }
@@ -881,6 +892,12 @@ internal class ClinicalProfileModel(
 
         /** Field key `parameter@start-end` (ADR 0013, section 10). */
         fun valueKey(parameter: ProfileParameter, segment: SegmentRef) = "${parameter.code}@${segment.key}"
+
+        /** Field key `limit:<code>` of a profile-wide limit (ADR 0025). */
+        fun limitKey(limit: ProfileLimit) = "limit:${limit.code}"
+
+        fun parseLimitKey(key: String): ProfileLimit? =
+            key.takeIf { it.startsWith("limit:") }?.let { ProfileLimit.fromCode(it.removePrefix("limit:")) }
 
         fun canonicalText(value: ProfileValue): String = (value as? ProfileValue.Entered)?.decimal?.text.orEmpty()
 

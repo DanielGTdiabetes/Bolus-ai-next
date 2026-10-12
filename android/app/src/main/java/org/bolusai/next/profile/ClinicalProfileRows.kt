@@ -9,8 +9,9 @@ import org.bolusai.profile.*
 internal class UnsupportedProfileSchema : RuntimeException()
 
 /**
- * Strict row codec of `clinical-profile.db`, shared by the adapter, the migration and the frozen-v1 test reader.
- * Any unexpected storage type, unknown code or impossible value throws; nothing is coerced or defaulted.
+ * Strict row codec of `clinical-profile.db` v3, shared by the adapter and the migration. Any unexpected storage type,
+ * unknown code or impossible value throws; nothing is coerced or defaulted. Limit rows exist only for content schemas
+ * that define limits (ADR 0025): a schema 1 version with a limit row, or a schema 2 version missing one, is corrupt.
  */
 internal object ClinicalProfileRows {
     fun insertVersion(db: SQLiteDatabase, version: ProfileVersion) {
@@ -46,6 +47,16 @@ internal object ClinicalProfileRows {
                 })
             }
         }
+        content.limits.forEach { (limit, value) ->
+            db.insertOrThrow("profile_limits", null, ContentValues().apply {
+                put("version", version.version)
+                put("limit_code", limit.code)
+                when (value) {
+                    ProfileValue.NotConfigured -> putNull("value")
+                    is ProfileValue.Entered -> put("value", value.decimal.text)
+                }
+            })
+        }
     }
 
     fun insertEvent(db: SQLiteDatabase, event: ConfirmationEvent) {
@@ -70,6 +81,8 @@ internal object ClinicalProfileRows {
 
     private class SegmentRow(val parameter: String, val start: Int, val end: Int, val value: String?)
 
+    private class LimitRow(val code: String, val value: String?)
+
     /** Every version, decoded and individually validated; chain rules are validated by the shared domain. */
     fun readVersions(db: SQLiteDatabase): List<ProfileVersion> {
         val rows = db.rawQuery("SELECT * FROM profile_versions ORDER BY version", null).use { cursor ->
@@ -80,9 +93,14 @@ internal object ClinicalProfileRows {
             null).use { cursor ->
             buildList { while (cursor.moveToNext()) add(cursor.getLong(0) to segmentRow(cursor)) }
         }.groupBy({ it.first }, { it.second })
-        // Orphan segments (no version row) are corruption, never ignored.
+        val limits = db.rawQuery("SELECT version, limit_code, value FROM profile_limits ORDER BY version, limit_code",
+            null).use { cursor ->
+            buildList { while (cursor.moveToNext()) add(cursor.getLong(0) to limitRow(cursor)) }
+        }.groupBy({ it.first }, { it.second })
+        // Orphan segments or limits (no version row) are corruption, never ignored.
         require(segments.keys.all { number -> rows.any { it.version == number } })
-        return rows.map { decode(it, segments[it.version].orEmpty()) }
+        require(limits.keys.all { number -> rows.any { it.version == number } })
+        return rows.map { decode(it, segments[it.version].orEmpty(), limits[it.version].orEmpty()) }
     }
 
     fun readVersion(db: SQLiteDatabase, number: Long): ProfileVersion? {
@@ -92,7 +110,9 @@ internal object ClinicalProfileRows {
         val segments = db.rawQuery(
             "SELECT version, parameter, start_minute, end_minute, value FROM profile_segments WHERE version = ? ORDER BY parameter, start_minute",
             arrayOf(number.toString())).use { cursor -> buildList { while (cursor.moveToNext()) add(segmentRow(cursor)) } }
-        return decode(row, segments)
+        val limits = db.rawQuery("SELECT version, limit_code, value FROM profile_limits WHERE version = ? ORDER BY limit_code",
+            arrayOf(number.toString())).use { cursor -> buildList { while (cursor.moveToNext()) add(limitRow(cursor)) } }
+        return decode(row, segments, limits)
     }
 
     /** Every confirmation event, in seq order, each well formed; history rules are validated by the shared domain. */
@@ -152,8 +172,20 @@ internal object ClinicalProfileRows {
             if (cursor.isNull(4)) null else cursor.getString(4))
     }
 
-    private fun decode(row: Row, segments: List<SegmentRow>): ProfileVersion {
+    private fun limitRow(cursor: Cursor): LimitRow {
+        require(cursor.getType(1) == Cursor.FIELD_TYPE_STRING &&
+            cursor.getType(2) in listOf(Cursor.FIELD_TYPE_NULL, Cursor.FIELD_TYPE_STRING))
+        return LimitRow(cursor.getString(1), if (cursor.isNull(2)) null else cursor.getString(2))
+    }
+
+    private fun decode(row: Row, segments: List<SegmentRow>, limitRows: List<LimitRow>): ProfileVersion {
         val catalog = ProfileCatalog.parameters(row.schemaVersion) ?: throw UnsupportedProfileSchema()
+        val limitCatalog = ProfileCatalog.limits(row.schemaVersion) ?: throw UnsupportedProfileSchema()
+        val limits = limitRows.associate { limit ->
+            requireNotNull(ProfileLimit.fromCode(limit.code)) to
+                (limit.value?.let { ProfileValue.Entered(CanonicalDecimal(it)) } ?: ProfileValue.NotConfigured)
+        }
+        require(limits.size == limitRows.size && limits.keys == limitCatalog.toSet())
         val unit: Setting<GlucoseUnit> = row.unit?.let { Setting.Declared(requireNotNull(GlucoseUnit.fromCode(it))) }
             ?: Setting.NotConfigured
         val zone: Setting<ProfileTimeZone> = row.zone?.let { Setting.Declared(ProfileTimeZone(it)) } ?: Setting.NotConfigured
@@ -164,7 +196,7 @@ internal object ClinicalProfileRows {
                 TimeSegment(it.start, it.end, it.value?.let { text -> ProfileValue.Entered(CanonicalDecimal(text)) }
                     ?: ProfileValue.NotConfigured)
             })
-        })
+        }, limits)
         val origin = requireNotNull(ProfileOrigin.fromCode(row.origin))
         // ProfileVersion re-derives the fingerprint from the decoded content and rejects any mismatch.
         return ProfileVersion(row.version, content, row.sha, origin, row.restoredFrom, row.createdAt, row.writer)

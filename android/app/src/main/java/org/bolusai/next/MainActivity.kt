@@ -277,13 +277,15 @@ class MainActivity : ComponentActivity() {
 
     /**
      * ADR 0024: the test calculation reads the profile state already loaded for Bolo, the meal selection and the
-     * reading shown on screen, and runs the single engine. Nothing is recorded, confirmed or sent.
+     * reading shown on screen, and runs the single engine. Nothing is recorded, confirmed or sent. ADR 0025: the limits
+     * shown and used are those of the same profile version.
      */
     private fun renderTestCalculation() {
         testCalculation.invalidateIfChanged(
             TestCalculation.dependencies(profile.gate, meals.selection, dexcomReading.state, testCalculation.form))
         TestCalculationScreen(this, findViewById(R.id.screen_content), testCalculation,
-            dexcomReading.state is LatestReadingPresentation.Reading, meals.selection is org.bolusai.meals.MealSelection.Reviewed,
+            dexcomReading.state is LatestReadingPresentation.Reading, TestCalculation.profile(profile.gate),
+            meals.selection is org.bolusai.meals.MealSelection.Reviewed,
             now = clock,
             calculate = {
                 val now = clock()

@@ -116,6 +116,18 @@ data class ProfileEditor(
     }
 
     /**
+     * Sets one profile-wide limit (ADR 0025). When the session started from a schema 1 version and every limit ends up
+     * not configured again, the content goes back to that schema, so an edit that adds nothing never creates a version
+     * that only differs by schema.
+     */
+    fun withLimit(limit: ProfileLimit, value: ProfileValue): ProfileEditor {
+        val next = content.withLimit(limit, value)
+        val back = start.schemaVersion < next.schemaVersion && next.limits.values.all { it == ProfileValue.NotConfigured }
+        return copy(content = if (back) ProfileContent(start.schemaVersion, next.glucoseUnit, next.timeZone, next.schedules)
+            else next)
+    }
+
+    /**
      * Editor-only indicator (ADR 0013, §8): the segment's interval does not exist in [start] for the same parameter, or
      * exists with another value. Derived from [start] and [content]; never stored, fingerprinted or used for origin.
      */
