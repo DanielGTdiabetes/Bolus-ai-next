@@ -6,8 +6,8 @@ import kotlin.test.assertFalse
 
 class EngineIdentityTest {
     @Test
-    fun scaffoldDeclaresThatClinicalRulesAreNotImplemented(): Unit {
+    fun engineDeclaresThatNoClinicalRuleIsApproved(): Unit {
         assertEquals("bolus-engine", EngineIdentity.ARTIFACT_NAME)
-        assertFalse(EngineIdentity.IMPLEMENTS_CLINICAL_RULES)
+        assertFalse(EngineIdentity.IMPLEMENTS_APPROVED_CLINICAL_RULES)
     }
 }
