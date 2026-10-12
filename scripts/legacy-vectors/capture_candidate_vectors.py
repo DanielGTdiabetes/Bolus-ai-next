@@ -41,10 +41,10 @@ def load_core(checkout):
     sys.modules["app.models.bolus_v2"] = stub_v2
     sys.modules["app.models.settings"] = stub_settings
     dtos = types.ModuleType("app.dtos.math_models")
-    exec(compile(open(f"{checkout}/backend/app/dtos/math_models.py").read(), "math_models.py", "exec"), dtos.__dict__)
+    exec(compile(open(f"{checkout}/backend/app/dtos/math_models.py", encoding="utf-8").read(), "math_models.py", "exec"), dtos.__dict__)
     sys.modules["app.dtos.math_models"] = dtos
     engine = types.ModuleType("app.services.bolus_engine")
-    exec(compile(open(f"{checkout}/backend/app/services/bolus_engine.py").read(), "bolus_engine.py", "exec"),
+    exec(compile(open(f"{checkout}/backend/app/services/bolus_engine.py", encoding="utf-8").read(), "bolus_engine.py", "exec"),
          engine.__dict__)
     return engine._calculate_core, dtos.CalculationInput
 
@@ -55,6 +55,8 @@ def kotlin_double(value):
 
 
 def main():
+    # Legacy sources are UTF-8 and the generated file is UTF-8 with LF, whatever the platform locale (Windows CI).
+    sys.stdout.reconfigure(encoding="utf-8", newline="\n")
     checkout, expected_sha = sys.argv[1], sys.argv[2]
     sha = subprocess.check_output(["git", "-C", checkout, "rev-parse", "HEAD"], text=True).strip()
     if sha != expected_sha:

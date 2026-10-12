@@ -3,7 +3,9 @@ package org.bolusai.profile
 /**
  * Canonical text of [ProfileContent] (ADR 0012, section 4.5). Metadata is excluded, so equal content yields the
  * same fingerprint. Limits (schema 2, ADR 0025) and parameters are ordered by code and segments by start minute;
- * "~" marks not configured. A schema 1 content has no limit lines, so its text and fingerprint never change.
+ * "~" marks not configured. A schema 1 content has no limit lines, so its text and fingerprint never change. Schema 3
+ * (ADR 0027) adds the insulin action fields as limit lines and one `insulin_curve` line; schema 1 and 2 texts and
+ * fingerprints never change.
  */
 object ProfileCodec {
     private const val HEADER = "bolus-ai-next/clinical-profile/content"
@@ -24,6 +26,12 @@ object ProfileCodec {
             append("limit=").append(limit.code).append(':').append(when (value) {
                 ProfileValue.NotConfigured -> MISSING
                 is ProfileValue.Entered -> value.decimal.text
+            }).append('\n')
+        }
+        content.insulinCurve?.let { curve ->
+            append("insulin_curve=").append(when (curve) {
+                Setting.NotConfigured -> MISSING
+                is Setting.Declared -> curve.value.code
             }).append('\n')
         }
         content.schedules.sortedBy { it.parameter.code }.forEach { schedule ->
@@ -65,6 +73,10 @@ object ProfileCodec {
                 else ProfileValue.Entered(CanonicalDecimal(value))) == null)
         }
         require(limits.keys == limitCatalog.toSet())
+        val curve: Setting<InsulinCurveCode>? = if (!ProfileCatalog.hasInsulinCurve(schema)) null else {
+            val code = field("insulin_curve")
+            if (code == MISSING) Setting.NotConfigured else Setting.Declared(requireNotNull(InsulinCurveCode.fromCode(code)))
+        }
         val schedules = mutableMapOf<ProfileParameter, ParameterSchedule>()
         while (index < lines.size - 1) {
             val parameter = requireNotNull(ProfileParameter.fromCode(field("parameter")))
@@ -78,7 +90,7 @@ object ProfileCodec {
             }
             require(schedules.put(parameter, ParameterSchedule(parameter, segments)) == null)
         }
-        val content = ProfileContent(schema, unit, zone, catalog.map { requireNotNull(schedules[it]) }, limits)
+        val content = ProfileContent(schema, unit, zone, catalog.map { requireNotNull(schedules[it]) }, limits, curve)
         content.takeIf { encode(it) == text }
     } catch (_: IllegalArgumentException) {
         null

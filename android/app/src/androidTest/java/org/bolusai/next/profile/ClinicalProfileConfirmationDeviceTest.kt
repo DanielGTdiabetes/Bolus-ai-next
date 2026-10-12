@@ -95,7 +95,9 @@ class ClinicalProfileConfirmationDeviceTest {
             val tables = db.rawQuery("SELECT name FROM sqlite_master WHERE type = 'table' AND name LIKE 'profile_%' ORDER BY name",
                 null).use { c -> buildList { while (c.moveToNext()) add(c.getString(0)) } }
             tables.forEach { table ->
-                db.rawQuery("SELECT * FROM $table ORDER BY 1, 2, 3", null).use { c ->
+                val columnCount = db.rawQuery("SELECT * FROM $table LIMIT 0", null).use { it.columnCount }
+                val ordering = (1..columnCount).joinToString(", ")
+                db.rawQuery("SELECT * FROM $table ORDER BY $ordering", null).use { c ->
                     while (c.moveToNext()) add(table + ":" + (0 until c.columnCount).joinToString("|") {
                         if (c.isNull(it)) "NULL" else "${c.getType(it)}:${c.getString(it)}"
                     })
@@ -125,12 +127,12 @@ class ClinicalProfileConfirmationDeviceTest {
             v1File(migrated)
             SqliteClinicalProfileRepository(context, migrated).use { assertEquals(VersionlessEmpty, it.readRecord().shape()) }
             assertEquals(schema(created), schema(migrated))
-            assertEquals(3, userVersion(created))
-            assertEquals(3, userVersion(migrated))
-            listOf(created, migrated).forEach { name -> raw(name) { ClinicalProfileSchema.verify(it, ClinicalProfileSchema.V3) } }
-            // The stored definitions are byte-for-byte the frozen v3 text.
+            assertEquals(ClinicalProfileSchema.V4, userVersion(created))
+            assertEquals(ClinicalProfileSchema.V4, userVersion(migrated))
+            listOf(created, migrated).forEach { name -> raw(name) { ClinicalProfileSchema.verify(it, ClinicalProfileSchema.V4) } }
+            // The stored definitions are byte-for-byte the frozen v4 text.
             val sql = schema(created).map { it.substringAfterLast("|") }
-            ClinicalProfileSchema.SCHEMA_V3.forEach { assertTrue(it, it in sql) }
+            ClinicalProfileSchema.SCHEMA_V4.forEach { assertTrue(it, it in sql) }
         }
     }
 
@@ -148,7 +150,7 @@ class ClinicalProfileConfirmationDeviceTest {
             assertTrue(state.canConfirm)
         }
         assertEquals(before, rows(name))
-        assertEquals(3, userVersion(name))
+        assertEquals(ClinicalProfileSchema.V4, userVersion(name))
         // Fingerprints are unchanged: re-deriving them from the stored content gives the stored values.
         versions.forEach { assertEquals(ProfileCodec.sha256(it.content), it.contentSha256) }
     }
@@ -159,7 +161,7 @@ class ClinicalProfileConfirmationDeviceTest {
             val versions = v1File(name, history)
             path(name).copyTo(path(copy))
             SqliteClinicalProfileRepository(context, name).use { assertEquals(ProfileRead.Loaded(versions), it.readVersions()) }
-            assertEquals(3, userVersion(name))
+            assertEquals(ClinicalProfileSchema.V4, userVersion(name))
             assertEquals(ProfileRead.Loaded(versions), FrozenV1ProfileReader.read(path(copy).path))
             assertEquals(1, userVersion(copy))
             // The migrated original is not a v1 file any more and the frozen v1 reader refuses it.
@@ -242,7 +244,7 @@ class ClinicalProfileConfirmationDeviceTest {
         altered { db -> ClinicalProfileSchema.V2_ADDITIONS.forEach(db::execSQL) }
     }
 
-    @Test fun alteredV3DefinitionsAreRejectedOnOpenAndFutureVersionsAreUnsupported() {
+    @Test fun alteredV4DefinitionsAreRejectedOnOpenAndFutureVersionsAreUnsupported() {
         fun altered(change: (SQLiteDatabase) -> Unit) = withDatabase { name ->
             SqliteClinicalProfileRepository(context, name).use { it.readRecord() }
             raw(name, change)
@@ -265,7 +267,13 @@ class ClinicalProfileConfirmationDeviceTest {
             it.execSQL("CREATE TRIGGER profile_limits_immutable_update BEFORE UPDATE ON profile_limits BEGIN SELECT 1; END")
         }
         altered { it.execSQL("DROP TRIGGER profile_limits_latest_only") }
-        altered { it.version = 4 }
+        altered {
+            it.execSQL("DROP TRIGGER profile_insulin_curve_immutable_delete")
+            it.execSQL("CREATE TRIGGER profile_insulin_curve_immutable_delete BEFORE DELETE ON profile_insulin_curve BEGIN SELECT 1; END")
+        }
+        altered { it.execSQL("DROP TRIGGER profile_insulin_curve_latest_only") }
+        altered { it.version = ClinicalProfileSchema.V4 + 1 }
+        altered { it.version = 3 }
         altered { it.version = 2 }
         altered { it.version = 1 }
     }

@@ -6,10 +6,11 @@ package org.bolusai.engine
  * Since 2026-10-12 the engine contains candidate rules observed in Legacy (ADR 0024), implemented under the owner's
  * development and testing authorization (AGENTS.md §3). None of them is clinically approved: every result is a test
  * result that cannot be used for treatment. [IMPLEMENTS_APPROVED_CLINICAL_RULES] stays false until a rule is approved.
- * Since 0.3.0 the rounding step and both maximums come from the profile version used (ADR 0025).
+ * Since 0.3.0 the rounding step and both maximums come from the profile version used (ADR 0025). Since 0.4.0 the
+ * engine also computes a candidate IOB from an explicit dose history (ADR 0026).
  */
 public object EngineIdentity {
     public const val ARTIFACT_NAME: String = "bolus-engine"
-    public const val VERSION: String = "0.3.0-candidate"
+    public const val VERSION: String = "0.4.0-candidate"
     public const val IMPLEMENTS_APPROVED_CLINICAL_RULES: Boolean = false
 }

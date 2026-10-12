@@ -1,5 +1,5 @@
 [CmdletBinding()]
-param([switch]$DeviceTests)
+param([switch]$DeviceTests, [switch]$SkipLegacyVectors)
 
 $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
@@ -220,6 +220,37 @@ try {
     if ($engineDexcom.Count -gt 0) {
         throw "The bolus engine must stay pure: no Dexcom, meals, Android or JVM imports: $($engineDexcom.Path -join ', ')"
     }
+    # ADR 0024 and ADR 0026: every engine result is a test result. Both result types keep usableForTreatment false and
+    # both rule sets keep their validation pending; promoting either requires approval and a change here.
+    foreach ($engineResult in @(
+            @{ Path = "shared\bolus-engine\src\commonMain\kotlin\org\bolusai\engine\candidate\CandidateEngine.kt"; Rules = "CandidateRuleSet" },
+            @{ Path = "shared\bolus-engine\src\commonMain\kotlin\org\bolusai\engine\iob\CandidateIob.kt"; Rules = "CandidateIobRules" })) {
+        $engineResultSource = Join-Path $repositoryRoot $engineResult.Path
+        if (-not (Select-String -LiteralPath $engineResultSource -SimpleMatch -Quiet -Pattern 'public val usableForTreatment: Boolean get() = false') -or
+                -not (Select-String -LiteralPath $engineResultSource -SimpleMatch -Quiet -Pattern 'public const val VALIDATION: String = "pending"') -or
+                -not (Select-String -LiteralPath $engineResultSource -SimpleMatch -Quiet -Pattern "public object $($engineResult.Rules)")) {
+            throw "Engine results must stay non-therapeutic with validation pending (ADR 0024, ADR 0026): $($engineResult.Path)"
+        }
+    }
+    # ADR 0027: the profile declares the curve with its own enum because it must not depend on the engine. Both lists
+    # must name the same curves with the same use of the peak, in the same order, so a declared curve always maps.
+    $curvePattern = '(?m)^\s+[A-Z]+\("([a-z]+)", (true|false)\),'
+    $engineCurves = @([regex]::Matches((Get-Content -Raw -LiteralPath (Join-Path $repositoryRoot "shared\bolus-engine\src\commonMain\kotlin\org\bolusai\engine\iob\IobInputs.kt")), $curvePattern) |
+        ForEach-Object { "$($_.Groups[1].Value):$($_.Groups[2].Value)" })
+    $profileCurveSource = Get-Content -Raw -LiteralPath (Join-Path $repositoryRoot "shared\clinical-profile\src\commonMain\kotlin\org\bolusai\profile\ProfileContent.kt")
+    $profileCurveBody = [regex]::Match($profileCurveSource, '(?s)enum class InsulinCurveCode.*?\n\s+;\n').Value
+    $profileCurves = @([regex]::Matches($profileCurveBody, $curvePattern) | ForEach-Object { "$($_.Groups[1].Value):$($_.Groups[2].Value)" })
+    if ($engineCurves.Count -eq 0 -or (($engineCurves -join ",") -cne ($profileCurves -join ","))) {
+        throw "Profile and engine insulin curves differ (ADR 0027): engine [$($engineCurves -join ', ')], profile [$($profileCurves -join ', ')]"
+    }
+    # ADR 0026, section 5: the candidate IOB has no producer yet. No Android source may call it until the profile carries
+    # the insulin action and a local dose history exists; Bolo keeps the manual IOB.
+    $iobConsumers = @(Get-ChildItem -LiteralPath (Join-Path $repositoryRoot "android") -Recurse -File |
+        Where-Object { $_.FullName -notmatch '[\\/]build[\\/]' -and $_.Extension -in @(".kt", ".kts", ".java") } |
+        Select-String -Pattern 'org\.bolusai\.engine\.iob|CandidateIob' -List)
+    if ($iobConsumers.Count -gt 0) {
+        throw "The candidate IOB has no approved producer yet (ADR 0026): $($iobConsumers.Path -join ', ')"
+    }
     # ADR 0024: test results stay in memory. The test calculation never persists, confirms or synchronises anything.
     foreach ($testCalculation in @("android\app\src\main\java\org\bolusai\next\application\TestCalculation.kt",
             "android\app\src\main\java\org\bolusai\next\ui\TestCalculationScreen.kt")) {
@@ -400,6 +431,9 @@ jobs:
           distribution: temurin
           java-version: "21"
       - uses: gradle/actions/setup-gradle@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
       - name: Verify
         shell: pwsh
         run: .\scripts\verify.ps1
@@ -434,6 +468,23 @@ jobs:
     git diff --check
     if ($LASTEXITCODE -ne 0) {
         throw "git diff --check found whitespace errors"
+    }
+
+    # ADR 0024 and ADR 0026: the committed Legacy vectors must be reproducible from the pinned public Legacy SHA. The
+    # verifier fetches one commit into a temporary directory, never pushes and runs only the read-only capture scripts.
+    # Offline work may skip it explicitly; CI never does.
+    if ($SkipLegacyVectors) {
+        Write-Warning "Legacy vector reproduction skipped (-SkipLegacyVectors): the committed vectors were not re-captured"
+    }
+    else {
+        $python = @(Get-Command python, python3 -CommandType Application -ErrorAction SilentlyContinue)
+        if ($python.Count -eq 0) {
+            throw "Python is required to reproduce the Legacy vectors; use -SkipLegacyVectors only when offline"
+        }
+        & $python[0].Source -I (Join-Path $PSScriptRoot "legacy-vectors\verify_legacy_vectors.py")
+        if ($LASTEXITCODE -ne 0) {
+            throw "The committed Legacy vectors do not reproduce from the pinned Legacy SHA (ADR 0024, ADR 0026)"
+        }
     }
 
     if ($DeviceTests) {
@@ -478,7 +529,7 @@ jobs:
             if ($LASTEXITCODE -ne 0) { throw "Could not wake the display for UI instrumentation" }
             # Direct instrumentation avoids collecting unrelated device logcat or clinical data.
             $instrumentation = @(adb shell am instrument -w -r `
-                -e class org.bolusai.next.glucose.dexcom.AndroidDexcomSenderEvidenceTest,org.bolusai.next.NavigationDeviceTest,org.bolusai.next.MealDraftDeviceTest,org.bolusai.next.MealHistoryDeviceTest,org.bolusai.next.MealRestoreDeviceTest,org.bolusai.next.meals.SqliteMealRepositoryDeviceTest,org.bolusai.next.DarkThemeDeviceTest,org.bolusai.next.TestCalculationDeviceTest,org.bolusai.next.profile.SqliteClinicalProfileRepositoryDeviceTest,org.bolusai.next.profile.ClinicalProfileConfirmationDeviceTest,org.bolusai.next.profile.ClinicalProfileLimitsDeviceTest,org.bolusai.next.ClinicalProfileDeviceTest,org.bolusai.next.ClinicalProfileConfirmationUiDeviceTest,org.bolusai.next.ClinicalProfileUnavailabilityDeviceTest,org.bolusai.next.BolusProfileDetailsDeviceTest,org.bolusai.next.ProfileStorageGuardDeviceTest,org.bolusai.next.glucose.dexcom.DexcomBundleExtrasDeviceTest,org.bolusai.next.glucose.dexcom.storage.SqliteDexcomObservationStoreDeviceTest,org.bolusai.next.DexcomLogDiagnosticsDeviceTest,org.bolusai.next.glucose.dexcom.storage.DexcomLogIsolationDeviceTest,org.bolusai.next.glucose.dexcom.DexcomG7ReceiverDeviceTest `
+                -e class org.bolusai.next.glucose.dexcom.AndroidDexcomSenderEvidenceTest,org.bolusai.next.NavigationDeviceTest,org.bolusai.next.MealDraftDeviceTest,org.bolusai.next.MealHistoryDeviceTest,org.bolusai.next.MealRestoreDeviceTest,org.bolusai.next.meals.SqliteMealRepositoryDeviceTest,org.bolusai.next.DarkThemeDeviceTest,org.bolusai.next.TestCalculationDeviceTest,org.bolusai.next.profile.SqliteClinicalProfileRepositoryDeviceTest,org.bolusai.next.profile.ClinicalProfileConfirmationDeviceTest,org.bolusai.next.profile.ClinicalProfileLimitsDeviceTest,org.bolusai.next.profile.ClinicalProfileInsulinActionDeviceTest,org.bolusai.next.ClinicalProfileDeviceTest,org.bolusai.next.ClinicalProfileConfirmationUiDeviceTest,org.bolusai.next.ClinicalProfileUnavailabilityDeviceTest,org.bolusai.next.BolusProfileDetailsDeviceTest,org.bolusai.next.ProfileStorageGuardDeviceTest,org.bolusai.next.glucose.dexcom.DexcomBundleExtrasDeviceTest,org.bolusai.next.glucose.dexcom.storage.SqliteDexcomObservationStoreDeviceTest,org.bolusai.next.DexcomLogDiagnosticsDeviceTest,org.bolusai.next.glucose.dexcom.storage.DexcomLogIsolationDeviceTest,org.bolusai.next.glucose.dexcom.DexcomG7ReceiverDeviceTest `
                 "$testPackage/$isolationRunner")
             $instrumentationExit = $LASTEXITCODE
             $instrumentation | Write-Output

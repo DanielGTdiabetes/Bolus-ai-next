@@ -788,6 +788,35 @@ bloquean solo los pasos que los necesitan. Motor `0.3.0-candidate`.
 Comprobaciones y pendientes del Pixel en la
 [validación](validation/profile-limits-2026-10-12.md).
 
+### Entrega de IOB candidato en el motor — 2026-10-12
+
+[ADR 0026](adr/0026-candidate-iob-from-dose-history.md): `CandidateIob` calcula
+el IOB desde un historial de dosis explícito con las curvas de Legacy `bcac891`
+(Walsh, bilineal, Fiasp, NovoRapid y lineal) y el reparto del bolo extendido.
+Paridad exacta en 19 vectores capturados. Sin defaults de DIA, curva ni pico.
+Exige cobertura desde `ahora - max(DIA, duración efectiva de la curva) - extendido máximo declarado`; historial
+ausente, insuficiente, duplicado, futuro o incoherente bloquea, y los fallbacks
+silenciosos de Legacy pasan a bloqueos. Motor `0.4.0-candidate`. Aún no hay
+productor: Bolo sigue con IOB manual. Fase 6, puntos 4 y 5, solo en el motor.
+La ventana usa la duración efectiva de las tablas sin estirar (regresión del
+falso cero con DIA 4,99 h). `verify.ps1` y la CI reproducen los vectores de
+Legacy desde el SHA fijado y exigen resultados no terapéuticos con validación
+pendiente.
+
+### Entrega de acción de la insulina en el perfil — 2026-10-12
+
+[ADR 0027](adr/0027-profile-insulin-action.md): DIA (h), curva y pico (min
+enteros) pasan al esquema de contenido 3, sin defaults ni rangos, versionados y
+confirmables con el resto de la versión. `clinical-profile.db` v4
+(`profile_insulin_curve`) migra desde v1, v2 y v3 sin rellenar nada. Las
+versiones anteriores dejan la acción desconocida. Aún no se traduce a
+`InsulinAction`: Bolo sigue con IOB manual hasta que exista el historial.
+Pruebas del Pixel A1–A3 superadas (401 JVM y 181 instrumentadas en la
+verificación completa). La base real era v2 vacía: actualización a v4
+verificada sin relleno; A4 queda no comprobada (no había perfil real v3) por decisión del propietario, que autorizó integrar la PR de prueba.
+Evidencia y límites en la
+[validación](validation/profile-insulin-action-2026-10-12.md).
+
 ### Secuencia de capacidades
 
 La secuencia inicial siguiente queda como referencia de dependencias, no como
@@ -824,11 +853,12 @@ unitarias, incluidos los límites del perfil de PR #58.
    de evidencia preliminar, pero sigue sin aprobación del informe; no repetir
    la decisión I-3 ni las pruebas de recepción ya registradas sin cambios que
    lo justifiquen.
-2. Sin depender del teléfono: la siguiente regla candidata trazada a Legacy en
-   el motor único, con validación pendiente visible y sin defaults. Candidatas
-   por orden: historial local de insulina e IOB calculado (LC-004, LC-005), que
-   sustituye el IOB manual, y fibra/Warsaw (LC-008). El techo de IOB
-   (`max_iob_u`) y el intervalo mínimo entre bolos dependen del IOB calculado.
+2. Sin depender del teléfono: el IOB candidato está en el motor (ADR 0026) y
+   DIA, curva y pico en el perfil (ADR 0027). Sigue el historial local de
+   insulina, en otra entrega y con decisión del propietario sobre su origen
+   porque Next no registra tratamientos reales, y después el IOB calculado en el
+   cálculo de prueba de Bolo en lugar del manual. Luego, fibra/Warsaw (LC-008). El techo de IOB (`max_iob_u`) y el intervalo mínimo entre bolos
+   dependen del IOB calculado.
 3. Mantener la matriz de `docs/audit/legacy-functional-inventory.md` en cada
    entrega, incluidos MyFitnessPal y los casos de uso del bot.
 

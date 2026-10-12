@@ -12,6 +12,7 @@ internal object ClinicalProfileSchema {
     const val V1 = 1
     const val V2 = 2
     const val V3 = 3
+    const val V4 = 4
 
     internal class Mismatch(message: String) : RuntimeException(message)
 
@@ -139,6 +140,29 @@ internal object ClinicalProfileSchema {
 
     val SCHEMA_V3: List<String> = SCHEMA_V2 + V3_ADDITIONS
 
+    /**
+     * Objects added by v4 (ADR 0027): the insulin curve of content schema 3, one row per schema 3 version. DIA and peak
+     * are numeric profile-wide fields and use `profile_limits`. Earlier versions have no row, so their curve stays
+     * unknown; nothing is backfilled. v1 to v3 objects are kept unchanged.
+     */
+    val V4_ADDITIONS: List<String> = listOf(
+        """
+        CREATE TABLE profile_insulin_curve (
+            version INTEGER PRIMARY KEY REFERENCES profile_versions(version),
+            curve TEXT CHECK(curve IS NULL OR (length(curve) BETWEEN 1 AND 32 AND curve NOT GLOB '*[^a-z]*'))
+        )
+        """.trimIndent(),
+        "CREATE TRIGGER profile_insulin_curve_immutable_update BEFORE UPDATE ON profile_insulin_curve " +
+            "BEGIN SELECT RAISE(ABORT, 'profile.storage.immutable'); END",
+        "CREATE TRIGGER profile_insulin_curve_immutable_delete BEFORE DELETE ON profile_insulin_curve " +
+            "BEGIN SELECT RAISE(ABORT, 'profile.storage.immutable'); END",
+        "CREATE TRIGGER profile_insulin_curve_latest_only BEFORE INSERT ON profile_insulin_curve " +
+            "WHEN NEW.version <> (SELECT MAX(version) FROM profile_versions) " +
+            "BEGIN SELECT RAISE(ABORT, 'profile.storage.immutable'); END",
+    )
+
+    val SCHEMA_V4: List<String> = SCHEMA_V3 + V4_ADDITIONS
+
     private class Index(val name: String, val unique: Boolean, val origin: String, val partial: Boolean, val columns: List<String>)
 
     private val SEGMENTS_PK = Index("sqlite_autoindex_profile_segments_1", true, "pk", false,
@@ -154,6 +178,8 @@ internal object ClinicalProfileSchema {
         V2 -> mapOf("profile_versions" to emptyList(), "profile_segments" to listOf(SEGMENTS_PK),
             "profile_confirmation_events" to listOf(EVENTS_UNIQUE_OPERATION, ONE_REVOCATION, BY_VERSION))
         V3 -> indexes(V2) + ("profile_limits" to listOf(LIMITS_PK))
+        // INTEGER PRIMARY KEY is the rowid: no automatic index.
+        V4 -> indexes(V3) + ("profile_insulin_curve" to emptyList())
         else -> throw Mismatch("version")
     }
 
@@ -161,6 +187,7 @@ internal object ClinicalProfileSchema {
         V1 -> SCHEMA_V1
         V2 -> SCHEMA_V2
         V3 -> SCHEMA_V3
+        V4 -> SCHEMA_V4
         else -> throw Mismatch("version")
     }
 

@@ -57,7 +57,8 @@ class ProfileContentTest {
         assertEquals(ProfileFailure.INVALID_PARAMETERS, ProfileContent.problem(1, mgdl, all.drop(1)))
         assertEquals(ProfileFailure.INVALID_PARAMETERS, ProfileContent.problem(1, mgdl, all + all.first()))
         assertEquals(ProfileFailure.INVALID_PARAMETERS, ProfileContent.problem(1, mgdl, all.reversed()))
-        assertEquals(ProfileFailure.INVALID_PARAMETERS, ProfileContent.problem(3, mgdl, all))
+        // The first schema this build does not know (schema 3 exists since ADR 0027).
+        assertEquals(ProfileFailure.INVALID_PARAMETERS, ProfileContent.problem(ProfileCatalog.CURRENT_SCHEMA + 1, mgdl, all))
     }
 
     @Test fun timeZoneGrammarIsCheckedAndExistenceByPlatform() {

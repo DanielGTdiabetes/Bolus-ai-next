@@ -375,11 +375,15 @@ class SqliteClinicalProfileRepositoryDeviceTest {
         }
         withDatabase { name ->
             SqliteClinicalProfileRepository(context, name).use { it.saved(write(0, content())) }
-            raw(name) { it.version = 4 }
+            var futureVersion = 0
+            raw(name) {
+                futureVersion = it.version + 1
+                it.version = futureVersion
+            }
             SqliteClinicalProfileRepository(context, name).use {
                 assertEquals(ProfileRead.Failed(ProfileFailure.UNSUPPORTED_SCHEMA), it.readVersions())
             }
-            raw(name) { assertEquals(4, it.version) }
+            raw(name) { assertEquals(futureVersion, it.version) }
         }
     }
 

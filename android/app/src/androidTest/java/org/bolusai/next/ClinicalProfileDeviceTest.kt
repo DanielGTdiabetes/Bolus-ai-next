@@ -220,6 +220,57 @@ class ClinicalProfileDeviceTest {
         assertEquals(ProfileValue.NotConfigured, v2.content.limit(ProfileLimit.MAX_CORRECTION))
     }
 
+    @Test fun insulinActionIsDeclaredOnceWithoutDefaultsAndOlderVersionsStayUnknown() {
+        // ADR 0027: a schema 2 version has no insulin action; it stays unknown until the user declares it.
+        val limited = content().withLimit(ProfileLimit.ROUND_STEP, ProfileValue.Entered(CanonicalDecimal("0.5")))
+        seed(ProfileWrite(0, limited, ProfileOrigin.MANUAL, null))
+        val unknown = s(R.string.profile_param_value, s(R.string.profile_action_dia), s(R.string.profile_action_not_in_schema))
+        launch().use { scenario ->
+            openProfile(scenario)
+            awaitView(scenario, "profile:current:limit:insulin_dia", unknown)
+            click(scenario, "profile:edit")
+            awaitView(scenario, "profile:limit:insulin_dia")
+            scenario.onActivity {
+                assertNotNull(viewOrNull(it, "profile:action:explanation"))
+                assertNotNull(viewOrNull(it, "profile:action:not_in_schema"))
+                assertTrue((view(it, "profile:curve:none") as android.widget.RadioButton).isChecked)
+                assertEquals(s(R.string.profile_action_preview_unknown), text(it, "profile:preview:limit:insulin_dia"))
+                type(it, "profile:limit:insulin_dia", "4,5")
+                assertEquals(s(R.string.profile_preview_value, "4.5 h"), text(it, "profile:preview:limit:insulin_dia"))
+                // The peak of the new schema starts not configured; a fraction is rejected, never rounded.
+                assertEquals(s(R.string.profile_preview_missing), text(it, "profile:preview:limit:insulin_peak"))
+                type(it, "profile:limit:insulin_peak", "75,5")
+                assertEquals(s(R.string.profile_preview_error, ProfileFailure.NOT_WHOLE_NUMBER.code),
+                    text(it, "profile:preview:limit:insulin_peak"))
+                assertFalse(view(it, "profile:save").isEnabled)
+                type(it, "profile:limit:insulin_peak", "75")
+                view(it, "profile:curve:walsh").performClick()
+            }
+            scenario.recreate()
+            awaitView(scenario, "profile:limit:insulin_peak")
+            scenario.onActivity {
+                assertEquals("4,5", text(it, "profile:limit:insulin_dia"))
+                assertEquals("75", text(it, "profile:limit:insulin_peak"))
+                assertTrue((view(it, "profile:curve:walsh") as android.widget.RadioButton).isChecked)
+                assertTrue(view(it, "profile:save").isEnabled)
+            }
+            click(scenario, "profile:save")
+            awaitView(scenario, "profile:saved", s(R.string.profile_saved, 2))
+            awaitView(scenario, "profile:current:action:curve", s(R.string.profile_param_value,
+                s(R.string.profile_action_curve_label), s(R.string.profile_curve_walsh)))
+        }
+        val (v1, v2) = stored()
+        assertNull(v1.content.insulinCurve)
+        assertNull(v1.content.limit(ProfileLimit.INSULIN_DIA))
+        assertEquals(3, v2.content.schemaVersion)
+        assertEquals(Setting.Declared(InsulinCurveCode.WALSH), v2.content.insulinCurve)
+        assertEquals(ProfileValue.Entered(CanonicalDecimal("4.5")), v2.content.limit(ProfileLimit.INSULIN_DIA))
+        assertEquals(ProfileValue.Entered(CanonicalDecimal("75")), v2.content.limit(ProfileLimit.INSULIN_PEAK))
+        // Earlier values are carried, nothing else is filled in.
+        assertEquals(ProfileValue.Entered(CanonicalDecimal("0.5")), v2.content.limit(ProfileLimit.ROUND_STEP))
+        assertEquals(ProfileValue.NotConfigured, v2.content.limit(ProfileLimit.MAX_BOLUS))
+    }
+
     @Test fun unitChangeIsSavedAloneAndOlderValuesKeepTheirOriginalUnit() {
         val (v1) = seed(ProfileWrite(0, content(), ProfileOrigin.MANUAL, null))
         launch().use { scenario ->

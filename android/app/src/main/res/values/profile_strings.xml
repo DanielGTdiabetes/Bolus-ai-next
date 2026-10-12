@@ -50,6 +50,20 @@
     <string name="profile_limit_max_bolus">Bolo máximo</string>
     <string name="profile_limit_max_correction">Corrección máxima</string>
     <string name="profile_limit_not_in_schema">desconocido (versión sin límites)</string>
+    <string name="profile_action_title">Acción de la insulina</string>
+    <string name="profile_action_explanation">Curva, DIA en horas y pico en minutos enteros para el IOB calculado de prueba. Sin valores por defecto: vacío = sin configurar y bloquea el IOB calculado. Validación pendiente, no utilizar para tratamiento. Se confirman con el resto de la versión.</string>
+    <string name="profile_action_not_in_schema_notice">La versión de partida no tiene acción de la insulina: sigue desconocida hasta que elijas una curva o introduzcas un valor. Nada se rellena automáticamente.</string>
+    <string name="profile_action_peak_hint">El pico solo lo usan las curvas Walsh y bilineal.</string>
+    <string name="profile_action_curve_label">Curva de acción</string>
+    <string name="profile_action_dia">DIA</string>
+    <string name="profile_action_peak">Pico</string>
+    <string name="profile_action_not_in_schema">desconocido (versión sin acción de la insulina)</string>
+    <string name="profile_action_preview_unknown">Se guardará: desconocido (versión sin acción de la insulina)</string>
+    <string name="profile_curve_walsh">Walsh</string>
+    <string name="profile_curve_bilinear">Bilineal</string>
+    <string name="profile_curve_fiasp">Fiasp (tabla)</string>
+    <string name="profile_curve_novorapid">NovoRapid (tabla)</string>
+    <string name="profile_curve_linear">Lineal</string>
     <string name="profile_preview_error">No válido · %1$s</string>
     <string name="profile_segment_range">%1$s–%2$s</string>
     <string name="profile_segment_value">Valor de %1$s</string>

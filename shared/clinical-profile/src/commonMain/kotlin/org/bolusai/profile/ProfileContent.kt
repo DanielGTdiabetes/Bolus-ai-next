@@ -43,39 +43,84 @@ enum class ProfileParameter(val code: String, val glucoseDependent: Boolean) {
     }
 }
 
-/**
- * Profile-wide insulin limits of content schema 2 (ADR 0025). Legacy keeps them as single values in
- * `UserSettings` (`round_step_u`, `max_bolus_u`, `max_correction_u`), not per time segment, so they are not schedules.
- * They are always in insulin units and never depend on the glucose unit. No range is checked here.
- */
-enum class ProfileLimit(val code: String) {
-    ROUND_STEP("round_step"), MAX_BOLUS("max_bolus"), MAX_CORRECTION("max_correction");
+/** What a profile-wide field is for. The UI groups them; storage, codec and confirmation treat them alike. */
+enum class ProfileFieldGroup { CALCULATION_LIMITS, INSULIN_ACTION }
 
-    val unitLabel: String get() = "U"
+/**
+ * Profile-wide numeric fields, one value per version, never per time segment and never dependent on the glucose unit.
+ * No range is checked here.
+ *
+ * - Content schema 2 (ADR 0025): the insulin limits of Legacy `UserSettings` (`round_step_u`, `max_bolus_u`,
+ *   `max_correction_u`), in U.
+ * - Content schema 3 (ADR 0027): the insulin action of Legacy `IOBConfig` (`dia_hours`, `peak_minutes`). Legacy
+ *   defaults (4 h, 75 min) are never used. The peak is whole minutes, as Legacy stores it ([wholeNumber]); that is a
+ *   representation rule, not a clinical range. The curve is not numeric and lives in [ProfileContent.insulinCurve].
+ */
+enum class ProfileLimit(val code: String, val unitLabel: String, val group: ProfileFieldGroup, val wholeNumber: Boolean) {
+    ROUND_STEP("round_step", "U", ProfileFieldGroup.CALCULATION_LIMITS, false),
+    MAX_BOLUS("max_bolus", "U", ProfileFieldGroup.CALCULATION_LIMITS, false),
+    MAX_CORRECTION("max_correction", "U", ProfileFieldGroup.CALCULATION_LIMITS, false),
+    INSULIN_DIA("insulin_dia", "h", ProfileFieldGroup.INSULIN_ACTION, false),
+    INSULIN_PEAK("insulin_peak", "min", ProfileFieldGroup.INSULIN_ACTION, true),
+    ;
+
+    /** Representation check only: a [wholeNumber] field rejects a fractional value. */
+    fun accepts(value: ProfileValue): Boolean =
+        !wholeNumber || value !is ProfileValue.Entered || '.' !in value.decimal.text
 
     companion object {
         fun fromCode(code: String): ProfileLimit? = entries.firstOrNull { it.code == code }
+
+        fun of(group: ProfileFieldGroup): List<ProfileLimit> = entries.filter { it.group == group }
     }
 }
 
 /**
- * Content schema catalogs. A new parameter or limit is a new content schema, never a change to an earlier one:
- * schema 1 has no limits, so a schema 1 version keeps them unknown forever and is never filled in.
+ * Insulin action curve of content schema 3 (ADR 0027), with the names Legacy `IOBConfig.curve` accepts. [usesPeak]
+ * mirrors the engine: the tabulated curves and the linear one ignore the peak. Choosing a curve is a user
+ * declaration, never a default.
+ */
+enum class InsulinCurveCode(val code: String, val usesPeak: Boolean) {
+    WALSH("walsh", true),
+    BILINEAR("bilinear", true),
+    FIASP("fiasp", false),
+    NOVORAPID("novorapid", false),
+    LINEAR("linear", false),
+    ;
+
+    companion object {
+        fun fromCode(code: String): InsulinCurveCode? = entries.firstOrNull { it.code == code }
+    }
+}
+
+/**
+ * Content schema catalogs. A new parameter or field is a new content schema, never a change to an earlier one:
+ * schema 1 has no limits and schemas 1 and 2 have no insulin action, so those versions keep them unknown forever and
+ * are never filled in.
  */
 object ProfileCatalog {
-    const val CURRENT_SCHEMA = 2
+    const val CURRENT_SCHEMA = 3
     const val MINUTES_PER_DAY = 1440
     private val schema1 = listOf(ProfileParameter.CARB_RATIO, ProfileParameter.INSULIN_SENSITIVITY,
         ProfileParameter.GLUCOSE_TARGET)
     private val limits2 = listOf(ProfileLimit.ROUND_STEP, ProfileLimit.MAX_BOLUS, ProfileLimit.MAX_CORRECTION)
+    private val limits3 = limits2 + listOf(ProfileLimit.INSULIN_DIA, ProfileLimit.INSULIN_PEAK)
 
-    fun parameters(schemaVersion: Int): List<ProfileParameter>? = if (schemaVersion in 1..2) schema1 else null
+    fun parameters(schemaVersion: Int): List<ProfileParameter>? = if (schemaVersion in 1..CURRENT_SCHEMA) schema1 else null
 
     fun limits(schemaVersion: Int): List<ProfileLimit>? = when (schemaVersion) {
         1 -> emptyList()
         2 -> limits2
+        3 -> limits3
         else -> null
     }
+
+    /** Whether [schemaVersion] declares the insulin curve (ADR 0027). */
+    fun hasInsulinCurve(schemaVersion: Int): Boolean = schemaVersion >= 3
+
+    /** Smallest known schema, at least [from], that holds [limit]; null when none does. */
+    fun firstSchemaWith(limit: ProfileLimit, from: Int): Int? =
+        (from..CURRENT_SCHEMA).firstOrNull { limit in limits(it).orEmpty() }
 
     /** Every limit of [schemaVersion] explicitly not configured; empty for a schema without limits. */
     fun unconfiguredLimits(schemaVersion: Int): Map<ProfileLimit, ProfileValue> =
@@ -109,7 +154,8 @@ data class ParameterSchedule(val parameter: ProfileParameter, val segments: List
 /**
  * Content of one profile version. Construction enforces the structural invariants of ADR 0012:
  * catalog complete and ordered, full-day contiguous segments, and no unit-dependent value without a unit.
- * [limits] holds exactly the limits of the schema (none in schema 1); the default marks them not configured.
+ * [limits] holds exactly the profile-wide fields of the schema (none in schema 1); the default marks them not
+ * configured. [insulinCurve] is null when the schema has no curve (schemas 1 and 2), which means unknown.
  * No clinical range is checked.
  */
 data class ProfileContent(
@@ -118,6 +164,8 @@ data class ProfileContent(
     val timeZone: Setting<ProfileTimeZone>,
     val schedules: List<ParameterSchedule>,
     val limits: Map<ProfileLimit, ProfileValue> = ProfileCatalog.unconfiguredLimits(schemaVersion),
+    val insulinCurve: Setting<InsulinCurveCode>? =
+        if (ProfileCatalog.hasInsulinCurve(schemaVersion)) Setting.NotConfigured else null,
 ) {
     init {
         val problem = problem(schemaVersion, glucoseUnit, schedules)
@@ -125,6 +173,10 @@ data class ProfileContent(
         require(limits.keys == ProfileCatalog.limits(schemaVersion).orEmpty().toSet()) {
             ProfileFailure.INVALID_PARAMETERS.code
         }
+        require((insulinCurve != null) == ProfileCatalog.hasInsulinCurve(schemaVersion)) {
+            ProfileFailure.INVALID_PARAMETERS.code
+        }
+        require(limits.all { (limit, value) -> limit.accepts(value) }) { ProfileFailure.NOT_WHOLE_NUMBER.code }
     }
 
     fun schedule(parameter: ProfileParameter): ParameterSchedule = schedules.first { it.parameter == parameter }
@@ -133,18 +185,44 @@ data class ProfileContent(
     fun limit(limit: ProfileLimit): ProfileValue? = limits[limit]
 
     /**
-     * Sets one limit. A schema 1 content becomes schema 2 only when a value is entered: its other limits start not
-     * configured, nothing is copied from elsewhere. Clearing a limit of a schema 1 content changes nothing.
+     * Sets one profile-wide field. When this schema has no such field, entering a value moves the content to the
+     * smallest schema that has it: its own values are kept and every new field starts not configured, nothing is
+     * copied from elsewhere. Clearing a field the schema does not have changes nothing.
      */
     fun withLimit(limit: ProfileLimit, value: ProfileValue): ProfileContent = when {
         limit in limits -> copy(limits = limits + (limit to value))
         value is ProfileValue.NotConfigured -> this
-        else -> {
-            val schema = ProfileCatalog.CURRENT_SCHEMA
-            require(limit in ProfileCatalog.limits(schema).orEmpty())
-            ProfileContent(schema, glucoseUnit, timeZone, schedules,
-                ProfileCatalog.unconfiguredLimits(schema) + (limit to value))
+        else -> upgradedTo(requireNotNull(ProfileCatalog.firstSchemaWith(limit, schemaVersion + 1)))
+            .withLimit(limit, value)
+    }
+
+    /** Declares the insulin curve (ADR 0027). A schema without a curve moves to the first schema that has one. */
+    fun withInsulinCurve(curve: Setting<InsulinCurveCode>): ProfileContent = when {
+        insulinCurve != null -> copy(insulinCurve = curve)
+        curve is Setting.NotConfigured -> this
+        else -> upgradedTo((schemaVersion + 1..ProfileCatalog.CURRENT_SCHEMA).first { ProfileCatalog.hasInsulinCurve(it) })
+            .withInsulinCurve(curve)
+    }
+
+    private fun upgradedTo(schema: Int): ProfileContent = ProfileContent(schema, glucoseUnit, timeZone, schedules,
+        ProfileCatalog.unconfiguredLimits(schema) + limits,
+        insulinCurve ?: if (ProfileCatalog.hasInsulinCurve(schema)) Setting.NotConfigured else null)
+
+    /**
+     * The same content in the smallest schema, at least [minimum], that keeps every configured value; this content
+     * when no smaller schema does. Lets an editor drop a schema it only entered to type a value that was then cleared.
+     */
+    fun compactedTo(minimum: Int): ProfileContent {
+        for (schema in minimum until schemaVersion) {
+            val catalog = ProfileCatalog.limits(schema) ?: continue
+            val dropsValue = limits.any { (limit, value) -> limit !in catalog && value is ProfileValue.Entered }
+            val dropsCurve = !ProfileCatalog.hasInsulinCurve(schema) && insulinCurve is Setting.Declared
+            if (!dropsValue && !dropsCurve) {
+                return ProfileContent(schema, glucoseUnit, timeZone, schedules, limits.filterKeys { it in catalog },
+                    if (ProfileCatalog.hasInsulinCurve(schema)) insulinCurve else null)
+            }
         }
+        return this
     }
 
     val hasGlucoseDependentValues: Boolean

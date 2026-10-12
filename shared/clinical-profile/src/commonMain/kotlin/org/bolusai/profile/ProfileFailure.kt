@@ -21,6 +21,8 @@ enum class ProfileFailure(val code: String) {
     ORIGIN_NOT_ENABLED("profile.origin.not_enabled"),
     /** A manual version may not use an older content schema than the version it started from (ADR 0025). */
     SCHEMA_DOWNGRADE("profile.edit.schema_downgrade"),
+    /** A whole-number field (the insulin peak, in minutes) received a fractional value (ADR 0027). */
+    NOT_WHOLE_NUMBER("profile.edit.not_whole_number"),
     /** Reserved (ADR 0012 P5, superseded by ADR 0013). Never produced again and never reused. */
     SEGMENTS_UI_UNAVAILABLE("profile.edit.segments_ui_unavailable"),
     SPLIT_OUT_OF_RANGE("profile.edit.split_out_of_range"),
