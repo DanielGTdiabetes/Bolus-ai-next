@@ -1,5 +1,16 @@
 Trabaja en E:\projects\Bolus-ai-next y continúa desde origin/main actualizado.
 
+ENTREGA 2026-10-12 — RECEPCIÓN POR PERMISO Y CÁLCULO DE PRUEBA
+Implementados los pasos 1 a 6 del ADR 0023 y el ADR 0024 (motor candidato
+`legacy-backend-core-candidate-v1`, paridad exacta con 12 vectores de Legacy
+`bcac891`, cálculo de prueba en Bolo). Evidencia y comprobaciones pendientes del
+Pixel P1 a P6 en docs/validation/dexcom-permission-reception-and-test-calculation-2026-10-12.md.
+Siguiente: P1 (`verify.ps1 -DeviceTests`) y P2 (prueba I-3 de visibilidad con
+las líneas `dexcom_reception.*` de Diagnóstico). Sin `QUERY_ALL_PACKAGES` la
+puerta queda en `visibility_unproven` y no se registran mensajes reales. Si P2
+demuestra que hace falta, añadirlo en una PR pequeña y seguir con P3 a P6.
+No repetir las decisiones ya aprobadas.
+
 CONTINUACIÓN ACTIVA — 2026-10-12
 El propietario pide reducir fricción y entregar capacidades completas. Aplica
 docs/EXECUTION_PLAN.md §3.3: decisiones técnicas reversibles autónomas, ADR solo

@@ -8,8 +8,11 @@
 - Responsable de decisión: propietario
 - Evidencia clínica: B4 y C5 aprobadas exclusivamente para presentación. No se
   aprueba vigencia clínica, cálculo ni tratamiento
-- Alcance de esta entrega: documentación, sin cambios de código, del teléfono,
-  de Dexcom ni de Legacy
+- Alcance de la entrega de aceptación: documentación, sin cambios de código, del
+  teléfono, de Dexcom ni de Legacy
+- Implementación: pasos 1 a 6 del plan en la entrega del 2026-10-12
+  ([validación](../validation/dexcom-permission-reception-and-test-calculation-2026-10-12.md)).
+  El paso 7 (validación real), la prueba I-3 y B1 siguen pendientes
 
 Este ADR unifica dos borradores del 2026-10-11: la evaluación de recepción por
 permiso de la PR #55 y la propuesta de presentación de la rama
@@ -371,6 +374,25 @@ prueba de visibilidad I-3, validación real y aprobación del informe B1; sin
 esta última, la hora de medida sigue no verificada. Tampoco está aprobado un
 umbral de vigencia ni el uso para calcular. Hasta implementar la entrega, el
 receiver sigue desactivado y la política en `Pending`.
+
+## Estado de implementación — 2026-10-12
+
+Los pasos 1 a 6 están implementados y probados en JVM y lint. Consecuencias
+técnicas, sin nuevas decisiones clínicas:
+
+- La visibilidad se comprueba antes que el conjunto. Sin `QUERY_ALL_PACKAGES` en
+  Android 11 o posterior, la puerta se cierra como `visibility_unproven`, que no
+  es durable. El permiso no se declara hasta que la prueba I-3 en el Pixel
+  demuestre que es necesario. Mientras tanto no se registran mensajes reales.
+- `dexcom-observations.db` pasa a v2. Solo se migra un v1 exacto y vacío; un v1
+  con filas queda intacto como `unsupported_schema`. Los bloqueos durables viven
+  en una tabla append-only y se aplican por versión de política. Solo una
+  versión nueva revisada por PR los levanta.
+- Antes de B1, un último mensaje con varias lecturas o que solo repite una ya
+  registrada no identifica una lectura única: se presenta
+  `dexcom_presentation.selection_pending_b1` sin valor.
+- La ruta estricta se conserva para una política aprobada inyectada. En
+  producción, con `Pending`, el receiver usa la ruta por permiso.
 
 ## Fuentes y condiciones para revisar
 
