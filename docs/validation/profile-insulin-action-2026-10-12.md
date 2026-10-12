@@ -48,3 +48,43 @@ comprobó la paridad de Walsh en iOS.
 | A2 | `ClinicalProfileDeviceTest.insulinActionIsDeclaredOnceWithoutDefaultsAndOlderVersionsStayUnknown` | flujo del editor con recreación, pico fraccionario rechazado y versión de esquema 3 guardada |
 | A3 | Pruebas existentes actualizadas a v4 (`ClinicalProfileConfirmationDeviceTest`, `ClinicalProfileLimitsDeviceTest`) | verdes con `clinical-profile.db` v4 |
 | A4 | Actualización real: abrir la app sobre el `clinical-profile.db` v3 existente del Pixel | el perfil sigue legible y confirmado como antes; acción desconocida; nada rellenado. Hacer copia del archivo antes |
+
+### Copia verificada antes de A4
+
+Orden: copia verificada → actualización sin desinstalar y A4 → A1 a A3 con
+`scripts/verify.ps1 -DeviceTests` → revisión e integración. La copia contiene
+datos clínicos reales: va fuera del repositorio y nunca se adjunta a commits,
+incidencias ni registros.
+
+Ejecutar en PowerShell 7.4 o posterior, que conserva los bytes al redirigir
+`adb exec-out`. Windows PowerShell 5.1 puede corromper la copia.
+
+```powershell
+if ($PSVersionTable.PSVersion -lt [version]"7.4") { throw "Usa PowerShell 7.4 o posterior" }
+$backup = Join-Path $env:USERPROFILE "bolus-next-backups\profile-$(Get-Date -Format yyyyMMdd-HHmmss)"
+New-Item -ItemType Directory -Path $backup | Out-Null
+adb shell am force-stop org.bolusai.next
+# Lista real de ficheros: solo se omite un auxiliar cuya ausencia queda confirmada aquí.
+$listing = adb shell run-as org.bolusai.next ls databases
+if ($LASTEXITCODE -ne 0) { throw "run-as falló: no instalar nada y revisar" }
+$files = @("clinical-profile.db", "clinical-profile.db-wal", "clinical-profile.db-shm", "clinical-profile.db-journal") |
+    Where-Object { $listing -contains $_ }
+if ($files -notcontains "clinical-profile.db") { throw "No existe clinical-profile.db" }
+foreach ($file in $files) {
+    adb exec-out run-as org.bolusai.next cat "databases/$file" > (Join-Path $backup $file)
+    if ($LASTEXITCODE -ne 0) { throw "Copia fallida: $file" }
+    $remote = ((adb shell run-as org.bolusai.next sha256sum "databases/$file") -split "\s+")[0]
+    $local = (Get-FileHash -Algorithm SHA256 (Join-Path $backup $file)).Hash.ToLower()
+    if ($remote -ne $local) { throw "Hash distinto en $file" }
+    Write-Output "$file $local $((Get-Item (Join-Path $backup $file)).Length) bytes"
+}
+# Apertura íntegra sobre una copia de comprobación con sus auxiliares; la copia original no se toca.
+$check = "$backup-check"
+Copy-Item -Recurse $backup $check
+python -I -c "import sqlite3,sys; c=sqlite3.connect(sys.argv[1]); r=c.execute('PRAGMA integrity_check').fetchall(); v=c.execute('PRAGMA user_version').fetchone()[0]; print(r, 'user_version', v); sys.exit(0 if r==[('ok',)] and v==3 else 1)" (Join-Path $check "clinical-profile.db")
+if ($LASTEXITCODE -ne 0) { throw "La copia no está íntegra o no es v3: no instalar" }
+```
+
+Solo con hashes iguales, `integrity_check` en `ok` y `user_version` 3 se
+instala la APK de la PR encima, sin desinstalar. Restaurar es copiar de vuelta
+los mismos ficheros con la app detenida.
