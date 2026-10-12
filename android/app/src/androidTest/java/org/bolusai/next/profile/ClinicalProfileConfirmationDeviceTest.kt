@@ -95,7 +95,9 @@ class ClinicalProfileConfirmationDeviceTest {
             val tables = db.rawQuery("SELECT name FROM sqlite_master WHERE type = 'table' AND name LIKE 'profile_%' ORDER BY name",
                 null).use { c -> buildList { while (c.moveToNext()) add(c.getString(0)) } }
             tables.forEach { table ->
-                db.rawQuery("SELECT * FROM $table ORDER BY 1, 2, 3", null).use { c ->
+                val columnCount = db.rawQuery("SELECT * FROM $table LIMIT 0", null).use { it.columnCount }
+                val ordering = (1..columnCount).joinToString(", ")
+                db.rawQuery("SELECT * FROM $table ORDER BY $ordering", null).use { c ->
                     while (c.moveToNext()) add(table + ":" + (0 until c.columnCount).joinToString("|") {
                         if (c.isNull(it)) "NULL" else "${c.getType(it)}:${c.getString(it)}"
                     })
