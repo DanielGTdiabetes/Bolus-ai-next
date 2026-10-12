@@ -7,6 +7,12 @@ sustituirlo con paridad funcional aprobada, no a depender de él como servicio.
 
 La aplicación móvil debe poder ejecutar localmente todas las funciones clínicas críticas, sin depender de NAS, Render, Telegram ni de una conexión a Internet para calcular un bolo.
 
+La sustitución debe conservar todas las funcionalidades actuales de `bolus_ai`,
+incluido el enlace con MyFitnessPal. Telegram puede reemplazarse por otra vía,
+siempre que cubra sus casos de uso. Las integraciones online son opcionales para
+ejecutar el flujo local, pero sus capacidades forman parte del alcance final;
+no se eliminan por trasladar el cálculo al móvil (AGENTS.md §1).
+
 Principios del proyecto:
 
 - **Seguridad > consistencia > disponibilidad > comodidad.**

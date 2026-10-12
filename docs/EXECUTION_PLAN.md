@@ -42,6 +42,23 @@ Al final de la migración:
 - cada entrega está probada y solo se considera terminada al estar integrada en
   `origin/main`.
 
+**Cobertura confirmada por el propietario — 2026-10-12:** conservar todas las
+capacidades actuales de `bolus_ai`, mediante paridad o una alternativa funcional
+equivalente y probada. Telegram puede sustituirse, pero no perder sus funciones;
+el enlace con MyFitnessPal debe estar cubierto. «Opcional» describe la dependencia
+en ejecución del camino local, no una exclusión del alcance final.
+
+Usar `docs/audit/legacy-functional-inventory.md` como matriz de partida y
+revalidar las capacidades contra el SHA remoto de Legacy fijado para cada lote.
+Los snapshots históricos no demuestran por sí solos la cobertura actual.
+Registrar por capacidad caso de uso, fuente/SHA, alternativa Next, estado y prueba;
+incluir los flujos del bot y sus conexiones con otras integraciones que se
+observen, sin suponer que MyFitnessPal depende de Telegram. La equivalencia
+debe cubrir el recorrido completo, incluidos usos remotos y errores pertinentes.
+Ampliar la matriz al implementar cada capacidad; no convertirla en otro bloqueo
+para desarrollar recepción o cálculo de prueba. La sustitución final requiere
+cobertura de todas las capacidades; cualquier pérdida necesita decisión expresa.
+
 ## 3. Reglas de ejecución transversales
 
 ### 3.1 Estados explícitos
@@ -383,9 +400,13 @@ sin Internet.
 - el flujo completo pasa en modo avión con fixtures aprobados;
 - la compilación sigue marcada como no autoritativa para tratamiento real.
 
-### Fase 8 — MyFitnessPal como importación opcional
+### Fase 8 — Enlace MyFitnessPal con independencia del cálculo local
 
 **Objetivo:** importar nutrición sin convertir el servicio en dependencia clínica.
+
+La capacidad es parte obligatoria de la sustitución funcional. La ausencia de
+cuenta o red permite usar el respaldo manual; no permite dar por implementado el
+enlace MyFitnessPal ni retirarlo del alcance.
 
 **Trabajo:**
 
@@ -403,7 +424,9 @@ sin Internet.
 - no se reutiliza una comida/revisión antigua como si fuera actual;
 - una reimportación idéntica no duplica el hecho local;
 - diferencias del proveedor son visibles antes de confirmar;
-- tokens no aparecen en logs, fixtures o repositorio.
+- tokens no aparecen en logs, fixtures o repositorio;
+- el recorrido MyFitnessPal observado en Legacy tiene equivalente probado en
+  Next, conservando sus casos de uso aunque cambie el canal de acceso.
 
 ### Fase 9 — Modo sombra y paridad operacional
 
@@ -443,6 +466,9 @@ camino crítico.
 3. Tratar respuesta perdida, replay, duplicado, desorden y conflicto.
 4. Conectar uno a uno los destinos aprobados (backup, Nightscout, panel,
    Telegram, NAS/Render), inicialmente sin autoridad clínica.
+   Si se prescinde del bot Telegram, trasladar sus casos de uso a alternativas
+   probadas antes de considerar cubierta esa capacidad. No asumir que todos
+   son mensajes o que una notificación local cubre un flujo remoto.
 5. Asegurar que sync no recalcula ni reescribe decisiones confirmadas.
 
 **Criterios de aceptación:**
@@ -462,6 +488,9 @@ reversibles.
 **Precondiciones:** fases anteriores aceptadas; informe de sombra aprobado;
 criterios de promoción, responsables y rollback escritos; ninguna incógnita
 clínica crítica abierta.
+Para declarar la sustitución completa, la matriz funcional debe demostrar que
+ninguna capacidad actual de Legacy queda sin equivalente, incluido el enlace
+MyFitnessPal y los casos de uso del bot aunque se haya sustituido Telegram.
 
 **Trabajo:**
 

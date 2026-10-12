@@ -21,8 +21,9 @@ el plan ejecutable.
    reglas cuya integridad pueda demostrarse.
 7. **Flujo de bolo local no autoritativo:** cálculo, revisión, confirmación y
    registro local durable, todavía en modo sombra.
-8. **Importaciones y sincronización opcionales:** nutrición, outbox e
-   integraciones sin situar la red en el camino crítico.
+8. **Importaciones y sincronización:** enlace MyFitnessPal, nutrición, outbox e
+   integraciones sin situar la red en el camino crítico. La independencia del
+   flujo local no excluye estas capacidades del alcance final.
 9. **Sombra, beta y promoción:** demostrar paridad, mantener un solo escritor y
    cambiar autoridad de forma gradual y reversible.
 10. **Portabilidad y retirada reversible:** consumir el mismo motor desde iOS si
@@ -31,7 +32,16 @@ el plan ejecutable.
 ## Cobertura funcional y retirada
 
 Ninguna función de Legacy se considera migrada por semejanza ni se omite en
-silencio. La auditoría mantiene una matriz con estas salidas explícitas:
+silencio.
+
+El propietario confirmó el 2026-10-12 que la sustitución debe conservar todas
+las capacidades actuales. Telegram puede reemplazarse, pero sus casos de uso
+deben tener equivalente probado; el enlace MyFitnessPal forma parte del alcance.
+Un pendiente no cuenta como función cubierta. Actualizar el inventario existente
+durante el desarrollo, sin frenar capacidades independientes por una auditoría
+global adicional. Una pérdida funcional exige decisión expresa del propietario.
+
+La auditoría mantiene una matriz con estas salidas explícitas:
 
 - migrar con paridad aprobada;
 - corregir deliberadamente con decisión y prueba;
