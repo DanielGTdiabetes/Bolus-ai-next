@@ -6,6 +6,25 @@ docs/EXECUTION_PLAN.md §3.3: decisiones técnicas reversibles autónomas, ADR s
 cuando corresponda, preguntas necesarias agrupadas y evidencia sin duplicación.
 Se mantienen los controles clínicos y las pruebas obligatorias.
 
+NO PERDER FUNCIONALIDADES DE LEGACY — 2026-10-12
+Next debe conservar todas las capacidades actuales de `bolus_ai` o suplirlas
+con equivalentes probados. Telegram puede sustituirse si hace falta, pero sus
+casos de uso deben quedar cubiertos. El enlace con MyFitnessPal está incluido;
+la entrada manual de respaldo no reemplaza esa integración. «Opcional» significa
+que no bloquea el flujo local, no que se pueda excluir del producto final.
+Mantén la cobertura en docs/audit/legacy-functional-inventory.md, revalidando
+fuentes contra el SHA remoto de Legacy fijado en cada lote. Audita los flujos
+reales del bot y sus enlaces, sin asumir que todo MyFitnessPal pasa por Telegram.
+Por capacidad registra equivalente Next, estado y prueba del recorrido completo,
+incluidos usos remotos cuando existan. Actualiza la matriz junto al desarrollo;
+no retrases recepción ni cálculo de prueba por otra auditoría global previa.
+No declares completa la sustitución mientras queden funcionalidades sin cubrir.
+El rumbo es sustituir `bolus_ai` para dejar de ejecutarlo en NAS y Render,
+con todas sus funciones. Next debe asumir la lógica y el estado operativo;
+no dar una capacidad por migrada si necesita el backend Legacy encendido.
+Conservar las conexiones online con proveedores externos cuando correspondan.
+No apagar ni modificar producción durante esta convivencia.
+
 CÁLCULO DE PRUEBA AUTORIZADO — 2026-10-12
 El propietario autoriza avanzar con lecturas reales y cálculos durante el
 desarrollo; no utilizará la app para tratamiento hasta finalizarla. Aplicar

@@ -21,6 +21,32 @@ Si dos objetivos entran en conflicto, conserva el de mayor prioridad y documenta
 el compromiso. Una respuesta bloqueada y explícita es preferible a una
 recomendación basada en datos incompletos, ambiguos, caducados o no validados.
 
+### Cobertura funcional de la sustitución — 2026-10-12
+
+Por decisión del propietario, Next debe conservar todas las capacidades actuales
+de `bolus_ai` o suplirlas con una alternativa funcional equivalente y probada.
+Telegram puede sustituirse cuando sea necesario, pero no se pueden perder los
+casos de uso que proporciona. El enlace con MyFitnessPal forma parte del alcance;
+la entrada manual como respaldo no sustituye esa integración.
+
+La finalidad es dejar de ejecutar `bolus_ai` en NAS y Render: Next es su
+sustituto completo, no un cliente que necesite ese backend para conservar las
+funciones. La lógica y el estado operativo de la app se trasladan al dispositivo;
+las conexiones necesarias con proveedores externos pueden seguir siendo online.
+Ninguna capacidad migrada se da por cubierta si exige mantener Legacy ejecutándose
+en NAS/Render. Esto no autoriza apagar ni modificar producción durante la convivencia.
+
+«Servicio opcional» significa que su caída o ausencia no bloquea el camino
+clínico local, no que se pueda omitir la funcionalidad de la sustitución final.
+Mantener la cobertura en el inventario funcional existente: fuente/SHA, caso de
+uso, alternativa Next, estado y prueba. Comprobar flujos completos, incluidos
+los usos remotos del bot que se identifiquen; una pantalla o aviso local no
+demuestra por sí solo equivalencia. No declarar Next sustituto completo mientras
+queden capacidades sin cubrir. Una pérdida funcional requiere decisión explícita
+del propietario; esta instrucción no la autoriza ni aprueba reglas clínicas.
+Actualizar la cobertura al implementar cada capacidad, sin frenar entregas
+independientes para repetir una auditoría completa.
+
 ## 2. Límite absoluto con Bolus AI Legacy
 
 - `DanielGTdiabetes/bolus_ai` y sus despliegues son producción durante la
