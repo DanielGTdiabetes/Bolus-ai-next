@@ -30,6 +30,7 @@ Dexcom ni la app del reloj. Ningún resultado es utilizable para tratamiento.
 | `./gradlew androidJvmTest allMetadataJar :android:app:testDebugUnitTest :android:app:lintDebug :android:app:assembleDebug :android:app:assembleDebugAndroidTest :android:app:processReleaseMainManifest :android:sender-fixture:assembleDebug :android:sender-fixture:lintDebug` | `BUILD SUCCESSFUL`. 400 pruebas JVM, 0 fallos: motor 67, perfil 108, parser Dexcom 47, traductor 25, comidas 17 y Android 136 |
 | `python3 -I scripts/legacy-vectors/verify_legacy_vectors.py` | los 12 vectores del ADR 0024 y los 19 del ADR 0026 se reproducen byte a byte; con un vector alterado falla |
 | Copia de `scripts/verify.ps1` adaptada a Linux con PowerShell 7.5.2 (`./gradlew`, rutas con `/`, `aapt2` sin `.exe`): Gradle con `clean`, aislamiento de instrumentación sobre los APK reales, manifiestos, anclas, consumidores, pureza del motor, resultados no terapéuticos, curvas del perfil y del motor, plantilla del CI y vectores de Legacy | exit 0: `BUILD SUCCESSFUL`, autoprueba y comprobación de aislamiento superadas, vectores reproducidos |
+| Captura con `open()` y salida forzadas a cp1252, como en el runner de Windows (fallo del CI en `add10ee`) | el script anterior falla con `UnicodeDecodeError` en `bolus_engine.py`; con UTF-8 explícito reproduce el fichero exacto |
 | Regresión del falso cero (DIA 4,99 h con Fiasp) sobre el motor anterior `a4daa93` | falla con `Computed(units=0.0)`; pasa con la corrección |
 
 Limitaciones: la copia adaptada no se publica y la ejecución completa en Windows

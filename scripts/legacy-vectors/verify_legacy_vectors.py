@@ -65,10 +65,13 @@ def main():
             sha = pinned_sha(rules, generated)
             result = subprocess.run(
                 [sys.executable, "-I", str(REPOSITORY / "scripts/legacy-vectors" / script), str(workspace / sha), sha],
-                cwd=workspace, check=True, capture_output=True, text=True, encoding="utf-8",
+                cwd=workspace, capture_output=True, text=True, encoding="utf-8",
             )
+            if result.returncode != 0:
+                failures.append(f"{script} failed at {sha} (exit {result.returncode}):\n{result.stderr}")
+                continue
             committed = generated.read_text(encoding="utf-8").replace("\r\n", "\n")
-            if result.stdout != committed:
+            if result.stdout.replace("\r\n", "\n") != committed:
                 failures.append(f"{generated.relative_to(REPOSITORY)} differs from {script} at {sha}")
             else:
                 print(f"Legacy vectors reproduced: {generated.name} from {script} at {sha}")

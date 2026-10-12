@@ -79,7 +79,7 @@ def load(checkout, relative, module_name):
     module.__dict__["__name__"] = module_name
     sys.modules[module_name] = module
     path = f"{checkout}/{relative}"
-    exec(compile(open(path).read(), relative, "exec"), module.__dict__)
+    exec(compile(open(path, encoding="utf-8").read(), relative, "exec"), module.__dict__)
     return module
 
 
@@ -128,6 +128,8 @@ def text(value):
 
 
 def main():
+    # Legacy sources are UTF-8 and the generated file is UTF-8 with LF, whatever the platform locale (Windows CI).
+    sys.stdout.reconfigure(encoding="utf-8", newline="\n")
     checkout, expected_sha = sys.argv[1], sys.argv[2]
     sha = subprocess.check_output(["git", "-C", checkout, "rev-parse", "HEAD"], text=True).strip()
     if sha != expected_sha:
