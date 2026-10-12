@@ -1,6 +1,7 @@
 package org.bolusai.next.glucose.dexcom
 
 import android.content.pm.PackageManager
+import org.bolusai.dexcomg7.AuthenticatedSender
 import org.bolusai.dexcomg7.DexcomG7Payload
 import org.bolusai.dexcomg7.DexcomObservationStore
 import org.bolusai.dexcomg7.ObservationFailure
@@ -39,13 +40,14 @@ class DexcomG7IntakeTest {
             inputs += input
             if (fail) return ObservationWrite.Failed(ObservationFailure.WRITE_FAILED)
             return ObservationWrite.Recorded(
-                StoredMessage("m", input.receivedAtEpochMs, input.sender, StoredMessageOutcome.OBSERVED, null, 1, 0, 0, 0,
+                StoredMessage("m", input.receivedAtEpochMs, input.provenance, StoredMessageOutcome.OBSERVED, null, 1, 0, 0, 0,
                     emptyList(), emptyList(), 0),
                 emptyList(),
             )
         }
         override fun read(): ObservationRead = error("unused")
         override fun summary(): ObservationSummaryRead = error("unused")
+        override fun latest(): org.bolusai.dexcomg7.ObservationLatestRead = error("unused")
         override fun close() {
             closed++
             closeDefect?.let { throw it }
@@ -104,7 +106,7 @@ class DexcomG7IntakeTest {
         assertEquals(1, receipt.payloadReads)
         val input = store.inputs.single() as ObservationInput.Observed
         assertEquals(42L, input.receivedAtEpochMs)
-        assertEquals(PACKAGE, input.sender.packageName)
+        assertEquals(PACKAGE, (input.provenance as AuthenticatedSender).packageName)
         val recorded = receipt.recording as DexcomG7Recording.Recorded
         assertEquals("input.glucose.policy_not_approved", recorded.glucose.code)
     }
@@ -350,6 +352,7 @@ class DexcomG7IntakeTest {
                 is DexcomReceipt.Recorded -> it.recording.glucose.code
                 is DexcomReceipt.StorageFailed -> it.glucose.code
                 is DexcomReceipt.IntakeFailed -> it.glucose.code
+                is DexcomReceipt.GateRejected, is DexcomReceipt.Admitted -> error("permission path is not the strict intake")
             }
         }
         assertEquals(

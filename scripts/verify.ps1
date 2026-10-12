@@ -46,14 +46,19 @@ try {
         (Select-String -LiteralPath $releaseManifest -Pattern 'senderfixture|android.permission.INTERNET' -Quiet)) {
         throw "Release manifest must stay isolated from fixtures and network permissions"
     }
-    # ADR 0022: the only receiver is the Dexcom one, declared disabled (R1) and exported without android:permission
-    # (R8), with a single intent filter holding only the observed action. No Dexcom permission is requested (R2): the
-    # action is the only com.dexcom. value of the whole merged manifest.
+    # ADR 0022 R1 and ADR 0023: the only receiver is the Dexcom one, declared disabled and exported, guarded by the
+    # producer's permission (ADR 0023, part I, point 1), with a single intent filter holding only the observed action.
+    # Next requests that permission and nothing else of Dexcom (I-6), and never QUERY_ALL_PACKAGES until the Pixel test
+    # of I-3 shows it is needed: the com.dexcom. values of the merged manifest are exactly action, receiver permission
+    # and the requested permission.
     foreach ($manifest in @($mergedManifest, $releaseManifest)) {
         [xml]$manifestXml = Get-Content -Raw -LiteralPath $manifest
         $androidNs = "http://schemas.android.com/apk/res/android"
         $receivers = @($manifestXml.SelectNodes("//receiver"))
         $dexcomValues = @($manifestXml.SelectNodes("//@*[starts-with(., 'com.dexcom.')]"))
+        $dexcomRequests = @($manifestXml.SelectNodes("/manifest/uses-permission") |
+            Where-Object { $_.GetAttribute("name", $androidNs).StartsWith("com.dexcom.") })
+        $queryAll = @($manifestXml.SelectNodes("//@*[. = 'android.permission.QUERY_ALL_PACKAGES']"))
         $receiver = if ($receivers.Count -eq 1) { $receivers[0] } else { $null }
         $filters = @(if ($null -ne $receiver) { $receiver.SelectNodes("intent-filter") })
         $filterChildren = @(if ($filters.Count -eq 1) { $filters[0].SelectNodes("*") })
@@ -61,12 +66,15 @@ try {
                 $receiver.GetAttribute("name", $androidNs) -cne "org.bolusai.next.glucose.dexcom.DexcomG7Receiver" -or
                 $receiver.GetAttribute("enabled", $androidNs) -cne "false" -or
                 $receiver.GetAttribute("exported", $androidNs) -cne "true" -or
-                $receiver.HasAttribute("permission", $androidNs) -or
+                $receiver.GetAttribute("permission", $androidNs) -cne "com.dexcom.cgm.EXTERNAL_PERMISSION" -or
                 $filters.Count -ne 1 -or $filterChildren.Count -ne 1 -or
                 $filterChildren[0].LocalName -cne "action" -or
                 $filterChildren[0].GetAttribute("name", $androidNs) -cne "com.dexcom.cgm.EXTERNAL_BROADCAST" -or
-                $dexcomValues.Count -ne 1) {
-            throw "The only receiver must be the disabled Dexcom receiver for the observed action, with no Dexcom permission (ADR 0022): $manifest"
+                $dexcomRequests.Count -ne 1 -or
+                $dexcomRequests[0].GetAttribute("name", $androidNs) -cne "com.dexcom.cgm.EXTERNAL_PERMISSION" -or
+                $queryAll.Count -ne 0 -or
+                $dexcomValues.Count -ne 3) {
+            throw "The only receiver must be the disabled Dexcom receiver for the observed action, guarded by the Dexcom permission that Next requests, without QUERY_ALL_PACKAGES (ADR 0022, ADR 0023): $manifest"
         }
     }
     foreach ($manifest in @($mergedManifest, $releaseManifest)) {
@@ -119,8 +127,9 @@ try {
     if ($dexcomParserDependencies.Count -gt 0) {
         throw "The Dexcom G7 payload parser must stay pure and dependency-free: $($dexcomParserDependencies.Path -join ', ')"
     }
-    # ADR 0019 to ADR 0022: only the Dexcom reception composition, its Bundle adapter, the observation log, the read-only
-    # Diagnostico view of its counts, the disabled receiver and their tests may use the parser. No other screen does.
+    # ADR 0019 to ADR 0023: only the Dexcom reception composition, its Bundle adapter, the observation log, the read-only
+    # Diagnostico view of its counts, the receiver, the permission gate, the read-only presentation of Inicio and Bolo
+    # (C1), the test calculation that may use the shown reading (ADR 0024) and their tests may use the parser or the log.
     $allowedDexcomParserConsumers = @(
         "android\app\build.gradle.kts",
         "android\app\src\main\java\org\bolusai\next\glucose\dexcom\DexcomPayloadExtras.kt",
@@ -145,7 +154,15 @@ try {
         "android\app\src\androidTest\java\org\bolusai\next\DexcomLogDiagnosticsDeviceTest.kt",
         "android\app\src\main\java\org\bolusai\next\glucose\dexcom\DexcomG7Receiver.kt",
         "android\app\src\test\java\org\bolusai\next\glucose\dexcom\DexcomG7IntakeTest.kt",
-        "android\app\src\androidTest\java\org\bolusai\next\glucose\dexcom\DexcomG7ReceiverDeviceTest.kt"
+        "android\app\src\androidTest\java\org\bolusai\next\glucose\dexcom\DexcomG7ReceiverDeviceTest.kt",
+        "android\app\src\main\java\org\bolusai\next\glucose\dexcom\DexcomPermissionSetPolicy.kt",
+        "android\app\src\main\java\org\bolusai\next\glucose\dexcom\DexcomPermissionIntake.kt",
+        "android\app\src\main\java\org\bolusai\next\glucose\dexcom\DexcomPresentationReader.kt",
+        "android\app\src\main\java\org\bolusai\next\ui\DexcomReadingBlock.kt",
+        "android\app\src\main\java\org\bolusai\next\application\TestCalculation.kt",
+        "android\app\src\test\java\org\bolusai\next\glucose\dexcom\DexcomPermissionGateTest.kt",
+        "android\app\src\test\java\org\bolusai\next\DexcomReadingBlockTest.kt",
+        "android\app\src\test\java\org\bolusai\next\TestCalculationTest.kt"
     ) | ForEach-Object { Join-Path $repositoryRoot $_ }
     $dexcomParserConsumers = @(Get-ChildItem -LiteralPath (Join-Path $repositoryRoot "android"), (Join-Path $repositoryRoot "shared") -Recurse -File |
         Where-Object { $_.FullName -notmatch '\\build\\' -and -not $_.FullName.StartsWith($dexcomParserRoot + [IO.Path]::DirectorySeparatorChar) } |
@@ -166,12 +183,57 @@ try {
         throw "Production code must not approve Dexcom senders, subclass the receiver or observe its receipts (ADR 0022, R6): $($productionTrust.Path -join ', ')"
     }
 
+    # ADR 0023, I-5 (a): the approved anchors live in production code and must equal the table of the accepted ADR.
+    $anchorSource = Get-Content -Raw -LiteralPath (Join-Path $repositoryRoot "android\app\src\main\java\org\bolusai\next\glucose\dexcom\DexcomPermissionSetPolicy.kt")
+    $anchorAdr = Get-Content -Raw -LiteralPath (Join-Path $repositoryRoot "docs\adr\0023-dexcom-existing-transport-trust.md")
+    $approvedAnchors = @(
+        'com.dexcom.cgm.EXTERNAL_PERMISSION',
+        'com.dexcom.g7',
+        'org.bolusai.companion',
+        'com.wtachtsugar',
+        'd30e0d3f08b70cedbc0804c96f2ec4599f243b5e149ef73a601757ad94c74145',
+        '1d1f25bf2aadfd82956610084f3acbf06bb69225b0c4fb031df8eae24f4f6a8d'
+    )
+    foreach ($anchor in $approvedAnchors) {
+        if (-not $anchorSource.Contains($anchor) -or -not $anchorAdr.Contains($anchor)) {
+            throw "Approved anchor missing from production code or ADR 0023: $anchor"
+        }
+    }
+    if ($anchorSource -notmatch 'ApprovedMember\("com\.dexcom\.g7", exactVersionCode = 4537L' -or
+            $anchorAdr -notmatch '\| 10451 \| 4537 \|' -or
+            ([regex]::Matches($anchorSource, 'exactVersionCode = null')).Count -ne 2 -or
+            ([regex]::Matches($anchorSource, 'ApprovedMember\("')).Count -ne 3) {
+        throw "Anchors must keep the exact Dexcom version and only package and signers for Legacy and the watch (ADR 0023, I-2 b)"
+    }
+    # ADR 0023, plan step 6: the clinical boundary still has no glucose. ReadOverview, the local source port and the
+    # engine never read the log or its presentation; the engine receives glucose only through an explicit request.
+    foreach ($boundary in @("android\app\src\main\java\org\bolusai\next\application\ReadOverview.kt",
+            "android\app\src\main\java\org\bolusai\next\glucose\LocalGlucoseSourcePort.kt")) {
+        if (Select-String -LiteralPath (Join-Path $repositoryRoot $boundary) -Pattern 'org\.bolusai\.dexcomg7|readDexcomPresentation|LatestReadingPresentation|candidate' -Quiet) {
+            throw "The clinical glucose boundary must not read the Dexcom log, its presentation or the test engine (ADR 0023): $boundary"
+        }
+    }
+    $engineDexcom = @(Get-ChildItem -LiteralPath (Join-Path $repositoryRoot "shared\bolus-engine\src\commonMain") -Recurse -File |
+        Where-Object { $_.FullName -notmatch '\\build\\' } |
+        Select-String -Pattern 'org\.bolusai\.(dexcomg7|meals|next)|import\s+(android|java)\.' -List)
+    if ($engineDexcom.Count -gt 0) {
+        throw "The bolus engine must stay pure: no Dexcom, meals, Android or JVM imports: $($engineDexcom.Path -join ', ')"
+    }
+    # ADR 0024: test results stay in memory. The test calculation never persists, confirms or synchronises anything.
+    foreach ($testCalculation in @("android\app\src\main\java\org\bolusai\next\application\TestCalculation.kt",
+            "android\app\src\main\java\org\bolusai\next\ui\TestCalculationScreen.kt")) {
+        if (Select-String -LiteralPath (Join-Path $repositoryRoot $testCalculation) -Pattern 'Sqlite|Repository|appendConfirmation|\.record\(|\.save\(|\.select\(' -Quiet) {
+            throw "The test calculation must not persist, confirm or record anything (ADR 0024): $testCalculation"
+        }
+    }
+
     # ADR 0021: ScreenRenderer only receives composed lines; it never reads the log nor knows its domain types.
     if (Select-String -LiteralPath (Join-Path $repositoryRoot "android\app\src\main\java\org\bolusai\next\ui\ScreenRenderer.kt") -Pattern 'org\.bolusai\.dexcomg7|DexcomLogModel|readDexcomObservationLog' -Quiet) {
         throw "ScreenRenderer must only receive the composed Dexcom log lines (ADR 0021)"
     }
 
-    # ADR 0012: the clinical profile is capture only. The engine and the Bolo overview must not depend on it.
+    # ADR 0012 and ADR 0024: the engine never depends on the profile module; the Android test calculation translates
+    # the profile into explicit engine inputs. The Bolo overview keeps reporting the profile as unavailable.
     $engineReferences = @(Get-ChildItem -LiteralPath (Join-Path $repositoryRoot "shared\bolus-engine") -Recurse -File |
         Where-Object { $_.FullName -notmatch '\\build\\' } |
         Select-String -Pattern 'clinical-profile|profile-unavailability|org\.bolusai\.profile' -List)

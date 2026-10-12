@@ -32,6 +32,41 @@ public fun interface ObservationIds {
 }
 
 /**
+ * How a recorded message passed the reception barrier. It is stored with every message so its provenance survives
+ * later policy changes; historical messages are never relabelled (ADR 0023, plan step 1).
+ */
+public sealed interface MessageProvenance {
+    public val code: String
+}
+
+/**
+ * Admitted by the approved permission set (ADR 0023, part I): Android delivered it only because its sender held the
+ * Dexcom permission and, when checked, the holders matched the approved set. It does NOT identify the sender: any approved
+ * member could have sent it. [policyVersion] names the anchors used; [holderSetSha256] fingerprints the holders seen.
+ */
+public class ApprovedPermissionSet(policyVersion: String, holderSetSha256: String) : MessageProvenance {
+    public val policyVersion: String = policyVersion.also {
+        require(POLICY.matches(it)) { "dexcom_observation.invalid_policy_version" }
+    }
+    public val holderSetSha256: String = holderSetSha256.also {
+        require(SHA256_HEX.matches(it)) { "dexcom_observation.invalid_holder_set" }
+    }
+    override val code: String get() = CODE
+
+    override fun equals(other: Any?): Boolean = other is ApprovedPermissionSet &&
+        other.policyVersion == policyVersion && other.holderSetSha256 == holderSetSha256
+
+    override fun hashCode(): Int = policyVersion.hashCode() * 31 + holderSetSha256.hashCode()
+    override fun toString(): String = "ApprovedPermissionSet($policyVersion, ${holderSetSha256.take(8)}…)"
+
+    public companion object {
+        public const val CODE: String = "approved_permission_set"
+        private val POLICY = Regex("[a-z0-9][a-z0-9._-]{0,63}")
+        private val SHA256_HEX = Regex("[0-9a-f]{64}")
+    }
+}
+
+/**
  * The sender identity that authentication proved for one message (ADR 0020, E9): package, exact version code and the
  * SHA-256 digests of the current APK signers. Stored with every message so its provenance survives later changes of
  * the trust policy. The UID is not kept: it is not stable across reinstalls.
@@ -40,7 +75,9 @@ public class AuthenticatedSender(
     public val packageName: String,
     public val versionCode: Long,
     signerCertificateSha256: Set<String>,
-) {
+) : MessageProvenance {
+    override val code: String get() = CODE
+
     public val signerCertificateSha256: List<String> = signerCertificateSha256.sorted()
 
     init {
@@ -61,35 +98,37 @@ public class AuthenticatedSender(
 
     override fun toString(): String = "AuthenticatedSender($packageName, $versionCode, signers=${signerCertificateSha256.size})"
 
-    private companion object {
-        val SHA256_HEX = Regex("[0-9a-f]{64}")
+    public companion object {
+        public const val CODE: String = "authenticated_sender"
+        private val SHA256_HEX = Regex("[0-9a-f]{64}")
     }
 }
 
-/** What one authenticated broadcast produced. Sender rejections are never recorded (ADR 0020, E5). */
+/** What one admitted broadcast produced. Rejections at the barrier are never recorded (ADR 0020, E5). */
 public sealed interface ObservationInput {
     public val receivedAtEpochMs: Long
-    public val sender: AuthenticatedSender
+    public val provenance: MessageProvenance
 
     public data class Observed(
         override val receivedAtEpochMs: Long,
-        override val sender: AuthenticatedSender,
+        override val provenance: MessageProvenance,
         val message: ObservedDexcomG7Message,
     ) : ObservationInput {
         init {
-            require(message.authenticatedPackage == sender.packageName) { "dexcom_observation.sender_mismatch" }
+            val expected = (provenance as? AuthenticatedSender)?.packageName
+            require(message.authenticatedPackage == expected) { "dexcom_observation.sender_mismatch" }
         }
     }
 
     public data class PayloadRejected(
         override val receivedAtEpochMs: Long,
-        override val sender: AuthenticatedSender,
+        override val provenance: MessageProvenance,
         val rejection: DexcomG7PayloadRejection,
     ) : ObservationInput
 
     public data class PayloadUnreadable(
         override val receivedAtEpochMs: Long,
-        override val sender: AuthenticatedSender,
+        override val provenance: MessageProvenance,
     ) : ObservationInput
 }
 
@@ -106,7 +145,7 @@ public enum class StoredMessageOutcome(public val code: String) {
 public data class StoredMessage(
     val messageId: String,
     val receivedAtEpochMs: Long,
-    val sender: AuthenticatedSender,
+    val provenance: MessageProvenance,
     val outcome: StoredMessageOutcome,
     val rejection: DexcomG7PayloadRejection?,
     val newReadings: Int,
@@ -235,7 +274,7 @@ public object ObservationPolicy {
             StoredMessage(
                 messageId = messageId,
                 receivedAtEpochMs = input.receivedAtEpochMs,
-                sender = input.sender,
+                provenance = input.provenance,
                 outcome = StoredMessageOutcome.OBSERVED,
                 rejection = null,
                 newReadings = stored.size - conflicts,
@@ -255,7 +294,7 @@ public object ObservationPolicy {
         input: ObservationInput,
         outcome: StoredMessageOutcome,
         rejection: DexcomG7PayloadRejection?,
-    ) = StoredMessage(messageId, input.receivedAtEpochMs, input.sender, outcome, rejection, 0, 0, 0, 0, emptyList(),
+    ) = StoredMessage(messageId, input.receivedAtEpochMs, input.provenance, outcome, rejection, 0, 0, 0, 0, emptyList(),
         emptyList(), 0)
 }
 
@@ -287,4 +326,7 @@ public interface DexcomObservationStore {
 
     /** Aggregates in storage, without loading the history; must equal [ObservationSummary.of] over [read]. */
     public fun summary(): ObservationSummaryRead
+
+    /** The last message and its stored readings; must equal [ObservationLatest.of] over [read]. */
+    public fun latest(): ObservationLatestRead
 }

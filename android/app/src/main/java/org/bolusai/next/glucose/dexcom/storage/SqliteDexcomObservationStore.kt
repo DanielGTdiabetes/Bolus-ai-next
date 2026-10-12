@@ -8,6 +8,7 @@ import android.database.sqlite.SQLiteDatabase
 import android.database.sqlite.SQLiteDatabaseCorruptException
 import android.database.sqlite.SQLiteOpenHelper
 import androidx.core.database.sqlite.transaction
+import org.bolusai.dexcomg7.ApprovedPermissionSet
 import org.bolusai.dexcomg7.AuthenticatedSender
 import org.bolusai.dexcomg7.DexcomG7PayloadRejection
 import org.bolusai.dexcomg7.DexcomG7RejectionCode
@@ -15,6 +16,8 @@ import org.bolusai.dexcomg7.DexcomObservationStore
 import org.bolusai.dexcomg7.ObservationFailure
 import org.bolusai.dexcomg7.ObservationIds
 import org.bolusai.dexcomg7.ObservationInput
+import org.bolusai.dexcomg7.ObservationLatest
+import org.bolusai.dexcomg7.ObservationLatestRead
 import org.bolusai.dexcomg7.ObservationPolicy
 import org.bolusai.dexcomg7.ObservationRead
 import org.bolusai.dexcomg7.ObservationSummary
@@ -25,10 +28,12 @@ import org.bolusai.dexcomg7.StoredMessageOutcome
 import org.bolusai.dexcomg7.StoredReading
 import org.bolusai.dexcomg7.TransmitterFingerprint
 import org.bolusai.dexcomg7.TransmitterHasher
+import org.bolusai.next.glucose.dexcom.DexcomReceptionBlocks
+import org.bolusai.next.glucose.dexcom.GateCause
 import java.io.Closeable
 
 /**
- * Device adapter of the Dexcom observation log (ADR 0020). Own database file, append-only by triggers, schema verified
+ * Device adapter of the Dexcom observation log (ADR 0020; schema v2 and durable reception blocks, ADR 0023). Own database file, append-only by triggers, schema verified
  * by definition on every opening. The policy decides each append inside one exclusive transaction and the result is
  * re-read before commit. Every read decodes strictly and fails closed. No row is ever updated or deleted.
  */
@@ -37,7 +42,7 @@ internal class SqliteDexcomObservationStore(
     name: String? = DATABASE_NAME,
     private val ids: ObservationIds,
     private val hasher: TransmitterHasher,
-) : DexcomObservationStore, Closeable {
+) : DexcomObservationStore, DexcomReceptionBlocks, Closeable {
     private class CorruptRow : RuntimeException("dexcom_observation.corrupt_storage")
 
     // Before SQLite sees the name: during instrumentation the app's own file is never opened (DexcomStorageGuard).
@@ -48,7 +53,7 @@ internal class SqliteDexcomObservationStore(
     /** Never the platform default, which deletes a file it considers corrupt. */
     private val errorHandler = DatabaseErrorHandler { throw SQLiteDatabaseCorruptException(ObservationFailure.CORRUPT_STORAGE.code) }
 
-    private val helper = object : SQLiteOpenHelper(context.applicationContext, name, null, DexcomObservationSchema.V1,
+    private val helper = object : SQLiteOpenHelper(context.applicationContext, name, null, DexcomObservationSchema.V2,
         errorHandler) {
         override fun onConfigure(db: SQLiteDatabase) {
             db.execSQL("PRAGMA synchronous=FULL")
@@ -60,12 +65,15 @@ internal class SqliteDexcomObservationStore(
                 "name NOT LIKE 'sqlite_%' AND name != 'android_metadata'", null).use {
                 if (it.moveToFirst()) throw DexcomObservationSchema.Mismatch("foreign objects")
             }
-            DexcomObservationSchema.SCHEMA_V1.forEach(db::execSQL)
+            DexcomObservationSchema.SCHEMA_V2.forEach(db::execSQL)
             DexcomObservationSchema.verify(db)
         }
 
         override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
-            throw DexcomObservationSchema.Mismatch("upgrade $oldVersion")
+            if (oldVersion != DexcomObservationSchema.V1 || newVersion != DexcomObservationSchema.V2) {
+                throw DexcomObservationSchema.Mismatch("upgrade $oldVersion")
+            }
+            DexcomObservationSchema.upgradeEmptyV1(db)
         }
 
         override fun onDowngrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
@@ -145,7 +153,7 @@ internal class SqliteDexcomObservationStore(
                 collapsedInMessage = totals[4].toCount(),
                 conflicts = readings[1].toCount(),
                 lastReceivedAtEpochMs = last?.receivedAtEpochMs,
-                lastSender = last?.sender,
+                lastProvenance = last?.provenance,
             ))
         }
         result
@@ -153,21 +161,90 @@ internal class SqliteDexcomObservationStore(
         ObservationSummaryRead.Failed(reason(failure, ObservationFailure.READ_FAILED))
     }
 
-    /**
-     * The summary Diagnóstico reads (ADR 0021, F4): only from an existing v1 log. `readableDatabase` may open for writing
-     * and run `onCreate` on a file whose `user_version` is 0, so the version and the schema are first checked on a
-     * read-only connection. An empty, version-0 or foreign file is `unsupported_schema` and stays untouched; it is never
-     * initialised nor shown as an empty log. Only then are the rows aggregated as in [summary].
-     */
-    fun summaryOfExisting(): ObservationSummaryRead = try {
-        val path = checkNotNull(file) { "dexcom_observation.in_memory_has_no_file" }.path
-        SQLiteDatabase.openDatabase(path, null, SQLiteDatabase.OPEN_READONLY, errorHandler).use { db ->
-            if (db.version != DexcomObservationSchema.V1) throw DexcomObservationSchema.Mismatch("version ${db.version}")
-            DexcomObservationSchema.verify(db)
+    override fun latest(): ObservationLatestRead = try {
+        val db = helper.readableDatabase
+        var result: ObservationLatestRead = ObservationLatestRead.Failed(ObservationFailure.READ_FAILED)
+        db.transaction {
+            val last = db.query("dexcom_messages", null, null, null, null, null, "seq DESC", "1").use { c ->
+                if (c.moveToFirst()) decodeMessage(c) else null
+            }
+            val readings = last?.let { readReadings(db, "message_id = ?", arrayOf(it.messageId)) }.orEmpty()
+            result = ObservationLatestRead.Loaded(ObservationLatest(last, readings))
         }
-        summary()
+        result
+    } catch (failure: RuntimeException) {
+        ObservationLatestRead.Failed(reason(failure, ObservationFailure.READ_FAILED))
+    }
+
+    /** Throws when the block table cannot be read or holds an unknown cause (ADR 0023, part I, point 5). */
+    override fun activeBlock(policyVersion: String): GateCause? {
+        val db = helper.readableDatabase
+        return db.query("dexcom_reception_blocks", arrayOf("cause"), "policy_version = ?", arrayOf(policyVersion),
+            null, null, "seq", "1").use { c ->
+            if (!c.moveToFirst()) null else GateCause.fromCode(c.getString(0))?.takeIf { it.durable } ?: throw CorruptRow()
+        }
+    }
+
+    override fun block(policyVersion: String, cause: GateCause, atEpochMs: Long) {
+        require(cause.durable) { "dexcom_reception.block_not_durable" }
+        helper.writableDatabase.transaction {
+            insertOrThrow("dexcom_reception_blocks", null, ContentValues().apply {
+                put("policy_version", policyVersion)
+                put("cause", cause.code)
+                put("blocked_at_ms", atEpochMs)
+            })
+        }
+    }
+
+    /** What a read-only connection found in an existing file before any helper opens it. */
+    private enum class Existing { EMPTY_V1, V2 }
+
+    /**
+     * Read-only paths (ADR 0021, F4): `readableDatabase` may open for writing and run `onCreate` or `onUpgrade`, so the
+     * version and the schema are first checked on a read-only connection. An exact, empty v1 file reads as an empty
+     * log without being migrated; any other version or a foreign file is `unsupported_schema` and stays untouched.
+     */
+    private fun existing(): Existing {
+        val path = checkNotNull(file) { "dexcom_observation.in_memory_has_no_file" }.path
+        return SQLiteDatabase.openDatabase(path, null, SQLiteDatabase.OPEN_READONLY, errorHandler).use { db ->
+            when (db.version) {
+                DexcomObservationSchema.V2 -> { DexcomObservationSchema.verify(db); Existing.V2 }
+                DexcomObservationSchema.V1 -> {
+                    DexcomObservationSchema.verify(db, DexcomObservationSchema.V1)
+                    val rows = db.rawQuery("SELECT (SELECT COUNT(*) FROM dexcom_messages) + " +
+                        "(SELECT COUNT(*) FROM dexcom_readings)", null).use { c -> check(c.moveToFirst()); c.getLong(0) }
+                    if (rows != 0L) throw DexcomObservationSchema.Mismatch("v1 log not empty")
+                    Existing.EMPTY_V1
+                }
+                else -> throw DexcomObservationSchema.Mismatch("version ${db.version}")
+            }
+        }
+    }
+
+    /** The summary Diagnóstico reads (ADR 0021, F4), only from an existing log. Never creates or migrates the file. */
+    fun summaryOfExisting(): ObservationSummaryRead = try {
+        when (existing()) {
+            Existing.EMPTY_V1 -> ObservationSummaryRead.Loaded(ObservationSummary(0, 0, 0, emptyMap(), 0, 0, 0, 0, null, null))
+            Existing.V2 -> summary()
+        }
     } catch (failure: RuntimeException) {
         ObservationSummaryRead.Failed(reason(failure, ObservationFailure.READ_FAILED))
+    }
+
+    /** The latest message for Inicio and Bolo (ADR 0023, plan step 5), read-only as [summaryOfExisting]. */
+    fun latestOfExisting(): ObservationLatestRead = try {
+        when (existing()) {
+            Existing.EMPTY_V1 -> ObservationLatestRead.Loaded(ObservationLatest(null, emptyList()))
+            Existing.V2 -> latest()
+        }
+    } catch (failure: RuntimeException) {
+        ObservationLatestRead.Failed(reason(failure, ObservationFailure.READ_FAILED))
+    }
+
+    /** The durable block of [policyVersion] in an existing log, read-only; throws when it cannot be established. */
+    fun activeBlockOfExisting(policyVersion: String): GateCause? = when (existing()) {
+        Existing.EMPTY_V1 -> null
+        Existing.V2 -> activeBlock(policyVersion)
     }
 
     private fun Long.toCount(): Int = if (this < 0 || this > Int.MAX_VALUE) throw CorruptRow() else toInt()
@@ -184,9 +261,18 @@ internal class SqliteDexcomObservationStore(
         val values = ContentValues().apply {
             put("message_id", message.messageId)
             put("received_at_ms", message.receivedAtEpochMs)
-            put("sender_package", message.sender.packageName)
-            put("sender_version_code", message.sender.versionCode)
-            put("sender_signers_sha256", message.sender.signerCertificateSha256.joinToString(","))
+            put("provenance", message.provenance.code)
+            when (val provenance = message.provenance) {
+                is AuthenticatedSender -> {
+                    put("sender_package", provenance.packageName)
+                    put("sender_version_code", provenance.versionCode)
+                    put("sender_signers_sha256", provenance.signerCertificateSha256.joinToString(","))
+                }
+                is ApprovedPermissionSet -> {
+                    put("policy_version", provenance.policyVersion)
+                    put("holder_set_sha256", provenance.holderSetSha256)
+                }
+            }
             put("outcome", message.outcome.code)
             put("contract", message.contract)
             put("rejection_code", message.rejection?.code?.code)
@@ -241,10 +327,14 @@ internal class SqliteDexcomObservationStore(
         StoredMessage(
             messageId = c.text("message_id"),
             receivedAtEpochMs = c.long("received_at_ms"),
-            sender = AuthenticatedSender(c.text("sender_package"), c.long("sender_version_code"),
-                c.text("sender_signers_sha256").split(",").toSet().also {
-                    if (it.joinToString(",") != c.text("sender_signers_sha256")) throw CorruptRow()
-                }),
+            provenance = when (c.text("provenance")) {
+                AuthenticatedSender.CODE -> AuthenticatedSender(c.text("sender_package"), c.long("sender_version_code"),
+                    c.text("sender_signers_sha256").split(",").toSet().also {
+                        if (it.joinToString(",") != c.text("sender_signers_sha256")) throw CorruptRow()
+                    })
+                ApprovedPermissionSet.CODE -> ApprovedPermissionSet(c.text("policy_version"), c.text("holder_set_sha256"))
+                else -> throw CorruptRow()
+            },
             outcome = outcome,
             rejection = rejection,
             newReadings = c.int("new_readings"),

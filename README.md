@@ -179,8 +179,8 @@ Fase 1 en curso: auditoría clínica y técnica de Legacy en modo de solo lectur
 El inventario funcional y el primer trazado de cálculo, perfil, IOB y glucosa
 están documentados, pero ninguna regla clínica está aprobada todavía. El sistema
 Bolus AI actual permanece sin cambios y sigue siendo la referencia de producción.
-Bolus AI Next todavía no implementa reglas clínicas ni tiene autoridad de
-tratamiento.
+Bolus AI Next no tiene reglas clínicas aprobadas ni autoridad de tratamiento.
+Sus reglas candidatas solo se usan en cálculos de prueba (ADR 0024).
 
 La fase 2 cuenta con un primer [contrato de entradas no disponibles](docs/contracts/unavailable-input-v1.md)
 en el núcleo compartido y pruebas comunes de sus códigos estables. Es un contrato
@@ -219,8 +219,20 @@ devuelve `policy_not_approved` hasta aprobar una política de recepción y las
 políticas clínicas restantes. Dexcom instalada no se modifica: la política
 compatible con su envío actual está aceptada para recepción y presentación
 técnica en el [ADR 0023](docs/adr/0023-dexcom-existing-transport-trust.md)
-desde el 2026-10-12. Quedan implementación y validación; cálculo y tratamiento
-siguen bloqueados.
+desde el 2026-10-12. La entrega del 2026-10-12 implementa esa política: receiver protegido por el
+permiso, conjunto exacto con anclas I-2b, bloqueo durable, registro v2 con
+procedencia y última lectura en Inicio y Bolo, con antigüedad desde la recepción,
+hora de medida no verificada y vigencia sin política. Mientras la prueba I-3 del
+Pixel no demuestre la visibilidad, la recepción real queda cerrada como
+`visibility_unproven`. Véase la
+[validación](docs/validation/dexcom-permission-reception-and-test-calculation-2026-10-12.md).
+
+El motor único `shared/bolus-engine` incluye un conjunto candidato trazado al
+núcleo backend de Legacy (`bcac891`), con paridad exacta en 12 vectores
+capturados. Bolo ofrece un **cálculo de prueba** con desglose, bloqueos por dato
+ausente, huella y el aviso «no utilizar para tratamiento». No registra ni
+sincroniza nada y no tiene autoridad clínica
+([ADR 0024](docs/adr/0024-candidate-engine-test-calculation.md)).
 
 ## Documentación para ejecutar el proyecto
 

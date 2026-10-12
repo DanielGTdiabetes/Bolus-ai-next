@@ -5,6 +5,10 @@ import android.database.sqlite.SQLiteDatabase
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import org.bolusai.dexcomg7.AuthenticatedSender
+import org.bolusai.next.glucose.dexcom.GateCause
+import org.bolusai.dexcomg7.ObservationLatestRead
+import org.bolusai.dexcomg7.ObservationLatest
+import org.bolusai.dexcomg7.ApprovedPermissionSet
 import org.bolusai.dexcomg7.DexcomG7PayloadRejection
 import org.bolusai.dexcomg7.DexcomG7RejectionCode
 import org.bolusai.dexcomg7.ObservationFailure
@@ -67,7 +71,7 @@ class SqliteDexcomObservationStoreDeviceTest {
                 conflict.conflictOf)
             assertEquals(listOf("newField"), read.messages.first().unknownReadingFields)
             assertEquals(AndroidTransmitterHasher.fingerprint("SYNTH-TX"), read.readings.first().transmitter)
-            assertEquals(listOf(sender, sender), read.messages.map { it.sender })
+            assertEquals(listOf(sender, sender), read.messages.map { it.provenance })
         }
     }
 
@@ -96,7 +100,7 @@ class SqliteDexcomObservationStoreDeviceTest {
             assertEquals(listOf(StoredMessageOutcome.PAYLOAD_REJECTED, StoredMessageOutcome.PAYLOAD_UNREADABLE),
                 read.messages.map { it.outcome })
             assertEquals(rejection, read.messages.first().rejection)
-            assertEquals(sender, read.messages.last().sender)
+            assertEquals(sender, read.messages.last().provenance)
             assertTrue(read.readings.isEmpty())
         }
     }
@@ -178,6 +182,87 @@ class SqliteDexcomObservationStoreDeviceTest {
         store().use { s ->
             assertEquals(ObservationRead.Failed(ObservationFailure.UNSUPPORTED_SCHEMA), s.read())
             assertEquals(ObservationWrite.Failed(ObservationFailure.UNSUPPORTED_SCHEMA), s.record(ObservationInput.PayloadUnreadable(2, sender)))
+        }
+    }
+
+    // ADR 0023, plan step 1: schema v2, provenance of the permission set, durable blocks and the latest message.
+
+    private val permissionSet = ApprovedPermissionSet("adr0023-i2b-2026-10-12", "c".repeat(64))
+
+    private fun writeV1(rows: Boolean) {
+        SQLiteDatabase.openOrCreateDatabase(context.getDatabasePath(name), null).use { db ->
+            DexcomObservationSchema.SCHEMA_V1.forEach(db::execSQL)
+            if (rows) db.execSQL("INSERT INTO dexcom_messages (message_id, received_at_ms, sender_package, " +
+                "sender_version_code, sender_signers_sha256, outcome, contract, new_readings, duplicate_readings, " +
+                "conflicting_readings, collapsed_in_message, unknown_top_level, unknown_reading, unreportable_unknown) " +
+                "VALUES ('m', 1, 'example.sender', 1, '${"a".repeat(64)}', 'payload_unreadable', " +
+                "'modified-dexcom-g7-broadcast-observed-v1', 0, 0, 0, 0, '', '', 0)")
+            db.version = DexcomObservationSchema.V1
+        }
+    }
+
+    @Test fun anEmptyV1LogIsReadAsEmptyWithoutMigrationAndMigratedByTheWriter() {
+        writeV1(rows = false)
+        store().use { s ->
+            assertEquals(ObservationLatestRead.Loaded(ObservationLatest(null, emptyList())), s.latestOfExisting())
+            assertEquals(0, (s.summaryOfExisting() as ObservationSummaryRead.Loaded).summary.messages)
+        }
+        SQLiteDatabase.openDatabase(context.getDatabasePath(name).path, null, SQLiteDatabase.OPEN_READONLY).use {
+            assertEquals(DexcomObservationSchema.V1, it.version)
+        }
+        store().use { s -> assertTrue(s.record(ObservationInput.PayloadUnreadable(5, permissionSet)) is ObservationWrite.Recorded) }
+        SQLiteDatabase.openDatabase(context.getDatabasePath(name).path, null, SQLiteDatabase.OPEN_READONLY).use {
+            assertEquals(DexcomObservationSchema.V2, it.version)
+            DexcomObservationSchema.verify(it)
+        }
+    }
+
+    @Test fun aV1LogWithRowsIsNeverMigratedNorDropped() {
+        writeV1(rows = true)
+        store().use { s ->
+            assertEquals(ObservationWrite.Failed(ObservationFailure.UNSUPPORTED_SCHEMA),
+                s.record(ObservationInput.PayloadUnreadable(5, permissionSet)))
+            assertEquals(ObservationLatestRead.Failed(ObservationFailure.UNSUPPORTED_SCHEMA), s.latestOfExisting())
+        }
+        SQLiteDatabase.openDatabase(context.getDatabasePath(name).path, null, SQLiteDatabase.OPEN_READONLY).use { db ->
+            assertEquals(DexcomObservationSchema.V1, db.version)
+            db.rawQuery("SELECT COUNT(*) FROM dexcom_messages", null).use { it.moveToFirst(); assertEquals(1, it.getInt(0)) }
+        }
+    }
+
+    @Test fun permissionSetProvenanceRoundTripsAndNeverStoresASender() {
+        store().use { s ->
+            val message = ObservedDexcomG7Message(null, listOf(reading(0, 10)), 0, emptyList(), emptyList(), 0)
+            s.record(ObservationInput.Observed(7, permissionSet, message))
+            s.record(observed(reading(0, 20)))
+            val read = loaded(s)
+            assertEquals(listOf(permissionSet, sender), read.messages.map { it.provenance })
+            assertEquals(ObservationLatestRead.Loaded(ObservationLatest.of(read)), s.latest())
+        }
+        SQLiteDatabase.openDatabase(context.getDatabasePath(name).path, null, SQLiteDatabase.OPEN_READONLY).use { db ->
+            db.rawQuery("SELECT sender_package, policy_version FROM dexcom_messages ORDER BY seq LIMIT 1", null).use {
+                it.moveToFirst()
+                assertTrue(it.isNull(0))
+                assertEquals("adr0023-i2b-2026-10-12", it.getString(1))
+            }
+        }
+    }
+
+    @Test fun durableBlocksPersistPerPolicyVersionAndAreAppendOnly() {
+        store().use { s ->
+            assertEquals(null, s.activeBlock("adr0023-i2b-2026-10-12"))
+            s.block("adr0023-i2b-2026-10-12", GateCause.HOLDER_SET_CHANGED, 9)
+            s.block("adr0023-i2b-2026-10-12", GateCause.SIGNERS_CHANGED, 10)
+        }
+        store().use { s ->
+            assertEquals(GateCause.HOLDER_SET_CHANGED, s.activeBlock("adr0023-i2b-2026-10-12"))
+            assertEquals(GateCause.HOLDER_SET_CHANGED, s.activeBlockOfExisting("adr0023-i2b-2026-10-12"))
+            assertEquals(null, s.activeBlock("another-policy"))
+            assertTrue(runCatching { s.block("p", GateCause.VISIBILITY_UNPROVEN, 1) }.isFailure)
+        }
+        SQLiteDatabase.openDatabase(context.getDatabasePath(name).path, null, SQLiteDatabase.OPEN_READWRITE).use { db ->
+            assertTrue(runCatching { db.execSQL("DELETE FROM dexcom_reception_blocks") }.isFailure)
+            assertTrue(runCatching { db.execSQL("UPDATE dexcom_reception_blocks SET cause = 'x'") }.isFailure)
         }
     }
 }

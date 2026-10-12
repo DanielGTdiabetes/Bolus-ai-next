@@ -1,5 +1,7 @@
 package org.bolusai.next.ui
 
+import org.bolusai.dexcomg7.ApprovedPermissionSet
+import org.bolusai.dexcomg7.AuthenticatedSender
 import org.bolusai.dexcomg7.ObservationFailure
 import org.bolusai.dexcomg7.ObservationSummary
 import org.bolusai.next.glucose.dexcom.DexcomReceiverStatus
@@ -13,12 +15,13 @@ internal sealed interface DexcomLogState {
 }
 
 /**
- * Technical lines of the folded block (ADR 0021, F1 and F3): counts, status, last reception and sender only. No
+ * Technical lines of the folded block (ADR 0021, F1 and F3): counts, status, last reception and provenance only. No
  * glucose value, trend, producer timestamp or transmitter fingerprint is ever printed. The receiver status comes first
  * and does not depend on the log read (ADR 0022, R9).
  */
 internal object DexcomLogBlock {
-    fun lines(state: DexcomLogState, receiver: DexcomReceiverStatus): List<String> = receiver.lines() + log(state)
+    fun lines(state: DexcomLogState, receiver: DexcomReceiverStatus): List<String> =
+        receiver.lines() + log(state) + receiver.reception
 
     private fun log(state: DexcomLogState): List<String> = when (state) {
         DexcomLogState.Reading -> listOf("dexcom_log.read.pending")
@@ -35,7 +38,11 @@ internal object DexcomLogBlock {
                 "dexcom_log.collapsed_in_message=$collapsedInMessage",
                 "dexcom_log.conflicts=$conflicts",
                 "dexcom_log.last_received_utc=${lastReceivedAtEpochMs?.let { Instant.ofEpochMilli(it).toString() } ?: "none"}",
-                "dexcom_log.last_sender=${lastSender?.let { "${it.packageName}@${it.versionCode}" } ?: "none"}",
+                "dexcom_log.last_provenance=${when (val last = lastProvenance) {
+                    null -> "none"
+                    is AuthenticatedSender -> "${last.code}:${last.packageName}@${last.versionCode}"
+                    is ApprovedPermissionSet -> "${last.code}:${last.policyVersion}"
+                }}",
             )
         }
     }

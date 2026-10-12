@@ -767,6 +767,16 @@ lee el reloj. La glucosa sigue bloqueada (`authentication_failed`,
 lógica clínica sin cambios. Véase la
 [validación](validation/dexcom-g7-receiver-intake-failure-2026-10-11.md).
 
+### Entrega de recepción por permiso, presentación y cálculo de prueba — 2026-10-12
+
+Implementa los pasos 1 a 6 del [ADR 0023](adr/0023-dexcom-existing-transport-trust.md)
+y el [ADR 0024](adr/0024-candidate-engine-test-calculation.md): puerta por
+permiso con anclas I-2b y bloqueo durable, registro v2 con procedencia,
+presentación de la última lectura en Inicio y Bolo, motor candidato único con
+paridad exacta en 12 vectores de Legacy `bcac891` y cálculo de prueba en Bolo.
+Evidencia y comprobaciones pendientes del Pixel (P1 a P6) en la
+[validación](validation/dexcom-permission-reception-and-test-calculation-2026-10-12.md).
+
 ### Secuencia de capacidades
 
 La secuencia inicial siguiente queda como referencia de dependencias, no como
@@ -784,6 +794,14 @@ una lista que deba reiniciarse ni una obligación de dividir cada capacidad:
 Cada cambio debe indicar fase, criterio cubierto, pruebas, riesgos y pendientes.
 
 ### Prioridad de continuación — 2026-10-12
+
+**Actualización tras la entrega del 2026-10-12:** recepción por permiso,
+presentación y cálculo de prueba implementados (sección anterior). Siguiente:
+P1 y P2 en el Pixel. Si P2 demuestra que hace falta, añadir
+`QUERY_ALL_PACKAGES` en una PR pequeña, seguida de P3 a P6 e informe B1. En
+paralelo y sin depender del teléfono, preparar la siguiente regla candidata
+trazada o los límites en el perfil, con aprobación del propietario sobre los
+valores.
 
 La [PR #53](https://github.com/DanielGTdiabetes/Bolus-ai-next/pull/53)
 (ADR 0022 R11) quedó integrada en `origin/main` mediante `740af25` durante

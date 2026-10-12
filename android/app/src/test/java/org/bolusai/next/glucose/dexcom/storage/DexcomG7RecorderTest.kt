@@ -38,12 +38,13 @@ class DexcomG7RecorderTest {
             }
             val rejection = (input as? ObservationInput.PayloadRejected)?.rejection
             return ObservationWrite.Recorded(
-                StoredMessage("m", input.receivedAtEpochMs, input.sender, outcome, rejection, 0, 0, 0, 0, emptyList(), emptyList(), 0),
+                StoredMessage("m", input.receivedAtEpochMs, input.provenance, outcome, rejection, 0, 0, 0, 0, emptyList(), emptyList(), 0),
                 emptyList(),
             )
         }
         override fun read(): ObservationRead = error("unused")
         override fun summary(): ObservationSummaryRead = error("unused")
+        override fun latest(): org.bolusai.dexcomg7.ObservationLatestRead = error("unused")
     }
 
     private val clock = EpochClock { 42L }
@@ -101,6 +102,7 @@ class DexcomG7RecorderTest {
             override fun record(input: ObservationInput): ObservationWrite = throw defect
             override fun read(): ObservationRead = error("unused")
         override fun summary(): ObservationSummaryRead = error("unused")
+        override fun latest(): org.bolusai.dexcomg7.ObservationLatestRead = error("unused")
         }
         assertSame(defect, assertThrows(IllegalStateException::class.java) { DexcomG7Recorder(store, clock).record(observed) })
     }

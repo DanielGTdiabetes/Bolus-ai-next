@@ -6,6 +6,8 @@ import org.bolusai.dexcomg7.ObservationSummary
 import org.bolusai.next.glucose.dexcom.DexcomReceiverComponent
 import org.bolusai.next.glucose.dexcom.DexcomReceiverStatus
 import org.bolusai.next.glucose.dexcom.DexcomSenderTrustPolicy
+import org.bolusai.next.glucose.dexcom.HolderSnapshot
+import org.bolusai.next.glucose.dexcom.PermissionHolder
 import org.bolusai.next.ui.DexcomLogBlock
 import org.bolusai.next.ui.DexcomLogState
 import org.junit.Assert.assertEquals
@@ -38,7 +40,7 @@ class DexcomLogBlockTest {
                 "dexcom_log.collapsed_in_message=0",
                 "dexcom_log.conflicts=0",
                 "dexcom_log.last_received_utc=none",
-                "dexcom_log.last_sender=none",
+                "dexcom_log.last_provenance=none",
             ),
             DexcomLogBlock.lines(DexcomLogState.Loaded(summary), receiver),
         )
@@ -51,7 +53,7 @@ class DexcomLogBlockTest {
             rejectedByCode = mapOf("dexcom_g7.payload.wrong_type" to 1),
             storedReadings = 3, duplicates = 1, collapsedInMessage = 2, conflicts = 1,
             lastReceivedAtEpochMs = 1_790_000_000_000,
-            lastSender = AuthenticatedSender("example.sender", 42, setOf("a".repeat(64))),
+            lastProvenance = AuthenticatedSender("example.sender", 42, setOf("a".repeat(64))),
         )
         val lines = DexcomLogBlock.lines(DexcomLogState.Loaded(summary), receiver)
         assertEquals(
@@ -66,10 +68,31 @@ class DexcomLogBlockTest {
                 "dexcom_log.collapsed_in_message=2",
                 "dexcom_log.conflicts=1",
                 "dexcom_log.last_received_utc=2026-09-21T14:13:20Z",
-                "dexcom_log.last_sender=example.sender@42",
+                "dexcom_log.last_provenance=authenticated_sender:example.sender@42",
             ),
             lines,
         )
         assertFalse(lines.any { "a".repeat(16) in it })
+    }
+
+    @Test
+    fun `reception lines of the permission gate follow the log and never carry glucose`() {
+        val status = DexcomReceiverStatus(DexcomReceiverComponent.ENABLED, DexcomSenderTrustPolicy.Pending,
+            DexcomReceiverStatus.receptionLines(false, HolderSnapshot.Read(false, null,
+                listOf(PermissionHolder("org.bolusai.next", 1, 1, setOf("e".repeat(64)), setOf("org.bolusai.next"))),
+                "org.bolusai.next", 1)))
+        assertEquals(listOf(
+            "dexcom_receiver.component=enabled",
+            "dexcom_receiver.policy=pending",
+            "dexcom_log.read.pending",
+            "dexcom_reception.policy=adr0023-i2b-2026-10-12",
+            "dexcom_reception.next_permission=missing",
+            "dexcom_reception.gate_now=dexcom_reception.visibility_unproven",
+            "dexcom_reception.full_visibility=false",
+            "dexcom_reception.visible_holders=org.bolusai.next",
+        ), DexcomLogBlock.lines(DexcomLogState.Reading, status))
+        assertEquals(listOf("dexcom_reception.policy=adr0023-i2b-2026-10-12", "dexcom_reception.next_permission=granted",
+            "dexcom_reception.gate_now=dexcom_reception.holders_query_failed", "dexcom_reception.snapshot=query_failed"),
+            DexcomReceiverStatus.receptionLines(true, HolderSnapshot.QueryFailed))
     }
 }

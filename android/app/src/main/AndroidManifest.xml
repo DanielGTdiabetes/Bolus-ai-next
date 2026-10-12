@@ -1,6 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:tools="http://schemas.android.com/tools">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!--
+        ADR 0023 I-6: requested so the producer discovers Next as a holder. During validation it is granted with
+        `adb shell pm grant`; a button arrives when the milestone closes. QUERY_ALL_PACKAGES is not requested until the
+        Pixel test of I-3 shows it is needed; meanwhile the gate stays closed as visibility_unproven.
+    -->
+    <uses-permission android:name="com.dexcom.cgm.EXTERNAL_PERMISSION" />
     <application
         android:allowBackup="false"
         android:dataExtractionRules="@xml/data_extraction_rules"
@@ -20,15 +25,16 @@
             </intent-filter>
         </activity>
         <!--
-            ADR 0022: disabled by default; only `adb shell pm enable` turns it on (R1). No android:permission: the
-            producer's permission is dangerous and proves nothing (R8). Authenticity comes from the sender identity,
-            checked before any extra is read; with the Pending policy every message is rejected and nothing is stored.
+            ADR 0022 R1 and ADR 0023 I-7: disabled by default; only `adb shell pm enable` turns it on until the real
+            validation is approved. ADR 0023, part I, point 1: Android delivers only from senders holding the Dexcom
+            permission. That proves membership of the holders, not the sender: the permission gate compares the
+            holders with the approved set before any extra is read.
         -->
         <receiver
             android:name=".glucose.dexcom.DexcomG7Receiver"
             android:enabled="false"
             android:exported="true"
-            tools:ignore="ExportedReceiver">
+            android:permission="com.dexcom.cgm.EXTERNAL_PERMISSION">
             <intent-filter>
                 <action android:name="com.dexcom.cgm.EXTERNAL_BROADCAST" />
             </intent-filter>
