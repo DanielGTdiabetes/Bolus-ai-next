@@ -103,8 +103,8 @@ La confirmación de datos (ADR 0014) vive en el mismo módulo: completitud
 estructural, eventos `confirm`/`revoke` append-only fuera de la huella,
 validación conjunta de versiones y eventos (`ProfileRecord`), política común y
 estado en cuatro dimensiones con elegibilidad clínica siempre bloqueada. El
-adaptador Android usa `clinical-profile.db` v2, verifica el esquema por
-definición al abrir y al migrar desde v1, y evalúa la política en una
+adaptador Android usa `clinical-profile.db` v3 (tabla `profile_limits` del
+ADR 0025), verifica el esquema por definición al abrir y al migrar desde v1 o v2, y evalúa la política en una
 transacción exclusiva. La pantalla de Ajustes → Cálculo presenta esos estados y
 llama a los casos de uso (`readState`, `confirmRequest`, `revokeRequest`,
 `record`, `resolvePending`); no decide reglas ni abre SQLite. Bolo muestra un
