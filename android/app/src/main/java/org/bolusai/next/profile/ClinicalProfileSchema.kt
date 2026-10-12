@@ -11,6 +11,7 @@ import android.database.sqlite.SQLiteDatabase
 internal object ClinicalProfileSchema {
     const val V1 = 1
     const val V2 = 2
+    const val V3 = 3
 
     internal class Mismatch(message: String) : RuntimeException(message)
 
@@ -114,6 +115,30 @@ internal object ClinicalProfileSchema {
 
     val SCHEMA_V2: List<String> = SCHEMA_V1 + V2_ADDITIONS
 
+    /**
+     * Objects added by v3 (ADR 0025): the profile-wide limits of content schema 2, one row per limit. Schema 1 versions
+     * have no rows, so their limits stay unknown; nothing is backfilled. v1 and v2 objects are kept unchanged.
+     */
+    val V3_ADDITIONS: List<String> = listOf(
+        """
+        CREATE TABLE profile_limits (
+            version INTEGER NOT NULL REFERENCES profile_versions(version),
+            limit_code TEXT NOT NULL CHECK(length(limit_code) > 0),
+            value TEXT CHECK(value IS NULL OR (length(value) BETWEEN 1 AND 10 AND value NOT GLOB '*[^0-9.]*')),
+            PRIMARY KEY(version, limit_code)
+        )
+        """.trimIndent(),
+        "CREATE TRIGGER profile_limits_immutable_update BEFORE UPDATE ON profile_limits " +
+            "BEGIN SELECT RAISE(ABORT, 'profile.storage.immutable'); END",
+        "CREATE TRIGGER profile_limits_immutable_delete BEFORE DELETE ON profile_limits " +
+            "BEGIN SELECT RAISE(ABORT, 'profile.storage.immutable'); END",
+        "CREATE TRIGGER profile_limits_latest_only BEFORE INSERT ON profile_limits " +
+            "WHEN NEW.version <> (SELECT MAX(version) FROM profile_versions) " +
+            "BEGIN SELECT RAISE(ABORT, 'profile.storage.immutable'); END",
+    )
+
+    val SCHEMA_V3: List<String> = SCHEMA_V2 + V3_ADDITIONS
+
     private class Index(val name: String, val unique: Boolean, val origin: String, val partial: Boolean, val columns: List<String>)
 
     private val SEGMENTS_PK = Index("sqlite_autoindex_profile_segments_1", true, "pk", false,
@@ -122,17 +147,20 @@ internal object ClinicalProfileSchema {
         listOf("operation_id"))
     private val ONE_REVOCATION = Index("profile_confirmation_one_revocation", true, "c", true, listOf("revokes_seq"))
     private val BY_VERSION = Index("profile_confirmation_by_version", false, "c", true, listOf("profile_version"))
+    private val LIMITS_PK = Index("sqlite_autoindex_profile_limits_1", true, "pk", false, listOf("version", "limit_code"))
 
     private fun indexes(version: Int): Map<String, List<Index>> = when (version) {
         V1 -> mapOf("profile_versions" to emptyList(), "profile_segments" to listOf(SEGMENTS_PK))
         V2 -> mapOf("profile_versions" to emptyList(), "profile_segments" to listOf(SEGMENTS_PK),
             "profile_confirmation_events" to listOf(EVENTS_UNIQUE_OPERATION, ONE_REVOCATION, BY_VERSION))
+        V3 -> indexes(V2) + ("profile_limits" to listOf(LIMITS_PK))
         else -> throw Mismatch("version")
     }
 
     private fun statements(version: Int): List<String> = when (version) {
         V1 -> SCHEMA_V1
         V2 -> SCHEMA_V2
+        V3 -> SCHEMA_V3
         else -> throw Mismatch("version")
     }
 

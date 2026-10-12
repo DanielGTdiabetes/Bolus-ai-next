@@ -2,7 +2,8 @@ package org.bolusai.profile
 
 /**
  * Canonical text of [ProfileContent] (ADR 0012, section 4.5). Metadata is excluded, so equal content yields the
- * same fingerprint. Parameters are ordered by code and segments by start minute; "~" marks not configured.
+ * same fingerprint. Limits (schema 2, ADR 0025) and parameters are ordered by code and segments by start minute;
+ * "~" marks not configured. A schema 1 content has no limit lines, so its text and fingerprint never change.
  */
 object ProfileCodec {
     private const val HEADER = "bolus-ai-next/clinical-profile/content"
@@ -19,6 +20,12 @@ object ProfileCodec {
             Setting.NotConfigured -> MISSING
             is Setting.Declared -> zone.value.id
         }).append('\n')
+        content.limits.entries.sortedBy { it.key.code }.forEach { (limit, value) ->
+            append("limit=").append(limit.code).append(':').append(when (value) {
+                ProfileValue.NotConfigured -> MISSING
+                is ProfileValue.Entered -> value.decimal.text
+            }).append('\n')
+        }
         content.schedules.sortedBy { it.parameter.code }.forEach { schedule ->
             append("parameter=").append(schedule.parameter.code).append('\n')
             schedule.segments.sortedBy { it.startMinute }.forEach { segment ->
@@ -43,12 +50,21 @@ object ProfileCodec {
         }
         val schema = field("schema").toInt()
         val catalog = requireNotNull(ProfileCatalog.parameters(schema))
+        val limitCatalog = requireNotNull(ProfileCatalog.limits(schema))
         val unitCode = field("glucose_unit")
         val unit: Setting<GlucoseUnit> = if (unitCode == MISSING) Setting.NotConfigured
             else Setting.Declared(requireNotNull(GlucoseUnit.fromCode(unitCode)))
         val zoneId = field("time_zone")
         val zone: Setting<ProfileTimeZone> = if (zoneId == MISSING) Setting.NotConfigured
             else Setting.Declared(ProfileTimeZone(zoneId))
+        val limits = mutableMapOf<ProfileLimit, ProfileValue>()
+        while (index < lines.size - 1 && lines[index].startsWith("limit=")) {
+            val (code, value) = field("limit").split(':', limit = 2).also { require(it.size == 2) }
+            val limit = requireNotNull(ProfileLimit.fromCode(code))
+            require(limits.put(limit, if (value == MISSING) ProfileValue.NotConfigured
+                else ProfileValue.Entered(CanonicalDecimal(value))) == null)
+        }
+        require(limits.keys == limitCatalog.toSet())
         val schedules = mutableMapOf<ProfileParameter, ParameterSchedule>()
         while (index < lines.size - 1) {
             val parameter = requireNotNull(ProfileParameter.fromCode(field("parameter")))
@@ -62,7 +78,7 @@ object ProfileCodec {
             }
             require(schedules.put(parameter, ParameterSchedule(parameter, segments)) == null)
         }
-        val content = ProfileContent(schema, unit, zone, catalog.map { requireNotNull(schedules[it]) })
+        val content = ProfileContent(schema, unit, zone, catalog.map { requireNotNull(schedules[it]) }, limits)
         content.takeIf { encode(it) == text }
     } catch (_: IllegalArgumentException) {
         null

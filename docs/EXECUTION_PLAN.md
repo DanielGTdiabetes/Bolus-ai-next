@@ -777,6 +777,17 @@ paridad exacta en 12 vectores de Legacy `bcac891` y cálculo de prueba en Bolo.
 Evidencia y comprobaciones pendientes del Pixel (P1 a P6) en la
 [validación](validation/dexcom-permission-reception-and-test-calculation-2026-10-12.md).
 
+### Entrega de límites del cálculo en el perfil — 2026-10-12
+
+[ADR 0025](adr/0025-profile-calculation-limits.md): paso de redondeo, bolo máximo
+y corrección máxima pasan a ser límites del perfil en el esquema de contenido 2.
+Se capturan en el editor, se versionan, se confirman con la versión y el cálculo
+de prueba los toma de ella. `clinical-profile.db` v3 migra desde v1 y v2 sin
+rellenar nada. Las versiones de esquema 1 dejan los límites como desconocidos y
+bloquean solo los pasos que los necesitan. Motor `0.3.0-candidate`.
+Comprobaciones y pendientes del Pixel en la
+[validación](validation/profile-limits-2026-10-12.md).
+
 ### Secuencia de capacidades
 
 La secuencia inicial siguiente queda como referencia de dependencias, no como
@@ -795,55 +806,29 @@ Cada cambio debe indicar fase, criterio cubierto, pruebas, riesgos y pendientes.
 
 ### Prioridad de continuación — 2026-10-12
 
-**Actualización tras la entrega del 2026-10-12:** recepción por permiso,
-presentación y cálculo de prueba implementados (sección anterior). Siguiente:
-P1 y P2 en el Pixel. Si P2 demuestra que hace falta, añadir
-`QUERY_ALL_PACKAGES` en una PR pequeña, seguida de P3 a P6 e informe B1. En
-paralelo y sin depender del teléfono, preparar la siguiente regla candidata
-trazada o los límites en el perfil, con aprobación del propietario sobre los
-valores.
+Estado en `main`: hay recepción Dexcom por permiso con presentación en Inicio y
+Bolo (ADR 0023), motor candidato único con cálculo de prueba en Bolo (ADR 0024)
+y límites del cálculo en el perfil versionado (ADR 0025). La recepción real y las
+pruebas instrumentadas siguen sin ejecutarse en el Pixel. Nada de esto autoriza
+tratamiento.
 
-La [PR #53](https://github.com/DanielGTdiabetes/Bolus-ai-next/pull/53)
-(ADR 0022 R11) quedó integrada en `origin/main` mediante `740af25` durante
-este ajuste. No queda pendiente de fusión; comprobar el CI del SHA integrado.
+1. Teléfono, cuando haya acceso: P1 a P6 de la
+   [validación del 2026-10-12](validation/dexcom-permission-reception-and-test-calculation-2026-10-12.md)
+   y P1, P6 y P7 ampliados en la [validación de límites](validation/profile-limits-2026-10-12.md).
+   `QUERY_ALL_PACKAGES` solo se añade si P2 (I-3) lo demuestra, en una PR pequeña.
+   B1 sigue pendiente de validación real y aprobación del informe.
+2. Sin depender del teléfono: la siguiente regla candidata trazada a Legacy en
+   el motor único, con validación pendiente visible y sin defaults. Candidatas
+   por orden: historial local de insulina e IOB calculado (LC-004, LC-005), que
+   sustituye el IOB manual, y fibra/Warsaw (LC-008). El techo de IOB
+   (`max_iob_u`) y el intervalo mínimo entre bolos dependen del IOB calculado.
+3. Mantener la matriz de `docs/audit/legacy-functional-inventory.md` en cada
+   entrega, incluidos MyFitnessPal y los casos de uso del bot.
 
-1. Concentrar la siguiente entrega funcional en el primer hito Android: recepción
-   local Dexcom, persistencia y presentación con origen, hora y estado. L1 ya
-   identificó la APK instalada y el propietario aprobó
-   el 2026-10-12 el [ADR 0023](adr/0023-dexcom-existing-transport-trust.md).
-   Implementar el recorrido completo con I-2b, B4b, C5a y las condiciones de
-   B1 e I-3, sin repetir las preguntas aprobadas ni exigir identity sharing
-   al productor. Los riesgos se aceptan solo para recepción/presentación técnica.
-2. Avanzar también en el motor único y el recorrido de cálculo de prueba con
-   entradas explícitas, incluidas lecturas reales conservando sus limitaciones.
-   No esperar a terminar Dexcom ni la app completa. Presentar resultados como
-   pruebas no utilizables para tratamiento, con desglose y procedencia; no
-   sustituir reglas pendientes por defaults ni elegir divergencias en silencio.
-3. Si falta evidencia de validación, dejar explícito qué bloquea y avanzar
-   en las capacidades independientes autorizadas. Retención, contadores,
-   exportación y refinamientos visuales quedan fuera de la ruta inmediata salvo
-   que sean necesarios para un riesgo concreto o los priorice el propietario.
-
-El ADR 0023 es la decisión aceptada del hito: recepción y presentación técnica,
-sin aprobar cálculo terapéutico ni umbral de vigencia. El desarrollo y ejecución
-de cálculos de prueba tienen autorización separada en AGENTS.md §3. La aprobación del
-2026-10-12 selecciona I-2b: Legacy y reloj pueden actualizarse con paquete y
-firmantes aprobados, mientras Dexcom mantiene versión exacta. Quedan pruebas
-de cobertura de visibilidad y validación real; B1 no se da por verificada.
-
-La recepción y presentación con Dexcom real conservan las puertas de los ADR
-vigentes que no contradigan el alcance Dexcom confirmado arriba. Revisar la
-política de Next según el ADR aceptado; la aprobación no activa por sí sola
-el receiver ni constituye evidencia de implementación. Unidad, timestamps y
-presentación siguen las opciones aprobadas; vigencia clínica y cálculo no se
-aprueban por inferencia.
-La validación offline debe preservar la recepción del sensor: según la decisión
-registrada en el ADR 0022, no activar el modo avión que corta su Bluetooth;
-documentar y probar la ausencia de dependencia de Internet sin interrumpirlo.
-La decisión D1 del ADR 0023 queda resuelta por el propietario el 2026-10-11:
-Wi-Fi y datos móviles apagados, Bluetooth activo y sin activar modo avión.
-Comprobar ausencia de red validada y continuidad de recepción del sensor,
-también tras reinicio. Esta decisión no acepta el resto del ADR.
+La validación offline real mantiene Bluetooth activo, Wi-Fi y datos móviles
+apagados y sin modo avión (ADR 0023, D1). No se modifican Dexcom, Legacy ni la
+app del reloj. La retransmisión del reloj es de contingencia cuando falla Dexcom
+y necesita su propio contrato.
 
 ## 7. Comandos iniciales para Codex
 

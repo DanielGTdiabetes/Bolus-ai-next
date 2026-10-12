@@ -126,7 +126,8 @@ sensibilidad y objetivo, sin valores por defecto y con «sin configurar» distin
 de `0`. Cada versión guarda fecha, origen, escritor y huella. Se pueden consultar
 y restaurar versiones anteriores como versión nueva. Cambiar de unidad nunca
 reinterpreta valores: la versión que cambia la unidad se guarda sin sensibilidad
-ni objetivo. El perfil no se usa para calcular, recomendar ni tratar. Véanse el
+ni objetivo. El perfil no se usa para recomendar ni tratar; solo el cálculo de
+prueba de Bolo lo lee (ADR 0024). Véanse el
 [ADR 0012](docs/adr/0012-local-clinical-profile.md) y la
 [validación](docs/validation/local-clinical-profile-2026-09-27.md).
 El dominio común y la base local ya registran la confirmación de datos de una
@@ -232,7 +233,12 @@ núcleo backend de Legacy (`bcac891`), con paridad exacta en 12 vectores
 capturados. Bolo ofrece un **cálculo de prueba** con desglose, bloqueos por dato
 ausente, huella y el aviso «no utilizar para tratamiento». No registra ni
 sincroniza nada y no tiene autoridad clínica
-([ADR 0024](docs/adr/0024-candidate-engine-test-calculation.md)).
+([ADR 0024](docs/adr/0024-candidate-engine-test-calculation.md)). Paso de
+redondeo, bolo máximo y corrección máxima se guardan como límites de la versión
+del perfil, se confirman con ella y el cálculo los toma sin volver a teclearlos.
+Las versiones anteriores los dejan desconocidos y bloquean solo los pasos que los
+necesitan ([ADR 0025](docs/adr/0025-profile-calculation-limits.md),
+[validación](docs/validation/profile-limits-2026-10-12.md)).
 
 ## Documentación para ejecutar el proyecto
 

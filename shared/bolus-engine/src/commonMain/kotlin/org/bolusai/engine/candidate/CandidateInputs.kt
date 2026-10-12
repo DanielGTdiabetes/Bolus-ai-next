@@ -95,6 +95,10 @@ public data class SegmentValue(
  * The profile version used, copied from the local profile. The engine never reads the profile store: the caller
  * passes the version, its fingerprint and whether its data are confirmed (ADR 0014). Confirmation is not clinical
  * approval.
+ *
+ * [roundStep], [maxBolus] and [maxCorrection] are the profile-wide limits of that same version (content schema 2,
+ * ADR 0025), in insulin units. A version without them carries the producer's cause, for example
+ * `profile.round_step.not_in_schema` for schema 1 or `profile.round_step.not_configured`; nothing is filled in.
  */
 public data class ProfileSnapshot(
     public val version: Long,
@@ -105,6 +109,9 @@ public data class ProfileSnapshot(
     public val carbRatio: List<SegmentValue>,
     public val sensitivity: List<SegmentValue>,
     public val target: List<SegmentValue>,
+    public val roundStep: Input<Quantity>,
+    public val maxBolus: Input<Quantity>,
+    public val maxCorrection: Input<Quantity>,
 ) {
     init {
         require(version > 0) { "engine.profile.invalid_version" }
@@ -119,9 +126,7 @@ public data class ProfileSnapshot(
 /**
  * Everything one candidate calculation reads. [localMinuteOfDay] is resolved by the platform from
  * [calculationAtEpochMs] and the profile's time zone; it is unavailable when the zone is not configured.
- *
- * [roundStep], [maxBolus] and [maxCorrection] are not part of profile schema 1. They are typed by the user for each
- * test calculation and are recorded as such; absence blocks the steps that need them.
+ * Rounding step, maximum bolus and maximum correction come only from [profile] (ADR 0025).
  */
 public data class CandidateRequest(
     public val calculationAtEpochMs: Long,
@@ -130,9 +135,6 @@ public data class CandidateRequest(
     public val carbs: Input<CarbsValue>,
     public val glucose: Input<GlucoseValue>,
     public val iob: Input<IobValue>,
-    public val roundStep: Input<Quantity>,
-    public val maxBolus: Input<Quantity>,
-    public val maxCorrection: Input<Quantity>,
 ) {
     init {
         val minute = (localMinuteOfDay as? Input.Provided)?.value
