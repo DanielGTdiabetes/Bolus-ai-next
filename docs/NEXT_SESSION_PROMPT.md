@@ -28,7 +28,7 @@ ENTREGA 2026-10-12 — IOB CANDIDATO EN EL MOTOR (ADR 0026)
 explícito con las curvas de Legacy `bcac891` y el bolo extendido. Paridad exacta
 en 19 vectores capturados con scripts/legacy-vectors/capture_iob_vectors.py.
 Sin defaults de DIA, curva ni pico. El historial declara su cobertura y debe
-llegar desde `ahora - DIA - extendido máximo`; si no, bloquea. Solo una lista
+llegar desde `ahora - max(DIA, duración efectiva) - extendido máximo`; si no, bloquea. Solo una lista
 vacía con cobertura suficiente da `0 U`. Aún no tiene productor: Bolo sigue con
 IOB manual. Paridad de Walsh en iOS sin comprobar (exp de la plataforma).
 

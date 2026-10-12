@@ -20,6 +20,9 @@ jobs:
           distribution: temurin
           java-version: "21"
       - uses: gradle/actions/setup-gradle@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
       - name: Verify
         shell: pwsh
         run: .\scripts\verify.ps1

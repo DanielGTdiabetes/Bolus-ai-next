@@ -141,6 +141,45 @@ class CandidateIobTest {
     }
 
     @Test
+    fun unstretchedTabulatedCurveRequiresItsOwnDurationNotTheShorterDia() {
+        // Regression: Legacy keeps the 300 min Fiasp table for a DIA of 4.99 h (299.4 min). A dose 299.7 min ago
+        // still leaves insulin, so a history that only covers the DIA could miss an active dose.
+        val fiasp = Input.Provided(action(InsulinCurve.FIASP, dia = "4.99"))
+        val diaOnly = NOW - 299L * 60_000L - 24_000L
+        assertEquals(listOf("iob.history.insufficient_window"),
+            causes(calculate(fiasp, Input.Provided(history(emptyList(), from = diaOnly)))))
+        val tableEnd = NOW - 300L * 60_000L
+        val activeOutsideDia = InsulinDose("a", NOW - 17_982_000L, Quantity("3"), 0)
+        val covered = calculate(fiasp, Input.Provided(history(listOf(activeOutsideDia), from = tableEnd)))
+        val computed = covered.outcome as IobOutcome.Computed
+        assertEquals(tableEnd, computed.requiredCoverageFromEpochMs)
+        assertTrue(computed.units > 0.0, "the dose beyond the DIA is still active")
+        assertEquals(300.0, computed.effectiveActionMinutes)
+        assertTrue(IobWarnings.TABULATED_DURATION_NOT_STRETCHED in covered.warnings)
+    }
+
+    @Test
+    fun windowIsNeverShorterThanTheDiaAndStretchedTablesEndAtTheDia() {
+        val longer = calculate(Input.Provided(action(InsulinCurve.NOVORAPID, dia = "5.01")),
+            Input.Provided(history(emptyList())))
+        val computed = longer.outcome as IobOutcome.Computed
+        assertEquals(NOW - 18_036_000L, computed.requiredCoverageFromEpochMs)
+        assertEquals(300.0, computed.effectiveActionMinutes)
+        assertTrue(IobWarnings.TABULATED_DURATION_NOT_STRETCHED in longer.warnings)
+
+        for (dia in listOf("5", "4", "6")) {
+            val result = calculate(Input.Provided(action(InsulinCurve.FIASP, dia = dia)), Input.Provided(history(emptyList())))
+            val outcome = result.outcome as IobOutcome.Computed
+            assertEquals(dia.toDouble() * 60, outcome.effectiveActionMinutes, dia)
+            assertEquals(NOW - dia.toLong() * HOUR, outcome.requiredCoverageFromEpochMs, dia)
+            assertFalse(IobWarnings.TABULATED_DURATION_NOT_STRETCHED in result.warnings, dia)
+        }
+        val walsh = calculate(Input.Provided(action(dia = "4.99")), Input.Provided(history(emptyList())))
+        assertEquals(4.99 * 60, (walsh.outcome as IobOutcome.Computed).effectiveActionMinutes)
+        assertEquals(NOW - 17_964_000L, (walsh.outcome as IobOutcome.Computed).requiredCoverageFromEpochMs)
+    }
+
+    @Test
     fun anomalousDosesBlock() {
         val a = Input.Provided(action())
         assertEquals(listOf("iob.history.duplicate_identity"),

@@ -3,7 +3,6 @@ package org.bolusai.engine.iob
 import org.bolusai.engine.EngineIdentity
 import org.bolusai.engine.candidate.EngineSha256
 import org.bolusai.engine.candidate.Input
-import org.bolusai.engine.candidate.Quantity
 import kotlin.math.ceil
 import kotlin.math.max
 
@@ -36,11 +35,13 @@ public sealed interface IobOutcome {
     /**
      * [units] is the IOB, never negative. [contributions] lists every dose of the history, including those with
      * nothing left; Legacy omits contributions of 0.01 U or less from its breakdown but still adds them.
-     * [requiredCoverageFromEpochMs] is the earliest instant the history had to cover.
+     * [effectiveActionMinutes] is how long the curve really acts for the declared DIA (ADR 0026, §3.1) and
+     * [requiredCoverageFromEpochMs] the earliest instant the history had to cover.
      */
     public data class Computed(
         public val units: Double,
         public val contributions: List<DoseContribution>,
+        public val effectiveActionMinutes: Double,
         public val requiredCoverageFromEpochMs: Long,
     ) : IobOutcome
 
@@ -69,6 +70,9 @@ public object IobWarnings {
     public const val TEST_ONLY: String = "result.test_only_not_for_treatment"
     public const val RULES_NOT_APPROVED: String = "iob.candidate_validation_pending"
     public const val PEAK_IGNORED_BY_CURVE: String = "iob.peak_ignored_by_curve"
+
+    /** A tabulated curve keeps its 300 min because the DIA is within 1 min of it; the window uses the longer one. */
+    public const val TABULATED_DURATION_NOT_STRETCHED: String = "iob.action.tabulated_duration_not_stretched"
 }
 
 /**
@@ -88,12 +92,15 @@ public object CandidateIob {
             is Input.Unavailable -> { causes += a.cause; null }
             is Input.Provided -> a.value
         }
-        val durationMs = action?.let { durationMs(it.diaHours) }
+        val durationMs = action?.let { windowMs(it) }
         var peak = 0.0
         if (action != null) {
             if (!action.dataConfirmed) causes += "profile.unconfirmed"
             val durationMinutes = action.diaHours.value * 60
             if (durationMs == 0L) causes += "iob.action.dia_not_positive"
+            else if (InsulinCurves.effectiveDurationMinutes(action.curve, durationMinutes) != durationMinutes) {
+                warnings += IobWarnings.TABULATED_DURATION_NOT_STRETCHED
+            }
             if (action.curve.usesPeak) {
                 when (val p = action.peakMinutes) {
                     is Input.Unavailable -> causes += p.cause
@@ -182,14 +189,22 @@ public object CandidateIob {
             total += contribution
             DoseContribution(dose.id, units, elapsed, contribution)
         }
-        return IobOutcome.Computed(max(total, 0.0), contributions, requiredFrom)
+        val effective = InsulinCurves.effectiveDurationMinutes(action.curve, duration)
+        return IobOutcome.Computed(max(total, 0.0), contributions, effective, requiredFrom)
     }
 
-    /** Exact duration in milliseconds from the canonical text (at most 3 decimals), so no IEEE error moves the window. */
-    private fun durationMs(diaHours: Quantity): Long {
-        val parts = diaHours.text.split('.')
+    /**
+     * Action window in milliseconds: the DIA, or the curve's own end when it acts longer (an unstretched table). It is
+     * never shorter than the DIA. The DIA is exact from the canonical text (at most 3 decimals), so no IEEE error
+     * moves the window; the table end is a whole number of minutes.
+     */
+    private fun windowMs(action: InsulinAction): Long {
+        val parts = action.diaHours.text.split('.')
         val thousandths = parts[0].toLong() * 1000 + (parts.getOrNull(1)?.padEnd(3, '0')?.toLong() ?: 0L)
-        return thousandths * 3_600L
+        val diaMs = thousandths * 3_600L
+        if (diaMs == 0L) return 0L
+        val effectiveMinutes = InsulinCurves.effectiveDurationMinutes(action.curve, action.diaHours.value * 60)
+        return max(diaMs, effectiveMinutes.toLong() * MS_PER_MINUTE)
     }
 }
 

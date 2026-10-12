@@ -22,6 +22,17 @@ internal object InsulinCurves {
             InsulinCurve.LINEAR -> max(0.0, 1.0 - tMinutes / durationMinutes)
         }
 
+    /**
+     * Minutes after which [curve] leaves no insulin for a declared [durationMinutes]. The tabulated curves end at
+     * their table (300 min) and Legacy only stretches them when the DIA differs by more than 1 min, so a DIA of
+     * 4.99 h still acts for 300 min. Every other curve ends exactly at the DIA.
+     */
+    fun effectiveDurationMinutes(curve: InsulinCurve, durationMinutes: Double): Double = when (curve) {
+        InsulinCurve.FIASP -> FIASP.effectiveDuration(durationMinutes)
+        InsulinCurve.NOVORAPID -> NOVORAPID.effectiveDuration(durationMinutes)
+        else -> durationMinutes
+    }
+
     /** `_walsh_tau`. A non-positive result means Legacy would fall back to the linear curve; Next blocks instead. */
     fun walshTau(peak: Double, duration: Double): Double {
         if (duration <= 0.0) return 0.0
@@ -77,7 +88,7 @@ internal object InsulinCurves {
     class Interpolated(private val points: List<Pair<Int, Int>>) {
         private val totalArea: Double
         private val cumulative: List<Double>
-        private val maxTime: Int = points.last().first
+        val maxTime: Int = points.last().first
 
         init {
             var total = 0.0
@@ -93,9 +104,15 @@ internal object InsulinCurves {
             cumulative = cdf
         }
 
+        /** Legacy stretches the table only when the DIA differs from it by more than 1 minute. */
+        fun stretches(durationOverride: Double): Boolean = durationOverride > 0 && abs(durationOverride - maxTime) > 1.0
+
+        fun effectiveDuration(durationOverride: Double): Double =
+            if (stretches(durationOverride)) durationOverride else maxTime.toDouble()
+
         fun remaining(tMinutes: Double, durationOverride: Double): Double {
             var t = tMinutes
-            if (durationOverride > 0 && abs(durationOverride - maxTime) > 1.0) {
+            if (stretches(durationOverride)) {
                 t /= durationOverride / maxTime
             }
             if (t <= 0) return 1.0

@@ -794,10 +794,14 @@ Comprobaciones y pendientes del Pixel en la
 el IOB desde un historial de dosis explícito con las curvas de Legacy `bcac891`
 (Walsh, bilineal, Fiasp, NovoRapid y lineal) y el reparto del bolo extendido.
 Paridad exacta en 19 vectores capturados. Sin defaults de DIA, curva ni pico.
-Exige cobertura desde `ahora - DIA - extendido máximo declarado`; historial
+Exige cobertura desde `ahora - max(DIA, duración efectiva de la curva) - extendido máximo declarado`; historial
 ausente, insuficiente, duplicado, futuro o incoherente bloquea, y los fallbacks
 silenciosos de Legacy pasan a bloqueos. Motor `0.4.0-candidate`. Aún no hay
 productor: Bolo sigue con IOB manual. Fase 6, puntos 4 y 5, solo en el motor.
+La ventana usa la duración efectiva de las tablas sin estirar (regresión del
+falso cero con DIA 4,99 h). `verify.ps1` y la CI reproducen los vectores de
+Legacy desde el SHA fijado y exigen resultados no terapéuticos con validación
+pendiente.
 
 ### Secuencia de capacidades
 

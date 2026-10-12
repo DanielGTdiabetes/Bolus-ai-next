@@ -89,7 +89,7 @@ no se ha revisado: su procedencia aquí es Legacy.
 | Walsh con `tau <= 0` cae a lineal | `iob.action.walsh_peak_incompatible` |
 | Bilineal con pico `>= DIA` divide por cero | `iob.action.peak_not_before_end` |
 | Pico validado entre 10 y 300 min | solo coherencia estructural (`> 0`, antes del final); el rango clínico queda pendiente |
-| Ventana fija `DIA + 1 h` | el historial debe cubrir desde `ahora - DIA - duración extendida máxima declarada` hasta `ahora`; si no, `iob.history.insufficient_window` |
+| Ventana fija `DIA + 1 h` | el historial debe cubrir desde `ahora - max(DIA, duración efectiva) - duración extendida máxima declarada` hasta `ahora`; si no, `iob.history.insufficient_window` (§3.1) |
 | Fuente local que falla → `partial` y calcula | el productor no puede declarar parcial: o garantiza la cobertura o pasa `Unavailable` |
 | Dosis con instante futuro cuentan enteras | `iob.history.future_dose` |
 | Dosis `<= 0` se ignoran | `iob.history.non_positive_dose` |
@@ -97,6 +97,23 @@ no se ha revisado: su procedencia aquí es Legacy.
 | Basal filtrada por texto | el historial solo contiene bolos rápidos; el productor separa por tipo |
 | Desglose omite contribuciones `<= 0,01 U` | se listan todas; la suma es la misma |
 | Caché `iob_cache.json` como último conocido | no hay caché: un IOB anterior nunca sustituye al actual |
+
+### 3.1 Duración efectiva de las curvas tabuladas
+
+Las tablas de Fiasp y NovoRapid terminan en 300 min y Legacy solo las estira si
+la DIA difiere más de 1 min. Con una DIA entre 299 y 301 min la curva sigue
+actuando 300 min. La primera versión de esta entrega exigía cobertura solo desde
+`ahora - DIA`: con DIA 4,99 h (299,4 min) y una dosis de hace 299,7 min, que aún
+deja insulina, un historial que cubriera solo la DIA daba un `0 U` conocido. Era
+un falso cero.
+
+Corrección: la ventana exigida usa `max(DIA, duración efectiva de la curva)`.
+La duración efectiva sale en el resultado (`effectiveActionMinutes`) y, cuando no
+coincide con la DIA, se avisa con `iob.action.tabulated_duration_not_stretched`.
+El cálculo del IOB no cambia y la paridad con Legacy se mantiene. La regresión
+`unstretchedTabulatedCurveRequiresItsOwnDurationNotTheShorterDia` falla con el
+motor anterior (`a4daa93`), que devolvía `Computed(units=0.0)`, y pasa con la
+corrección.
 
 Una dosis fuera del intervalo declarado (`iob.history.dose_outside_coverage`) o
 más larga que la duración extendida declarada
@@ -158,7 +175,9 @@ golden vectors clínicos.
 
 ## Seguridad y pruebas
 
-- `CandidateIobTest` (13 pruebas): paridad exacta con los 19 vectores; resultado
+- `CandidateIobTest` (15 pruebas): paridad exacta con los 19 vectores; ventana
+  con la duración efectiva de las tablas sin estirar y nunca menor que la DIA
+  (§3.1, regresión); resultado
   no utilizable; lista vacía como único cero; historial ausente, acción ausente,
   sin confirmar, pico ausente y DIA cero; pico no positivo, al final y Walsh
   incompatible; aviso de pico ignorado; ventana exacta, insuficiente y ampliada
@@ -166,6 +185,15 @@ golden vectors clínicos.
   duplicada, dosis futura, fuera de cobertura, nula o con extendido mayor que el
   declarado; acumulación de causas; trozos no administrados; huella determinista
   y sensible a cada entrada; rechazo de entradas mal formadas.
+- `scripts/verify.ps1` y la CI reproducen los vectores de los ADR 0024 y 0026:
+  `scripts/legacy-vectors/verify_legacy_vectors.py` obtiene solo el commit fijado
+  del repositorio público de Legacy en un directorio temporal sin push, ejecuta
+  los scripts de captura con `python -I` y compara byte a byte. Un vector
+  alterado hace fallar la verificación. Sin red se puede omitir con
+  `-SkipLegacyVectors`, con aviso visible; la CI no lo omite y fija Python 3.13.
+- `verify.ps1` exige además que ambos resultados mantengan
+  `usableForTreatment = false` y validación `pending`, y que ningún código Android
+  use todavía `org.bolusai.engine.iob`.
 - No se ejecutó nada contra Legacy ni sus despliegues. La captura usa una copia
   local separada.
 - Queda pendiente la aprobación clínica de curvas, tablas, bolo extendido y del
