@@ -11,7 +11,7 @@ import org.junit.runner.RunWith
 import java.util.UUID
 
 /**
- * ADR 0025 on SQLite: `clinical-profile.db` v3 stores the profile-wide limits of content schema 2. Migrations from v1
+ * ADR 0025 on SQLite: `clinical-profile.db` (v3, now v4) stores the profile-wide limits of content schema 2. Migrations from v1
  * and v2 keep every row, fingerprint and confirmation, and fill in no limit. Synthetic isolated files only.
  */
 @RunWith(AndroidJUnit4::class)
@@ -90,9 +90,9 @@ class ClinicalProfileLimitsDeviceTest {
                     assertEquals(confirmed, state.confirmation is VersionConfirmation.Active)
                     ProfileLimit.entries.forEach { assertNull(state.latest.content.limit(it)) }
                 }
-                assertEquals(ClinicalProfileSchema.V3, userVersion(name))
+                assertEquals(ClinicalProfileSchema.V4, userVersion(name))
                 assertEquals(emptyList<String>(), limitRows(name))
-                raw(name) { ClinicalProfileSchema.verify(it, ClinicalProfileSchema.V3) }
+                raw(name) { ClinicalProfileSchema.verify(it, ClinicalProfileSchema.V4) }
             }
         }
     }

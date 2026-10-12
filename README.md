@@ -243,8 +243,10 @@ El motor también calcula un **IOB candidato** desde un historial de dosis
 explícito, con las curvas de Legacy y paridad exacta en 19 vectores. Un historial
 ausente, insuficiente o incoherente bloquea; solo una lista vacía con cobertura
 suficiente da `0 U`. Aún no tiene productor: Bolo sigue con IOB manual hasta que
-el perfil tenga DIA y curva y exista un historial local
-([ADR 0026](docs/adr/0026-candidate-iob-from-dose-history.md)).
+exista un historial local
+([ADR 0026](docs/adr/0026-candidate-iob-from-dose-history.md)). DIA, curva y
+pico ya se declaran en el perfil versionado, sin defaults y con validación
+pendiente ([ADR 0027](docs/adr/0027-profile-insulin-action.md)).
 
 ## Documentación para ejecutar el proyecto
 

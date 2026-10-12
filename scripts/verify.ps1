@@ -232,6 +232,17 @@ try {
             throw "Engine results must stay non-therapeutic with validation pending (ADR 0024, ADR 0026): $($engineResult.Path)"
         }
     }
+    # ADR 0027: the profile declares the curve with its own enum because it must not depend on the engine. Both lists
+    # must name the same curves with the same use of the peak, in the same order, so a declared curve always maps.
+    $curvePattern = '(?m)^\s+[A-Z]+\("([a-z]+)", (true|false)\),'
+    $engineCurves = @([regex]::Matches((Get-Content -Raw -LiteralPath (Join-Path $repositoryRoot "shared\bolus-engine\src\commonMain\kotlin\org\bolusai\engine\iob\IobInputs.kt")), $curvePattern) |
+        ForEach-Object { "$($_.Groups[1].Value):$($_.Groups[2].Value)" })
+    $profileCurveSource = Get-Content -Raw -LiteralPath (Join-Path $repositoryRoot "shared\clinical-profile\src\commonMain\kotlin\org\bolusai\profile\ProfileContent.kt")
+    $profileCurveBody = [regex]::Match($profileCurveSource, '(?s)enum class InsulinCurveCode.*?\n\s+;\n').Value
+    $profileCurves = @([regex]::Matches($profileCurveBody, $curvePattern) | ForEach-Object { "$($_.Groups[1].Value):$($_.Groups[2].Value)" })
+    if ($engineCurves.Count -eq 0 -or (($engineCurves -join ",") -cne ($profileCurves -join ","))) {
+        throw "Profile and engine insulin curves differ (ADR 0027): engine [$($engineCurves -join ', ')], profile [$($profileCurves -join ', ')]"
+    }
     # ADR 0026, section 5: the candidate IOB has no producer yet. No Android source may call it until the profile carries
     # the insulin action and a local dose history exists; Bolo keeps the manual IOB.
     $iobConsumers = @(Get-ChildItem -LiteralPath (Join-Path $repositoryRoot "android") -Recurse -File |
@@ -518,7 +529,7 @@ jobs:
             if ($LASTEXITCODE -ne 0) { throw "Could not wake the display for UI instrumentation" }
             # Direct instrumentation avoids collecting unrelated device logcat or clinical data.
             $instrumentation = @(adb shell am instrument -w -r `
-                -e class org.bolusai.next.glucose.dexcom.AndroidDexcomSenderEvidenceTest,org.bolusai.next.NavigationDeviceTest,org.bolusai.next.MealDraftDeviceTest,org.bolusai.next.MealHistoryDeviceTest,org.bolusai.next.MealRestoreDeviceTest,org.bolusai.next.meals.SqliteMealRepositoryDeviceTest,org.bolusai.next.DarkThemeDeviceTest,org.bolusai.next.TestCalculationDeviceTest,org.bolusai.next.profile.SqliteClinicalProfileRepositoryDeviceTest,org.bolusai.next.profile.ClinicalProfileConfirmationDeviceTest,org.bolusai.next.profile.ClinicalProfileLimitsDeviceTest,org.bolusai.next.ClinicalProfileDeviceTest,org.bolusai.next.ClinicalProfileConfirmationUiDeviceTest,org.bolusai.next.ClinicalProfileUnavailabilityDeviceTest,org.bolusai.next.BolusProfileDetailsDeviceTest,org.bolusai.next.ProfileStorageGuardDeviceTest,org.bolusai.next.glucose.dexcom.DexcomBundleExtrasDeviceTest,org.bolusai.next.glucose.dexcom.storage.SqliteDexcomObservationStoreDeviceTest,org.bolusai.next.DexcomLogDiagnosticsDeviceTest,org.bolusai.next.glucose.dexcom.storage.DexcomLogIsolationDeviceTest,org.bolusai.next.glucose.dexcom.DexcomG7ReceiverDeviceTest `
+                -e class org.bolusai.next.glucose.dexcom.AndroidDexcomSenderEvidenceTest,org.bolusai.next.NavigationDeviceTest,org.bolusai.next.MealDraftDeviceTest,org.bolusai.next.MealHistoryDeviceTest,org.bolusai.next.MealRestoreDeviceTest,org.bolusai.next.meals.SqliteMealRepositoryDeviceTest,org.bolusai.next.DarkThemeDeviceTest,org.bolusai.next.TestCalculationDeviceTest,org.bolusai.next.profile.SqliteClinicalProfileRepositoryDeviceTest,org.bolusai.next.profile.ClinicalProfileConfirmationDeviceTest,org.bolusai.next.profile.ClinicalProfileLimitsDeviceTest,org.bolusai.next.profile.ClinicalProfileInsulinActionDeviceTest,org.bolusai.next.ClinicalProfileDeviceTest,org.bolusai.next.ClinicalProfileConfirmationUiDeviceTest,org.bolusai.next.ClinicalProfileUnavailabilityDeviceTest,org.bolusai.next.BolusProfileDetailsDeviceTest,org.bolusai.next.ProfileStorageGuardDeviceTest,org.bolusai.next.glucose.dexcom.DexcomBundleExtrasDeviceTest,org.bolusai.next.glucose.dexcom.storage.SqliteDexcomObservationStoreDeviceTest,org.bolusai.next.DexcomLogDiagnosticsDeviceTest,org.bolusai.next.glucose.dexcom.storage.DexcomLogIsolationDeviceTest,org.bolusai.next.glucose.dexcom.DexcomG7ReceiverDeviceTest `
                 "$testPackage/$isolationRunner")
             $instrumentationExit = $LASTEXITCODE
             $instrumentation | Write-Output

@@ -141,8 +141,9 @@ golden vectors clínicos.
   manual. Conectar el IOB calculado exige DIA, curva y pico en el perfil y un
   historial local; hasta entonces no hay productor. No se mezcla con esta
   entrega para no cambiar el codec del cálculo dos veces.
-- **Campos del perfil.** DIA, curva y pico entrarán como nueva versión del
-  esquema de contenido, sin defaults, como en el ADR 0025.
+- **Campos del perfil.** DIA, curva y pico están ya en el esquema de contenido 3,
+  sin defaults ([ADR 0027](0027-profile-insulin-action.md)). Falta traducirlos a
+  `InsulinAction` cuando exista el historial.
 - **Historial local de insulina.** Next no registra tratamientos reales
   (AGENTS.md §2, §7). El historial que alimente este cálculo debe definir qué
   dosis contiene y de dónde vienen (registro manual de dosis administradas,

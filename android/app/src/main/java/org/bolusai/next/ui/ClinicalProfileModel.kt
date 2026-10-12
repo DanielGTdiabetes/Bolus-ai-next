@@ -255,6 +255,16 @@ internal class ClinicalProfileModel(
         changed?.invoke()
     }
 
+    /** Declares the insulin curve (ADR 0027). Choosing "not configured" on a version without a curve changes nothing. */
+    fun setInsulinCurve(curve: Setting<InsulinCurveCode>) {
+        val current = editor ?: return
+        if (busy || current.content.insulinCurve == curve) return
+        editor = current.withInsulinCurve(curve)
+        failure = null
+        editFailure = null
+        changed?.invoke()
+    }
+
     /** Structural edits need a settled schedule: not locked, no pending invalid text, nothing saving. */
     fun canEditStructure(parameter: ProfileParameter): Boolean {
         val current = editor ?: return false
@@ -412,7 +422,12 @@ internal class ClinicalProfileModel(
         parseLimitKey(key)?.let { limit ->
             when (val parsed = DecimalInputs.parse(text)) {
                 DecimalInput.Blank -> editor = current.withLimit(limit, ProfileValue.NotConfigured)
-                is DecimalInput.Valid -> editor = current.withLimit(limit, ProfileValue.Entered(parsed.value))
+                is DecimalInput.Valid -> {
+                    val value = ProfileValue.Entered(parsed.value)
+                    // The peak is whole minutes (ADR 0027): a fraction is rejected, never rounded.
+                    if (limit.accepts(value)) editor = current.withLimit(limit, value)
+                    else errors[key] = ProfileFailure.NOT_WHOLE_NUMBER
+                }
                 is DecimalInput.Invalid -> errors[key] = parsed.reason
             }
             return

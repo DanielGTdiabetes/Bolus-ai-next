@@ -29,9 +29,10 @@ class ProfileLimitsTest {
         """.trimIndent(), ProfileCodec.encode(old))
     }
 
-    @Test fun newProfilesUseSchemaTwoWithEveryLimitExplicitlyNotConfigured() {
+    // Since ADR 0027 new profiles start in schema 3, which keeps every schema 2 limit.
+    @Test fun newProfilesUseTheCurrentSchemaWithEveryLimitExplicitlyNotConfigured() {
         val empty = ProfileContent.empty()
-        assertEquals(2, empty.schemaVersion)
+        assertEquals(ProfileCatalog.CURRENT_SCHEMA, empty.schemaVersion)
         ProfileLimit.entries.forEach { assertEquals(ProfileValue.NotConfigured, empty.limit(it), it.code) }
         assertTrue(empty.completeness(knownZones) is ProfileCompleteness.Incomplete)
     }
@@ -111,10 +112,10 @@ class ProfileLimitsTest {
         val cleared = typed.withLimit(ProfileLimit.ROUND_STEP, ProfileValue.NotConfigured)
         assertEquals(start, cleared.content)
         assertFalse(cleared.changed)
-        // From a schema 2 start an explicit "not configured" stays schema 2.
+        // From a current-schema start an explicit "not configured" stays in that schema.
         val fresh = ProfileContent.empty()
         val newEditor = ProfileEditor(0, fresh, fresh, null)
-        assertEquals(2, newEditor.withLimit(ProfileLimit.MAX_BOLUS, entered("8"))
+        assertEquals(ProfileCatalog.CURRENT_SCHEMA, newEditor.withLimit(ProfileLimit.MAX_BOLUS, entered("8"))
             .withLimit(ProfileLimit.MAX_BOLUS, ProfileValue.NotConfigured).content.schemaVersion)
     }
 

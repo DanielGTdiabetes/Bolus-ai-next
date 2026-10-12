@@ -31,6 +31,14 @@ Sin defaults de DIA, curva ni pico. El historial declara su cobertura y debe
 llegar desde `ahora - max(DIA, duración efectiva) - extendido máximo`; si no, bloquea. Solo una lista
 vacía con cobertura suficiente da `0 U`. Aún no tiene productor: Bolo sigue con
 IOB manual. Paridad de Walsh en iOS sin comprobar (exp de la plataforma).
+La ventana usa la duración efectiva de las tablas sin estirar (regresión del
+falso cero con DIA 4,99 h). verify.ps1 y la CI reproducen los vectores de Legacy.
+
+ENTREGA 2026-10-12 — ACCIÓN DE LA INSULINA EN EL PERFIL (ADR 0027)
+DIA (h), curva y pico (min enteros) en el esquema de contenido 3, sin defaults
+ni rangos. `clinical-profile.db` v4 migra desde v1 a v3 sin rellenar nada. Las
+versiones anteriores la dejan desconocida. Aún no se traduce a `InsulinAction`.
+Pendiente en el Pixel: A1 a A4 de docs/validation/profile-insulin-action-2026-10-12.md.
 
 SIGUIENTE
 - Teléfono: cálculo con perfil real confirmado (P6) y actualización sobre un
@@ -40,11 +48,11 @@ SIGUIENTE
   pruebas ya ejecutadas sin cambios que lo justifiquen. En esta sesión Codex
   hizo las pruebas del Pixel mientras Claude avanzaba desde la nube, sin
   modificar la implementación de perfil o motor de Claude.
-- Sin teléfono: DIA, curva y pico en el perfil versionado sin defaults (como
-  ADR 0025) y conectar `CandidateIob` al cálculo de prueba en lugar del IOB
-  manual. El historial local de insulina necesita una decisión del propietario
-  sobre su origen (Next no registra tratamientos reales); preguntarla agrupada.
-  Después, fibra/Warsaw (LC-008). Resolver y registrar el SHA remoto de Legacy
+- Sin teléfono: historial local de insulina, en entrega separada y con decisión
+  del propietario sobre su origen (Next no registra tratamientos reales);
+  preguntarla agrupada. Después, traducir el perfil a `InsulinAction` y conectar
+  `CandidateIob` al cálculo de prueba en lugar del IOB manual. Luego
+  fibra/Warsaw (LC-008). Resolver y registrar el SHA remoto de Legacy
   antes de usarlo.
 No repetir las decisiones ya aprobadas.
 

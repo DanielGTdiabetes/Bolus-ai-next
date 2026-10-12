@@ -316,7 +316,10 @@ internal class ClinicalProfileScreen(
             is Setting.Declared -> zone.value.id
         }), "profile:review:zone")
         heading(context.getString(R.string.profile_limits_title), "profile:review:limits")
-        ProfileLimit.entries.forEach { label(limitText(body, it), "profile:review:limit:${it.code}") }
+        ProfileLimit.of(ProfileFieldGroup.CALCULATION_LIMITS).forEach { label(limitText(body, it), "profile:review:limit:${it.code}") }
+        heading(context.getString(R.string.profile_action_title), "profile:review:action")
+        label(curveText(body), "profile:review:action:curve")
+        ProfileLimit.of(ProfileFieldGroup.INSULIN_ACTION).forEach { label(limitText(body, it), "profile:review:limit:${it.code}") }
         body.schedules.forEach { schedule ->
             val parameter = schedule.parameter
             heading(parameter.unitLabel(body.glucoseUnit)?.let {
@@ -353,14 +356,38 @@ internal class ClinicalProfileScreen(
         ProfileLimit.ROUND_STEP -> R.string.profile_limit_round_step
         ProfileLimit.MAX_BOLUS -> R.string.profile_limit_max_bolus
         ProfileLimit.MAX_CORRECTION -> R.string.profile_limit_max_correction
+        ProfileLimit.INSULIN_DIA -> R.string.profile_action_dia
+        ProfileLimit.INSULIN_PEAK -> R.string.profile_action_peak
     })
 
-    /** A schema 1 version has no limits: "unknown", never "not configured" and never a value from another version. */
+    /** A version without the field has it "unknown", never "not configured" and never a value from another version. */
     private fun limitText(body: ProfileContent, limit: ProfileLimit): String =
         context.getString(R.string.profile_param_value, limitName(limit), when (val value = body.limit(limit)) {
-            null -> context.getString(R.string.profile_limit_not_in_schema)
+            null -> context.getString(notInSchema(limit))
             else -> valueText(value, limit.unitLabel)
         })
+
+    private fun notInSchema(limit: ProfileLimit): Int = when (limit.group) {
+        ProfileFieldGroup.CALCULATION_LIMITS -> R.string.profile_limit_not_in_schema
+        ProfileFieldGroup.INSULIN_ACTION -> R.string.profile_action_not_in_schema
+    }
+
+    private fun curveName(curve: InsulinCurveCode): String = context.getString(when (curve) {
+        InsulinCurveCode.WALSH -> R.string.profile_curve_walsh
+        InsulinCurveCode.BILINEAR -> R.string.profile_curve_bilinear
+        InsulinCurveCode.FIASP -> R.string.profile_curve_fiasp
+        InsulinCurveCode.NOVORAPID -> R.string.profile_curve_novorapid
+        InsulinCurveCode.LINEAR -> R.string.profile_curve_linear
+    })
+
+    private fun curveSettingText(curve: Setting<InsulinCurveCode>): String = when (curve) {
+        Setting.NotConfigured -> context.getString(R.string.profile_not_configured)
+        is Setting.Declared -> curveName(curve.value)
+    }
+
+    private fun curveText(body: ProfileContent): String = context.getString(R.string.profile_param_value,
+        context.getString(R.string.profile_action_curve_label),
+        body.insulinCurve?.let(::curveSettingText) ?: context.getString(R.string.profile_action_not_in_schema))
 
     private fun valueText(value: ProfileValue, unit: String?): String = when (value) {
         ProfileValue.NotConfigured -> context.getString(R.string.profile_not_configured)
@@ -402,7 +429,9 @@ internal class ClinicalProfileScreen(
             label(context.getString(R.string.profile_param_value, parameterName(schedule.parameter),
                 scheduleText(schedule, body.glucoseUnit)), "$prefix:${schedule.parameter.code}")
         }
-        ProfileLimit.entries.forEach { label(limitText(body, it), "$prefix:limit:${it.code}", 14f) }
+        ProfileLimit.of(ProfileFieldGroup.CALCULATION_LIMITS).forEach { label(limitText(body, it), "$prefix:limit:${it.code}", 14f) }
+        label(curveText(body), "$prefix:action:curve", 14f)
+        ProfileLimit.of(ProfileFieldGroup.INSULIN_ACTION).forEach { label(limitText(body, it), "$prefix:limit:${it.code}", 14f) }
         label(context.getString(R.string.profile_writer, version.writer), "$prefix:writer", 13f)
         label(context.getString(R.string.profile_fingerprint, version.contentSha256.take(16)), "$prefix:sha", 13f)
     }
@@ -468,6 +497,7 @@ internal class ClinicalProfileScreen(
         }
         editor.content.schedules.forEach { schedule -> schedule(editor, schedule, ::refresh) }
         limits(editor, ::refresh)
+        insulinAction(editor, ::refresh)
 
         save.apply {
             text = context.getString(R.string.profile_save, editor.nextVersion)
@@ -644,9 +674,54 @@ internal class ClinicalProfileScreen(
         if (editor.start.limit(ProfileLimit.ROUND_STEP) == null) {
             notice(context.getString(R.string.profile_limits_not_in_schema_notice), "profile:limits:not_in_schema")
         }
-        ProfileLimit.entries.forEach { limit ->
+        ProfileLimit.of(ProfileFieldGroup.CALCULATION_LIMITS).forEach { limit ->
             field(ProfileEditorField.Limit(limit), context.getString(R.string.profile_param_with_unit, limitName(limit),
                 limit.unitLabel), true, refresh)
+        }
+    }
+
+    /**
+     * Insulin action of content schema 3 (ADR 0027): curve, DIA and peak for the candidate IOB, with validation pending
+     * and no default. A version without them shows them as unknown until the user chooses a curve or types a value.
+     */
+    private fun insulinAction(editor: ProfileEditor, refresh: () -> Unit) {
+        heading(context.getString(R.string.profile_action_title), "profile:action")
+        notice(context.getString(R.string.profile_action_explanation), "profile:action:explanation")
+        if (editor.start.insulinCurve == null) {
+            notice(context.getString(R.string.profile_action_not_in_schema_notice), "profile:action:not_in_schema")
+        }
+        label(R.string.profile_action_curve_label)
+        val options = listOf<Pair<Setting<InsulinCurveCode>, String>>(Setting.NotConfigured to "none") +
+            InsulinCurveCode.entries.map { Setting.Declared(it) to it.code }
+        val group = RadioGroup(context).apply { orientation = RadioGroup.VERTICAL }
+        // A version without a curve shows "not configured" checked; choosing it again changes nothing.
+        val current = editor.content.insulinCurve ?: Setting.NotConfigured
+        options.forEach { (curve, key) ->
+            group.addView(RadioButton(context).apply {
+                id = View.generateViewId()
+                tag = "profile:curve:$key"
+                text = curveSettingText(curve)
+                minHeight = dp(48)
+                setTextColor(context.getColor(R.color.primary_text))
+                buttonTintList = ColorStateList.valueOf(context.getColor(R.color.accent))
+                isEnabled = !model.busy
+                isChecked = current == curve
+            })
+        }
+        content.addView(group, LinearLayout.LayoutParams(-1, -2))
+        // Attached after the initial check so rendering never declares a curve.
+        options.forEachIndexed { index, (curve, _) ->
+            (group.getChildAt(index) as RadioButton).setOnCheckedChangeListener { _, checked ->
+                if (checked) {
+                    model.setInsulinCurve(curve)
+                    refresh()
+                }
+            }
+        }
+        ProfileLimit.of(ProfileFieldGroup.INSULIN_ACTION).forEach { limit ->
+            field(ProfileEditorField.Limit(limit), context.getString(R.string.profile_param_with_unit, limitName(limit),
+                limit.unitLabel), true, refresh,
+                hint = if (limit == ProfileLimit.INSULIN_PEAK) context.getString(R.string.profile_action_peak_hint) else null)
         }
     }
 
@@ -722,7 +797,10 @@ internal class ClinicalProfileScreen(
                 is ProfileValue.Entered -> context.getString(R.string.profile_preview_value,
                     valueText(value, field.limit.unitLabel))
                 ProfileValue.NotConfigured -> context.getString(R.string.profile_preview_missing)
-                null -> context.getString(R.string.profile_preview_unknown)
+                null -> context.getString(when (field.limit.group) {
+                    ProfileFieldGroup.CALCULATION_LIMITS -> R.string.profile_preview_unknown
+                    ProfileFieldGroup.INSULIN_ACTION -> R.string.profile_action_preview_unknown
+                })
             }
         }
     }

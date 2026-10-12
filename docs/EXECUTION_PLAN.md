@@ -803,6 +803,17 @@ falso cero con DIA 4,99 h). `verify.ps1` y la CI reproducen los vectores de
 Legacy desde el SHA fijado y exigen resultados no terapéuticos con validación
 pendiente.
 
+### Entrega de acción de la insulina en el perfil — 2026-10-12
+
+[ADR 0027](adr/0027-profile-insulin-action.md): DIA (h), curva y pico (min
+enteros) pasan al esquema de contenido 3, sin defaults ni rangos, versionados y
+confirmables con el resto de la versión. `clinical-profile.db` v4
+(`profile_insulin_curve`) migra desde v1, v2 y v3 sin rellenar nada. Las
+versiones anteriores dejan la acción desconocida. Aún no se traduce a
+`InsulinAction`: Bolo sigue con IOB manual hasta que exista el historial.
+Comprobaciones del Pixel A1 a A4 en la
+[validación](validation/profile-insulin-action-2026-10-12.md).
+
 ### Secuencia de capacidades
 
 La secuencia inicial siguiente queda como referencia de dependencias, no como
@@ -839,12 +850,11 @@ unitarias, incluidos los límites del perfil de PR #58.
    de evidencia preliminar, pero sigue sin aprobación del informe; no repetir
    la decisión I-3 ni las pruebas de recepción ya registradas sin cambios que
    lo justifiquen.
-2. Sin depender del teléfono: el IOB candidato ya está en el motor (ADR 0026).
-   Sigue, por orden: DIA, curva y pico en el perfil versionado sin defaults
-   (como el ADR 0025); historial local de insulina, cuyo origen debe decidir el
-   propietario porque Next no registra tratamientos reales; y el IOB calculado
-   en el cálculo de prueba de Bolo en lugar del manual. Después, fibra/Warsaw
-   (LC-008). El techo de IOB (`max_iob_u`) y el intervalo mínimo entre bolos
+2. Sin depender del teléfono: el IOB candidato está en el motor (ADR 0026) y
+   DIA, curva y pico en el perfil (ADR 0027). Sigue el historial local de
+   insulina, en otra entrega y con decisión del propietario sobre su origen
+   porque Next no registra tratamientos reales, y después el IOB calculado en el
+   cálculo de prueba de Bolo en lugar del manual. Luego, fibra/Warsaw (LC-008). El techo de IOB (`max_iob_u`) y el intervalo mínimo entre bolos
    dependen del IOB calculado.
 3. Mantener la matriz de `docs/audit/legacy-functional-inventory.md` en cada
    entrega, incluidos MyFitnessPal y los casos de uso del bot.
