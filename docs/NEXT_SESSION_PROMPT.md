@@ -2,7 +2,7 @@ Trabaja en E:\projects\Bolus-ai-next y continúa desde origin/main actualizado.
 
 ESTADO EN MAIN — 2026-10-12
 Existen y están integrados: recepción Dexcom por permiso con presentación en
-Inicio y Bolo (ADR 0023), motor candidato único `0.3.0-candidate` con cálculo de
+Inicio y Bolo (ADR 0023), motor candidato único (ahora `0.4.0-candidate`) con cálculo de
 prueba en Bolo y paridad exacta en 12 vectores de Legacy `bcac891` (ADR 0024) y
 límites del cálculo en el perfil versionado (ADR 0025). Ningún resultado es
 utilizable para tratamiento. La recepción real offline ya pasó en el Pixel antes
@@ -23,6 +23,15 @@ sin rellenar nada. Las versiones de esquema 1 los dejan desconocidos
 (`profile.<código>.not_in_schema`) y bloquean solo B2, D y E. Evidencia y
 comprobaciones P1, P6 y P7 del Pixel en docs/validation/profile-limits-2026-10-12.md.
 
+ENTREGA 2026-10-12 — IOB CANDIDATO EN EL MOTOR (ADR 0026)
+`org.bolusai.engine.iob.CandidateIob` calcula el IOB desde un historial de dosis
+explícito con las curvas de Legacy `bcac891` y el bolo extendido. Paridad exacta
+en 19 vectores capturados con scripts/legacy-vectors/capture_iob_vectors.py.
+Sin defaults de DIA, curva ni pico. El historial declara su cobertura y debe
+llegar desde `ahora - DIA - extendido máximo`; si no, bloquea. Solo una lista
+vacía con cobertura suficiente da `0 U`. Aún no tiene productor: Bolo sigue con
+IOB manual. Paridad de Walsh en iOS sin comprobar (exp de la plataforma).
+
 SIGUIENTE
 - Teléfono: cálculo con perfil real confirmado (P6) y actualización sobre un
   perfil v2 real existente (P7 de la validación de límites). B1 tiene evidencia
@@ -31,10 +40,12 @@ SIGUIENTE
   pruebas ya ejecutadas sin cambios que lo justifiquen. En esta sesión Codex
   hizo las pruebas del Pixel mientras Claude avanzaba desde la nube, sin
   modificar la implementación de perfil o motor de Claude.
-- Sin teléfono: siguiente regla candidata trazada a Legacy en el motor único.
-  Candidatas: historial local de insulina e IOB calculado (LC-004, LC-005), que
-  sustituye el IOB manual, y fibra/Warsaw (LC-008). Resolver y registrar el SHA
-  remoto de Legacy antes de usarlo.
+- Sin teléfono: DIA, curva y pico en el perfil versionado sin defaults (como
+  ADR 0025) y conectar `CandidateIob` al cálculo de prueba en lugar del IOB
+  manual. El historial local de insulina necesita una decisión del propietario
+  sobre su origen (Next no registra tratamientos reales); preguntarla agrupada.
+  Después, fibra/Warsaw (LC-008). Resolver y registrar el SHA remoto de Legacy
+  antes de usarlo.
 No repetir las decisiones ya aprobadas.
 
 CONTINUACIÓN ACTIVA — 2026-10-12

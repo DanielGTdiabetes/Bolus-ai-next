@@ -239,6 +239,12 @@ del perfil, se confirman con ella y el cálculo los toma sin volver a teclearlos
 Las versiones anteriores los dejan desconocidos y bloquean solo los pasos que los
 necesitan ([ADR 0025](docs/adr/0025-profile-calculation-limits.md),
 [validación](docs/validation/profile-limits-2026-10-12.md)).
+El motor también calcula un **IOB candidato** desde un historial de dosis
+explícito, con las curvas de Legacy y paridad exacta en 19 vectores. Un historial
+ausente, insuficiente o incoherente bloquea; solo una lista vacía con cobertura
+suficiente da `0 U`. Aún no tiene productor: Bolo sigue con IOB manual hasta que
+el perfil tenga DIA y curva y exista un historial local
+([ADR 0026](docs/adr/0026-candidate-iob-from-dose-history.md)).
 
 ## Documentación para ejecutar el proyecto
 

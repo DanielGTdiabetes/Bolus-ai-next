@@ -1,0 +1,215 @@
+package org.bolusai.engine.iob
+
+import org.bolusai.engine.EngineIdentity
+import org.bolusai.engine.candidate.Input
+import org.bolusai.engine.candidate.Quantity
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
+import kotlin.test.assertNotEquals
+import kotlin.test.assertTrue
+
+private const val FINGERPRINT = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+private const val NOW = LEGACY_IOB_NOW_MS
+private const val HOUR = 3_600_000L
+
+private fun action(
+    curve: InsulinCurve = InsulinCurve.WALSH,
+    dia: String = "4",
+    peak: Input<Int> = Input.Provided(75),
+    confirmed: Boolean = true,
+) = InsulinAction(1, FINGERPRINT, confirmed, curve, Quantity(dia), peak)
+
+private fun dose(id: String, minutesBefore: Long, units: String, extended: Int = 0) =
+    InsulinDose(id, NOW - minutesBefore * 60_000L, Quantity(units), extended)
+
+private fun history(
+    doses: List<InsulinDose>,
+    from: Long = NOW - 6 * HOUR,
+    until: Long = NOW,
+    maxExtended: Int = 0,
+) = DoseHistory("next-local-history:v1", from, until, maxExtended, doses)
+
+private fun calculate(action: Input<InsulinAction>, history: Input<DoseHistory>, now: Long = NOW) =
+    CandidateIob.calculate(IobRequest(now, action, history))
+
+private fun causes(result: IobResult): List<String> = (result.outcome as IobOutcome.Blocked).causes
+
+class CandidateIobTest {
+    @Test
+    fun matchesEveryLegacyVectorExactly() {
+        assertEquals(CandidateIobRules.LEGACY_SHA, LEGACY_IOB_VECTORS_SHA)
+        assertEquals(19, LEGACY_IOB_VECTORS.size)
+        for (vector in LEGACY_IOB_VECTORS) {
+            val curve = InsulinCurve.fromCode(vector.curve) ?: error("unknown curve ${vector.curve}")
+            val doses = vector.doses.map {
+                InsulinDose(it.id, NOW - it.secondsBefore * 1000L, Quantity(it.units), it.extendedMinutes)
+            }
+            val maxExtended = doses.maxOfOrNull { it.extendedMinutes } ?: 0
+            val result = calculate(
+                Input.Provided(action(curve, vector.diaHours, if (curve.usesPeak) Input.Provided(vector.peakMinutes)
+                else Input.Unavailable("profile.insulin_peak.not_used_by_curve"))),
+                Input.Provided(history(doses, from = NOW - 12 * HOUR, maxExtended = maxExtended)),
+            )
+            val computed = result.outcome as? IobOutcome.Computed ?: error("${vector.name}: ${result.outcome}")
+            assertEquals(vector.totalU.toRawBits(), computed.units.toRawBits(), "${vector.name} total ${computed.units}")
+            for (legacy in vector.doses) {
+                val mine = computed.contributions.single { it.doseId == legacy.id }
+                val expected = legacy.legacyContributionU
+                if (expected == null) {
+                    assertTrue(mine.remainingUnits <= 0.01, "${vector.name}/${legacy.id} omitted by Legacy")
+                } else {
+                    assertEquals(expected.toRawBits(), mine.remainingUnits.toRawBits(), "${vector.name}/${legacy.id}")
+                }
+            }
+        }
+    }
+
+    @Test
+    fun resultIsNeverUsableForTreatmentAndCarriesItsIdentity() {
+        val result = calculate(Input.Provided(action()), Input.Provided(history(listOf(dose("a", 30, "2")))))
+        assertFalse(result.usableForTreatment)
+        assertEquals("pending", result.ruleValidation)
+        assertEquals(EngineIdentity.VERSION, result.engineVersion)
+        assertEquals("legacy-iob-candidate-v1", result.ruleSetId)
+        assertEquals(NOW, result.calculationAtEpochMs)
+        assertTrue(IobWarnings.TEST_ONLY in result.warnings)
+        assertTrue(IobWarnings.RULES_NOT_APPROVED in result.warnings)
+        assertEquals(NOW - 4 * HOUR, (result.outcome as IobOutcome.Computed).requiredCoverageFromEpochMs)
+    }
+
+    @Test
+    fun emptyCompleteHistoryIsAKnownZeroButUnavailableHistoryIsNever() {
+        val zero = calculate(Input.Provided(action()), Input.Provided(history(emptyList())))
+        assertEquals(0.0, (zero.outcome as IobOutcome.Computed).units)
+
+        val unknown = calculate(Input.Provided(action()), Input.Unavailable("iob.history.not_recorded"))
+        assertEquals(listOf("iob.history.not_recorded"), causes(unknown))
+    }
+
+    @Test
+    fun actionMustComeFromAConfirmedProfileWithoutDefaults() {
+        val h = Input.Provided(history(emptyList()))
+        assertEquals(listOf("profile.insulin_action.not_configured"),
+            causes(calculate(Input.Unavailable("profile.insulin_action.not_configured"), h)))
+        assertEquals(listOf("profile.unconfirmed"), causes(calculate(Input.Provided(action(confirmed = false)), h)))
+        assertEquals(listOf("profile.insulin_peak.not_configured"),
+            causes(calculate(Input.Provided(action(peak = Input.Unavailable("profile.insulin_peak.not_configured"))), h)))
+        assertEquals(listOf("iob.action.dia_not_positive"), causes(calculate(Input.Provided(action(dia = "0")), h)))
+    }
+
+    @Test
+    fun invalidPeaksBlockInsteadOfLegacyFallbacks() {
+        val h = Input.Provided(history(emptyList()))
+        assertEquals(listOf("iob.action.peak_not_positive"), causes(calculate(Input.Provided(action(peak = Input.Provided(0))), h)))
+        assertEquals(listOf("iob.action.peak_not_before_end"),
+            causes(calculate(Input.Provided(action(InsulinCurve.BILINEAR, dia = "2", peak = Input.Provided(120))), h)))
+        // Legacy silently switches Walsh to a linear curve when tau <= 0 (peak >= DIA / 2).
+        assertEquals(listOf("iob.action.walsh_peak_incompatible"),
+            causes(calculate(Input.Provided(action(dia = "2", peak = Input.Provided(60))), h)))
+        val bilinearAtHalf = calculate(Input.Provided(action(InsulinCurve.BILINEAR, dia = "2", peak = Input.Provided(60))), h)
+        assertTrue(bilinearAtHalf.outcome is IobOutcome.Computed)
+    }
+
+    @Test
+    fun peakIsReportedAsIgnoredByCurvesThatDoNotUseIt() {
+        val result = calculate(Input.Provided(action(InsulinCurve.FIASP, dia = "5")), Input.Provided(history(emptyList())))
+        assertTrue(IobWarnings.PEAK_IGNORED_BY_CURVE in result.warnings)
+        val withoutPeak = calculate(
+            Input.Provided(action(InsulinCurve.LINEAR, peak = Input.Unavailable("profile.insulin_peak.not_used_by_curve"))),
+            Input.Provided(history(emptyList())))
+        assertTrue(withoutPeak.outcome is IobOutcome.Computed)
+        assertFalse(IobWarnings.PEAK_IGNORED_BY_CURVE in withoutPeak.warnings)
+    }
+
+    @Test
+    fun historyMustCoverDiaPlusDeclaredExtendedDurationUpToNow() {
+        val a = Input.Provided(action(dia = "4.5"))
+        val exact = calculate(a, Input.Provided(history(emptyList(), from = NOW - 4 * HOUR - HOUR / 2)))
+        assertTrue(exact.outcome is IobOutcome.Computed)
+        assertEquals(listOf("iob.history.insufficient_window"),
+            causes(calculate(a, Input.Provided(history(emptyList(), from = NOW - 4 * HOUR - HOUR / 2 + 1)))))
+        assertEquals(listOf("iob.history.insufficient_window"),
+            causes(calculate(a, Input.Provided(history(emptyList(), from = NOW - 5 * HOUR, maxExtended = 31)))))
+        assertTrue(calculate(a, Input.Provided(history(emptyList(), from = NOW - 5 * HOUR, maxExtended = 30)))
+            .outcome is IobOutcome.Computed)
+        assertEquals(listOf("iob.history.not_current"),
+            causes(calculate(a, Input.Provided(history(emptyList(), until = NOW - 1)))))
+        assertEquals(listOf("iob.history.coverage_invalid", "iob.history.not_current", "iob.history.insufficient_window"),
+            causes(calculate(a, Input.Provided(history(emptyList(), from = NOW, until = NOW - 1)))))
+    }
+
+    @Test
+    fun anomalousDosesBlock() {
+        val a = Input.Provided(action())
+        assertEquals(listOf("iob.history.duplicate_identity"),
+            causes(calculate(a, Input.Provided(history(listOf(dose("a", 30, "1"), dose("a", 90, "2")))))))
+        assertEquals(listOf("iob.history.future_dose", "iob.history.dose_outside_coverage"),
+            causes(calculate(a, Input.Provided(history(listOf(dose("a", -1, "1")))))))
+        assertEquals(listOf("iob.history.future_dose"),
+            causes(calculate(a, Input.Provided(history(listOf(dose("a", -1, "1")), until = NOW + HOUR)))))
+        assertEquals(listOf("iob.history.dose_outside_coverage"),
+            causes(calculate(a, Input.Provided(history(listOf(dose("a", 7 * 60, "1")))))))
+        assertEquals(listOf("iob.history.non_positive_dose"),
+            causes(calculate(a, Input.Provided(history(listOf(dose("a", 30, "0")))))))
+        assertEquals(listOf("iob.history.extended_beyond_declared_maximum"),
+            causes(calculate(a, Input.Provided(history(listOf(dose("a", 30, "1", extended = 45)), maxExtended = 30)))))
+    }
+
+    @Test
+    fun sameDoseAndInstantWithDistinctIdentitiesAreDistinctDoses() {
+        val one = calculate(Input.Provided(action()), Input.Provided(history(listOf(dose("a", 30, "1")))))
+        val two = calculate(Input.Provided(action()), Input.Provided(history(listOf(dose("a", 30, "1"), dose("b", 30, "1")))))
+        assertEquals((one.outcome as IobOutcome.Computed).units * 2, (two.outcome as IobOutcome.Computed).units)
+    }
+
+    @Test
+    fun everyAbsenceIsReportedTogether() {
+        val result = calculate(Input.Unavailable("profile.insulin_action.not_configured"),
+            Input.Provided(history(listOf(dose("a", -5, "1")))))
+        assertEquals(listOf("profile.insulin_action.not_configured", "iob.history.future_dose",
+            "iob.history.dose_outside_coverage"), causes(result))
+    }
+
+    @Test
+    fun undeliveredExtendedChunksCountInFull() {
+        val result = calculate(Input.Provided(action()),
+            Input.Provided(history(listOf(InsulinDose("a", NOW, Quantity("6"), 60)), maxExtended = 60)))
+        assertEquals(6.0, (result.outcome as IobOutcome.Computed).units)
+    }
+
+    @Test
+    fun fingerprintIsDeterministicAndCoversEveryInput() {
+        val base = IobRequest(NOW, Input.Provided(action()), Input.Provided(history(listOf(dose("a", 30, "2")))))
+        val fingerprint = CandidateIob.calculate(base).inputFingerprintSha256
+        assertEquals(fingerprint, CandidateIob.calculate(base.copy()).inputFingerprintSha256)
+        val variants = listOf(
+            base.copy(calculationAtEpochMs = NOW + 1),
+            base.copy(action = Input.Provided(action(dia = "4.5"))),
+            base.copy(action = Input.Provided(action(peak = Input.Provided(76)))),
+            base.copy(action = Input.Provided(action(curve = InsulinCurve.BILINEAR))),
+            base.copy(action = Input.Provided(action(confirmed = false))),
+            base.copy(history = Input.Provided(history(listOf(dose("a", 31, "2"))))),
+            base.copy(history = Input.Provided(history(listOf(dose("b", 30, "2"))))),
+            base.copy(history = Input.Provided(history(listOf(dose("a", 30, "2.5"))))),
+            base.copy(history = Input.Provided(history(listOf(dose("a", 30, "2", extended = 0)), maxExtended = 30))),
+            base.copy(history = Input.Provided(history(listOf(dose("a", 30, "2")), from = NOW - 7 * HOUR))),
+            base.copy(history = Input.Unavailable("iob.history.not_recorded")),
+        )
+        for (variant in variants) {
+            assertNotEquals(fingerprint, CandidateIob.calculate(variant).inputFingerprintSha256, variant.toString())
+        }
+    }
+
+    @Test
+    fun malformedInputsAreRejectedAtConstruction() {
+        assertFailsWith<IllegalArgumentException> { InsulinDose("", NOW, Quantity("1"), 0) }
+        assertFailsWith<IllegalArgumentException> { InsulinDose("a:b", NOW, Quantity("1"), 0) }
+        assertFailsWith<IllegalArgumentException> { InsulinDose("a", NOW, Quantity("1"), -1) }
+        assertFailsWith<IllegalArgumentException> { DoseHistory("", NOW, NOW, 0, emptyList()) }
+        assertFailsWith<IllegalArgumentException> { DoseHistory("src", NOW, NOW, -1, emptyList()) }
+        assertFailsWith<IllegalArgumentException> { InsulinAction(0, FINGERPRINT, true, InsulinCurve.WALSH, Quantity("4"), Input.Provided(75)) }
+        assertFailsWith<IllegalArgumentException> { InsulinAction(1, "x", true, InsulinCurve.WALSH, Quantity("4"), Input.Provided(75)) }
+    }
+}
