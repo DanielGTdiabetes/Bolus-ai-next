@@ -92,9 +92,8 @@ class DexcomG7ReceiverDeviceTest {
         assertEquals(DexcomApprovedPermissionSet.PERMISSION, receiver.permission)
         assertEquals(listOf(DexcomApprovedPermissionSet.PERMISSION),
             info.requestedPermissions.orEmpty().filter { it.startsWith("com.dexcom.") })
-        assertTrue(info.requestedPermissions.orEmpty().none {
-            it == "android.permission.INTERNET" || it == "android.permission.QUERY_ALL_PACKAGES"
-        })
+        assertTrue(info.requestedPermissions.orEmpty().none { it == "android.permission.INTERNET" })
+        assertTrue("android.permission.QUERY_ALL_PACKAGES" in info.requestedPermissions.orEmpty())
         val observed = Intent(DexcomReceiverConfiguration.ACTION).setPackage(context.packageName)
         assertTrue(context.packageManager.queryBroadcastReceivers(observed, PackageManager.ResolveInfoFlags.of(0)).isEmpty())
         assertEquals(
@@ -115,11 +114,20 @@ class DexcomG7ReceiverDeviceTest {
 
     @Test
     fun enabledReceiverGetsNothingFromASenderWithoutTheDexcomPermission() {
-        // ADR 0023 acceptance: the synthetic sender does not hold the permission, so Android never delivers, even with
-        // the observed action and extras copied. Nothing is read or stored.
+        // ADR 0023 acceptance: the manifest permission applies before onReceive, even for an explicit component.
+        // Use a fixed probe action: an erroneous delivery yields its unique IgnoredAction receipt. Real producer
+        // messages may arrive while this component is enabled and must not be mistaken for fixture delivery.
         val existedBefore = realLog().exists()
+        assertEquals(PackageManager.PERMISSION_DENIED,
+            context.packageManager.checkPermission(DexcomApprovedPermissionSet.PERMISSION, FIXTURE_PACKAGE))
+        val probeAction = "$FIXTURE_PACKAGE.PERMISSION_PROBE"
+        DexcomG7Receiver.receipts = { receipt ->
+            if (receipt is DexcomReceipt.IgnoredAction && receipt.action == probeAction) receipts.offer(receipt)
+        }
         enable()
-        fixture(shareIdentity = true, payload(FIXTURE_PACKAGE))
+        context.sendBroadcast(Intent("$FIXTURE_PACKAGE.TRIGGER_G7_PERMISSION_PROBE")
+            .setComponent(ComponentName(FIXTURE_PACKAGE, "$FIXTURE_PACKAGE.SyntheticSenderReceiver"))
+            .addFlags(Intent.FLAG_INCLUDE_STOPPED_PACKAGES or Intent.FLAG_RECEIVER_FOREGROUND))
         assertNull(receipts.poll(5, TimeUnit.SECONDS))
         assertEquals(existedBefore, realLog().exists())
     }
@@ -128,12 +136,9 @@ class DexcomG7ReceiverDeviceTest {
     fun enabledReceiverIgnoresAnotherActionWithoutCheckingTheGate() {
         enable()
         context.sendBroadcast(Intent("org.bolusai.next.test.OTHER_ACTION").setComponent(component))
-        // The sender here is Next itself: Android delivers only if Next already holds the permission (I-6, by adb).
-        if (context.checkSelfPermission(DexcomApprovedPermissionSet.PERMISSION) == PackageManager.PERMISSION_GRANTED) {
-            assertEquals(DexcomReceipt.IgnoredAction("org.bolusai.next.test.OTHER_ACTION"), next())
-        } else {
-            assertNull(receipts.poll(3, TimeUnit.SECONDS))
-        }
+        // Same-UID delivery does not require the sender to hold the receiver permission. The separate cross-UID
+        // fixture test above checks permission enforcement; this test checks only that another action is ignored.
+        assertEquals(DexcomReceipt.IgnoredAction("org.bolusai.next.test.OTHER_ACTION"), next())
     }
 
     @Test

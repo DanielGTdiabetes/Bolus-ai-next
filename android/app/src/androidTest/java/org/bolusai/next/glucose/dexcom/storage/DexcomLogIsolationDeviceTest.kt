@@ -114,7 +114,7 @@ class DexcomLogIsolationDeviceTest {
 
         synthetic.delete()
         writer().use { it.record(ObservationInput.PayloadUnreadable(1, sender)) }
-        SQLiteDatabase.openDatabase(synthetic.path, null, SQLiteDatabase.OPEN_READWRITE).use { it.version = 2 }
+        SQLiteDatabase.openDatabase(synthetic.path, null, SQLiteDatabase.OPEN_READWRITE).use { it.version = DexcomObservationSchema.V2 + 1 }
         val newer = synthetic.readBytes()
         assertEquals(ObservationSummaryRead.Failed(ObservationFailure.UNSUPPORTED_SCHEMA), read())
         assertUntouched(newer)

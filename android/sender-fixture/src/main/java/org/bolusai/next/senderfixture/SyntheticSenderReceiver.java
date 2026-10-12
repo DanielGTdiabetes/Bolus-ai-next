@@ -25,6 +25,11 @@ public final class SyntheticSenderReceiver extends BroadcastReceiver {
             response = new Intent("com.dexcom.cgm.EXTERNAL_BROADCAST");
             Bundle payload = command.getBundleExtra("payload");
             if (payload != null) response.putExtras(payload);
+        } else if ("org.bolusai.next.senderfixture.TRIGGER_G7_PERMISSION_PROBE".equals(command.getAction())) {
+            // Fixed destination/action for the manifest permission test. If delivered, Next ignores this action
+            // before reading extras or opening storage. Real Dexcom traffic cannot produce this receipt.
+            response = new Intent("org.bolusai.next.senderfixture.PERMISSION_PROBE")
+                    .setClassName(NEXT_PACKAGE, NEXT_PACKAGE + ".glucose.dexcom.DexcomG7Receiver");
         } else {
             return;
         }
