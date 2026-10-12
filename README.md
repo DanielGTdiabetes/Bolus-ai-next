@@ -202,8 +202,10 @@ identifica la aplicación Dexcom modificada por el propietario como fuente local
 primaria y la Web API como contingencia de emergencia con retraso. El puerto
 devuelve `policy_not_approved` hasta aprobar una política de recepción y las
 políticas clínicas restantes. Dexcom instalada no se modifica: la política
-compatible con su envío actual se propone en el
-[ADR 0023](docs/adr/0023-dexcom-existing-transport-trust.md), sin aprobar.
+compatible con su envío actual está aceptada para recepción y presentación
+técnica en el [ADR 0023](docs/adr/0023-dexcom-existing-transport-trust.md)
+desde el 2026-10-12. Quedan implementación y validación; cálculo y tratamiento
+siguen bloqueados.
 
 ## Documentación para ejecutar el proyecto
 

@@ -745,28 +745,28 @@ este ajuste. No queda pendiente de fusión; comprobar el CI del SHA integrado.
 
 1. Concentrar la siguiente entrega funcional en el primer hito Android: recepción
    local Dexcom, persistencia y presentación con origen, hora y estado, sin
-   habilitar cálculo. Reunir en una sola propuesta las decisiones pendientes de
-   identificación de la APK instalada, política compatible con su envío actual,
-   permiso y presentación; no exigir `setShareIdentityEnabled(true)` al productor;
-   implementar después el recorrido completo dentro del alcance aprobado.
-   La combinación de permiso, conjunto de titulares y anclas se evalúa en el
-   [ADR 0023](adr/0023-dexcom-existing-transport-trust.md), todavía propuesto y
-   pendiente de aceptación de sus garantías condicionadas y riesgos residuales.
-2. Si faltan esas decisiones o artefactos, dejar explícito qué bloquean y avanzar
+   habilitar cálculo. L1 ya identificó la APK instalada y el propietario aprobó
+   el 2026-10-12 el [ADR 0023](adr/0023-dexcom-existing-transport-trust.md).
+   Implementar el recorrido completo con I-2b, B4b, C5a y las condiciones de
+   B1 e I-3, sin repetir las preguntas aprobadas ni exigir identity sharing
+   al productor. Los riesgos se aceptan solo para recepción/presentación técnica.
+2. Si falta evidencia de validación, dejar explícito qué bloquea y avanzar
    solo con preparativos independientes del mismo hito. Retención, contadores,
    exportación y refinamientos visuales quedan fuera de la ruta inmediata salvo
    que sean necesarios para un riesgo concreto o los priorice el propietario.
 
-El ADR 0023 es la propuesta única del hito, en estado propuesto: parte I
-(recepción técnica por permiso y conjunto aprobado: L1, L2 e I-1 a I-8) y
-parte II (presentación y validez clínica: B1 a D2). La implementación empieza
-cuando el propietario responda.
+El ADR 0023 es la decisión aceptada del hito: recepción y presentación técnica,
+sin habilitar cálculo ni aprobar umbral de vigencia. La aprobación del
+2026-10-12 selecciona I-2b: Legacy y reloj pueden actualizarse con paquete y
+firmantes aprobados, mientras Dexcom mantiene versión exacta. Quedan pruebas
+de cobertura de visibilidad y validación real; B1 no se da por verificada.
 
 La recepción y presentación con Dexcom real conservan las puertas de los ADR
 vigentes que no contradigan el alcance Dexcom confirmado arriba. Revisar la
-política de Next en el ADR existente; esta decisión no activa el receiver ni
-aprueba una política alternativa de confianza. No aprobar por inferencia unidad,
-timestamps, vigencia ni uso clínico.
+política de Next según el ADR aceptado; la aprobación no activa por sí sola
+el receiver ni constituye evidencia de implementación. Unidad, timestamps y
+presentación siguen las opciones aprobadas; vigencia clínica y cálculo no se
+aprueban por inferencia.
 La validación offline debe preservar la recepción del sensor: según la decisión
 registrada en el ADR 0022, no activar el modo avión que corta su Bluetooth;
 documentar y probar la ausencia de dependencia de Internet sin interrumpirlo.

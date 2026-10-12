@@ -14,6 +14,11 @@
 Este documento registra lo observado. No aprueba anclas, conjunto, riesgos ni
 uso clínico.
 
+La aprobación posterior del propietario (2026-10-12) está en el registro del
+[ADR 0023](../adr/0023-dexcom-existing-transport-trust.md): L2 e I-2b, con
+riesgos aceptados solo para recepción y presentación técnica. No transforma
+este inventario en una prueba de recepción ni aprueba uso para calcular.
+
 ## Aclaración posterior del propietario — 2026-10-11
 
 `com.wtachtsugar` es su app del reloj para ver la glucosa de Dexcom G7. El

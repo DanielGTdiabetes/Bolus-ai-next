@@ -144,7 +144,8 @@ no demuestran compatibilidad con el productor instalado. Las pruebas de
 aceptación de la política compatible (permiso, conjunto exacto de titulares,
 anclas, bloqueo durable y riesgos residuales) están en la sección «Pruebas de
 aceptación» del [ADR 0023](../adr/0023-dexcom-existing-transport-trust.md),
-todavía propuesto. Pruebas que conserva la ruta estricta:
+aceptado el 2026-10-12 para recepción y presentación técnica, pendiente de
+implementación y validación. Pruebas que conserva la ruta estricta:
 
 - el broadcast genuino con identity sharing expone el paquete y la UID esperados;
 - omitir identity sharing produce identidad no disponible y bloqueo explícito;
