@@ -142,8 +142,7 @@ revisión muestran la curva, la DIA y el pico, «Sin configurar» o «desconocid
   `ClinicalProfileDeviceTest.insulinActionIsDeclaredOnceWithoutDefaultsAndOlderVersionsStayUnknown`.
   Se actualizaron las existentes que esperaban v3. La verificación completa
   de Windows pasó con 401 pruebas JVM y 181 instrumentadas, sin fallos.
-  La actualización real disponible fue sobre una base v2 vacía; A4 con un
-  perfil real v3 confirmado sigue pendiente. Evidencia y correcciones del
+  La actualización real disponible fue sobre una base v2 vacía; A4 queda no comprobada (no había perfil real v3) por decisión del propietario, que autorizó integrar la PR de prueba. Evidencia y correcciones del
   arnés en la [validación](../validation/profile-insulin-action-2026-10-12.md).
 
 ## Condiciones para revisar este ADR

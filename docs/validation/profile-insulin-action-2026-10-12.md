@@ -48,7 +48,7 @@ comprobarse.
 | A1 | `ClinicalProfileInsulinActionDeviceTest` | migraciones v1, v2 y v3 → v4 con filas y confirmación intactas y sin curva ni valores; persistencia tras reinicio; triggers; filas manipuladas rechazadas |
 | A2 | `ClinicalProfileDeviceTest.insulinActionIsDeclaredOnceWithoutDefaultsAndOlderVersionsStayUnknown` | flujo del editor con recreación, pico fraccionario rechazado y versión de esquema 3 guardada |
 | A3 | Pruebas existentes actualizadas a v4 (`ClinicalProfileConfirmationDeviceTest`, `ClinicalProfileLimitsDeviceTest`) | verdes con `clinical-profile.db` v4 |
-| A4 | Actualización real: abrir la app sobre el `clinical-profile.db` v3 existente del Pixel | el perfil sigue legible y confirmado como antes; acción desconocida; nada rellenado. Hacer copia del archivo antes |
+| A4 | Actualización real: abrir la app sobre el `clinical-profile.db` v3 existente del Pixel | **no comprobada**: no había perfil real v3 (decisión del propietario abajo). El criterio era: perfil legible y confirmado como antes, acción desconocida, nada rellenado |
 
 ### Ejecución local en Windows y estado real del Pixel — 2026-10-12
 
@@ -108,8 +108,15 @@ hacer pasar estas pruebas.
 A1 pasó 4/4 (`ClinicalProfileInsulinActionDeviceTest`); A2 pasó dentro de
 `ClinicalProfileDeviceTest` (20/20); A3 pasó con confirmación 14/14 y límites
 4/4. Se retiraron los dos paquetes sintéticos de pruebas y se abrió Next de
-nuevo. **A4 con perfil real v3 confirmado sigue pendiente**, al igual que la
-revisión explícita del propietario y la integración en `main`.
+nuevo.
+
+**A4: no comprobada.** No existía un perfil real v3 confirmado en el Pixel y
+ya no puede crearse uno: un perfil creado ahora nace en v4. Decisión del
+propietario de 2026-10-12: no introducir datos clínicos reales solo para
+probarla, mantener A4 como no comprobada sin darla por superada e integrar la
+PR #60 de prueba con la evidencia de A1 (migración v3 → v4 con perfil y
+confirmación sintéticos en el Pixel) y de la actualización real v2 vacía → v4.
+Esa decisión no habilita uso terapéutico ni modifica Legacy o Dexcom G7.
 
 La revisión técnica abarca motor IOB, aritmética de la ventana, perfil/codec,
 migraciones, UI y arnés. No equivale a aprobación clínica ni integra la PR.

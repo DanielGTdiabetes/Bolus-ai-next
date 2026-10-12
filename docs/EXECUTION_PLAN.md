@@ -813,7 +813,7 @@ versiones anteriores dejan la acción desconocida. Aún no se traduce a
 `InsulinAction`: Bolo sigue con IOB manual hasta que exista el historial.
 Pruebas del Pixel A1–A3 superadas (401 JVM y 181 instrumentadas en la
 verificación completa). La base real era v2 vacía: actualización a v4
-verificada sin relleno; A4 con perfil real v3 confirmado sigue pendiente.
+verificada sin relleno; A4 queda no comprobada (no había perfil real v3) por decisión del propietario, que autorizó integrar la PR de prueba.
 Evidencia y límites en la
 [validación](validation/profile-insulin-action-2026-10-12.md).
 

@@ -41,11 +41,10 @@ versiones anteriores la dejan desconocida. Aún no se traduce a `InsulinAction`.
 A1–A3 pasaron en el Pixel: `verify.ps1 -DeviceTests`, 401 pruebas JVM y 181
 instrumentadas, sin fallos, tras corregir dos pruebas en `ff6c2f0`.
 La base real era v2 vacía, no un perfil v3 confirmado: copia verificada y
-actualización v2 → v4 correctas, sin relleno ni cambios de filas. A4 con perfil
-real confirmado sigue pendiente. Receptor de Next restaurado a habilitado y
+actualización v2 → v4 correctas, sin relleno ni cambios de filas. A4 queda no comprobada (no había perfil real v3) por decisión del propietario, que autorizó integrar la PR de prueba. Receptor de Next restaurado a habilitado y
 permiso conservado; Legacy y Dexcom sin cambios. Evidencia y límites en
-docs/validation/profile-insulin-action-2026-10-12.md. Falta revisión explícita
-del propietario e integración de la PR #60; no presentarla como entregada.
+docs/validation/profile-insulin-action-2026-10-12.md. El propietario autorizó
+integrar la PR #60 de prueba el 2026-10-12; no habilita uso terapéutico.
 
 SIGUIENTE
 - Teléfono: cálculo con perfil real confirmado (P6) y actualización sobre un
