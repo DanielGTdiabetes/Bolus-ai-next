@@ -19,6 +19,11 @@ Por capacidad registra equivalente Next, estado y prueba del recorrido completo,
 incluidos usos remotos cuando existan. Actualiza la matriz junto al desarrollo;
 no retrases recepción ni cálculo de prueba por otra auditoría global previa.
 No declares completa la sustitución mientras queden funcionalidades sin cubrir.
+El rumbo es sustituir `bolus_ai` para dejar de ejecutarlo en NAS y Render,
+con todas sus funciones. Next debe asumir la lógica y el estado operativo;
+no dar una capacidad por migrada si necesita el backend Legacy encendido.
+Conservar las conexiones online con proveedores externos cuando correspondan.
+No apagar ni modificar producción durante esta convivencia.
 
 CÁLCULO DE PRUEBA AUTORIZADO — 2026-10-12
 El propietario autoriza avanzar con lecturas reales y cálculos durante el

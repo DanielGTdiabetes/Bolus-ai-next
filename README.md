@@ -13,6 +13,11 @@ siempre que cubra sus casos de uso. Las integraciones online son opcionales para
 ejecutar el flujo local, pero sus capacidades forman parte del alcance final;
 no se eliminan por trasladar el cálculo al móvil (AGENTS.md §1).
 
+El objetivo es dejar de ejecutar `bolus_ai` en NAS y Render, conservando todas
+sus funciones en Next. Ninguna capacidad migrada puede exigir que ese backend
+siga encendido. Las conexiones online con proveedores externos se mantienen
+cuando correspondan; Legacy sigue intacto durante la transición.
+
 Principios del proyecto:
 
 - **Seguridad > consistencia > disponibilidad > comodidad.**

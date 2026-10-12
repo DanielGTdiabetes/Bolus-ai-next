@@ -48,6 +48,14 @@ equivalente y probada. Telegram puede sustituirse, pero no perder sus funciones;
 el enlace con MyFitnessPal debe estar cubierto. «Opcional» describe la dependencia
 en ejecución del camino local, no una exclusión del alcance final.
 
+La finalidad confirmada es dejar de ejecutar `bolus_ai` en NAS y Render.
+Next debe asumir la lógica y el estado operativo de la app; no basta una interfaz
+móvil que siga llamando al backend Legacy para completar sus funciones. La
+matriz debe identificar esas dependencias y su sustitución, distinguiéndolas de
+las conexiones online con proveedores externos que sí siguen siendo necesarias.
+La retirada de producción solo se realiza cuando corresponda a la transición
+aprobada; este requisito no autoriza apagar NAS/Render ahora.
+
 Usar `docs/audit/legacy-functional-inventory.md` como matriz de partida y
 revalidar las capacidades contra el SHA remoto de Legacy fijado para cada lote.
 Los snapshots históricos no demuestran por sí solos la cobertura actual.

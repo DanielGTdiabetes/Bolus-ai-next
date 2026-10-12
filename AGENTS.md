@@ -29,6 +29,13 @@ Telegram puede sustituirse cuando sea necesario, pero no se pueden perder los
 casos de uso que proporciona. El enlace con MyFitnessPal forma parte del alcance;
 la entrada manual como respaldo no sustituye esa integración.
 
+La finalidad es dejar de ejecutar `bolus_ai` en NAS y Render: Next es su
+sustituto completo, no un cliente que necesite ese backend para conservar las
+funciones. La lógica y el estado operativo de la app se trasladan al dispositivo;
+las conexiones necesarias con proveedores externos pueden seguir siendo online.
+Ninguna capacidad migrada se da por cubierta si exige mantener Legacy ejecutándose
+en NAS/Render. Esto no autoriza apagar ni modificar producción durante la convivencia.
+
 «Servicio opcional» significa que su caída o ausencia no bloquea el camino
 clínico local, no que se pueda omitir la funcionalidad de la sustitución final.
 Mantener la cobertura en el inventario funcional existente: fuente/SHA, caso de
