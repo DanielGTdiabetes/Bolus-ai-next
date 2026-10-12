@@ -83,6 +83,24 @@ Si falta una definición necesaria:
 Las constantes técnicas no clínicas (por ejemplo, tamaño de página de una lista)
 deben distinguirse claramente de parámetros clínicos.
 
+### Autorización de desarrollo y pruebas — 2026-10-12
+
+El propietario autoriza implementar y ejecutar lecturas reales y cálculos de
+prueba durante el desarrollo de Next, sin esperar a terminar toda la app ni a
+aprobar su uso terapéutico. Se pueden implementar reglas observadas y trazadas
+como candidatas de prueba, conservando versión, procedencia y validación pendiente.
+Esta autorización prevalece sobre puertas anteriores que impidan desarrollar
+o simular únicamente por faltar aprobación para tratamiento. No repetir esa
+consulta en cada paso ni imponer el cierre de Dexcom antes de desarrollar el motor.
+
+Los resultados de prueba deben identificarse como no utilizables para tratamiento;
+las lecturas reales conservan sus estados y limitaciones, sin convertirlas en
+entradas clínicamente validadas. No inventar fórmulas, datos, IOB, umbrales ni
+defaults; una ausencia bloquea solo el cálculo o componente que la necesita.
+Usar el motor único, pruebas proporcionales y datos minimizados. No registrar ni
+sincronizar tratamientos reales, modificar productores o Legacy, ni conceder
+autoridad clínica a Next. Esa promoción requiere validación final y autorización.
+
 ## 4. Arquitectura obligatoria
 
 ### 4.1 Local-first
@@ -246,6 +264,10 @@ Cobertura mínima por tipo de cambio:
   conflicto, reinicio y ejecución offline;
 - Dexcom/integraciones: contratos con fixtures saneados, permisos/errores y prueba
   en modo avión; ninguna prueba automatizada escribe en producción;
+  para la recepción con el sensor Dexcom G7 real, el propietario ha decidido
+  el 2026-10-11 probar sin Internet con Wi-Fi y datos móviles apagados,
+  manteniendo Bluetooth activo y sin activar modo avión, para no desconectar
+  el sensor (ADR 0023, D1). Esta excepción no elimina la prueba offline;
 - sombra: paridad por componente, clasificación de discrepancias y ausencia de
   efectos laterales;
 - UI crítica: estado de antigüedad/origen, bloqueos visibles y confirmación

@@ -108,6 +108,16 @@ debe incluir `BroadcastOptions.setShareIdentityEnabled(true)` y una prueba
 instrumentada debe demostrar que Next obtiene paquete y UID; el envío observado
 sin opciones no proporciona esa garantía.
 
+Rectificación del propietario, 2026-10-11: Dexcom instalada no se modifica,
+recompila ni reinstala. El opt-in de identidad y la release reproducible no son
+trabajo pendiente del productor, sino requisitos de la ruta estricta de Next,
+que se conserva. La política compatible del
+[ADR 0023](0023-dexcom-existing-transport-trust.md) está aceptada desde el
+2026-10-12 para recepción y presentación técnica, con garantía de conjunto
+aprobado y sin identidad individual por mensaje. Su implementación y validación
+siguen pendientes. Esto no añade una lectura disponible para cálculo; las
+anclas proceden del inventario de solo lectura L1 y la aprobación L2.
+
 No es válido fijar como ancla de confianza una firma extraída de una compilación
 no archivada. No basta con observar un payload o replicar el comportamiento
 Legacy.

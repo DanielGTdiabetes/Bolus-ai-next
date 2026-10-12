@@ -1,16 +1,85 @@
 Trabaja en E:\projects\Bolus-ai-next y continúa desde origin/main actualizado.
 
-CONTINUACIÓN ACTIVA — 2026-10-11
+CONTINUACIÓN ACTIVA — 2026-10-12
 El propietario pide reducir fricción y entregar capacidades completas. Aplica
 docs/EXECUTION_PLAN.md §3.3: decisiones técnicas reversibles autónomas, ADR solo
 cuando corresponda, preguntas necesarias agrupadas y evidencia sin duplicación.
 Se mantienen los controles clínicos y las pruebas obligatorias.
 
+CÁLCULO DE PRUEBA AUTORIZADO — 2026-10-12
+El propietario autoriza avanzar con lecturas reales y cálculos durante el
+desarrollo; no utilizará la app para tratamiento hasta finalizarla. Aplicar
+AGENTS.md §3, «Autorización de desarrollo y pruebas». Implementar el motor único
+y su recorrido de prueba sin esperar al cierre de Dexcom ni pedir de nuevo
+permiso para desarrollar. Se admiten reglas candidatas observadas y trazadas,
+con validación pendiente explícita. Conservar las limitaciones de las lecturas
+reales; los resultados son pruebas no utilizables para tratamiento. No inventar
+valores ni reglas; bloquear solo lo que dependa de un dato ausente. No habilitar
+tratamientos reales ni escrituras a Legacy. Las prohibiciones históricas de
+«cálculo» se refieren al uso terapéutico y no bloquean esta autorización de prueba.
+
+DEXCOM INSTALADA: NO MODIFICAR
+El propietario confirma que Dexcom ya está modificada, funciona y la utiliza
+`bolus_ai`. Next debe aprovechar ese mismo transporte como sustituto de Bolus AI.
+No pedir cambios, recompilación, reinstalación ni `setShareIdentityEnabled(true)`
+en Dexcom. La adaptación corresponde a Next. Identificar y archivar la APK
+instalada es una operación de solo lectura, no una obligación de reconstruirla.
+Revisar en el ADR 0022 la política de recepción de Next: la implementada hoy
+exige identidad compartida y todavía no es compatible con el envío existente.
+No simular esa identidad ni llamar autenticación por mensaje a verificar una
+APK instalada. Este cambio de alcance no habilita cálculo ni tratamiento.
+
+RECEPCIÓN Y PRESENTACIÓN TÉCNICA APROBADAS — 2026-10-12
+El propietario respondió «sí» al paquete de decisiones del ADR 0023
+(docs/adr/0023-dexcom-existing-transport-trust.md): L2, I-1 a I-8, B1 a B5,
+C1 a C7 y D2, según su registro de aprobación. No repetir esas preguntas.
+Conjunto aprobado: Dexcom, Legacy, reloj y Next. I-2 **b**: Dexcom conserva
+paquete, versión 4537 y firmantes exactos; Legacy y reloj permiten versiones
+nuevas con paquete y firmantes aprobados. Next sin ancla de versión. Los UID
+del inventario son observados; resolver UID/perfil actual en cada comprobación.
+I-4: riesgos residuales aceptados solo para recepción y presentación técnica,
+sin cálculo ni tratamientos. No atribuir cada mensaje a Dexcom.
+I-3: `QUERY_ALL_PACKAGES` autorizado únicamente si la prueba en el Pixel
+demuestra que hace falta; si no se demuestra cobertura, bloquear.
+B4 **b**: fuera de 1..400, aviso sin número. C5 **a**: mostrar antigüedad y
+vigencia pendiente, nunca «actual»; no hay umbral clínico aprobado.
+B1 permanece condicionada a validación real y aprobación del informe:
+hasta entonces ordenar por recepción y contar tiempo desde recepción,
+etiquetándolo, con hora de medida «no verificada».
+Anclas en código/PR; permiso de Next por adb durante validación y botón al
+cerrar el hito; receiver activable por adb hasta validar. No se ejecutan
+acciones sobre el teléfono por este cambio documental.
+D1 ya está decidida por el propietario el 2026-10-11: prueba sin Internet con
+Wi-Fi y datos móviles apagados, Bluetooth activo y sin activar modo avión,
+para no desconectar el sensor G7. Comprobar continuidad de recepción y ausencia
+de red validada, también tras reinicio. No volver a pedir esta decisión;
+la aceptación del resto procede del registro separado del 2026-10-12.
+L1 hecho el 2026-10-11 (docs/validation/dexcom-installed-inventory-2026-10-11.md):
+Dexcom tiene el permiso concedido; titulares actuales Dexcom, Legacy y
+`com.wtachtsugar`; Legacy, Next y `com.wtachtsugar` comparten firmante. El ADR
+recoge las anclas aprobadas con esos valores y las reglas I-2b.
+El propietario ya identificó `com.wtachtsugar`: es su app del reloj para ver
+glucosa Dexcom G7; también permite conexión directa al sensor sin Dexcom y
+está previsto que retransmita hacia Next. Conservar su permiso e incluirla
+en el conjunto aprobado; no volver a pedir qué app es. La retransmisión
+del reloj es de respaldo: según el propietario, solo emite cuando falla la
+app Dexcom, sin emisión simultánea prevista desde ambas apps. No inventar
+criterios de fallo ni tiempos para el cambio de fuente.
+La integración
+futura requiere contrato y validación propios, sin bloquear el hito Dexcom
+actual ni atribuir al productor Dexcom los mensajes de la app del reloj.
+La aprobación del 2026-10-12 no autoriza cambios en la app del reloj ni uso
+clínico de sus futuras retransmisiones.
+Siguiente paso: implementar el plan aceptado de recepción y presentación y
+avanzar con el cálculo de prueba autorizado, en entregas funcionales completas.
+La aprobación no equivale a implementación
+ni a recepción real verificada; el código actual continúa con Pending.
+
 La PR #53 (ADR 0022 R11) ya está integrada en `origin/main` mediante
 `740af25`; no reabrir su trabajo como un paso pendiente. Comprobar el CI del
 SHA integrado al continuar. Priorizar ahora una entrega completa de
-recepción local Dexcom y presentación offline con cálculo bloqueado, reuniendo
-las decisiones pendientes en una sola propuesta. No encadenar nuevas PR de
+recepción local Dexcom y presentación offline con cálculo bloqueado, aplicando
+el ADR 0023 aceptado. No encadenar nuevas PR de
 diagnóstico o endurecimiento sin un hallazgo o riesgo concreto.
 
 El detalle que sigue conserva antecedentes de entregas; el estado de integración
@@ -362,13 +431,13 @@ Toda prueba que active el receiver debe restaurar
 sintética: `DexcomStorageGuard` rechaza la real.
 
 PENDIENTE DEL PROPIETARIO (ADR 0018 a 0022)
-- Decidir si Diagnóstico muestra un contador duradero de fallos del receiver
-  (almacenamiento R10 y fase síncrona R11).
+- El contador duradero de fallos del receiver queda fuera del hito por C7 del
+  ADR 0023, aprobado el 2026-10-12; no volver a pedirlo para esta entrega.
 - Revisar las decisiones técnicas T1 a T6 (ADR 0019), E5 a E9 (ADR 0020), F3
   a F5 (ADR 0021) y R4 a R9 (ADR 0022).
-- Para el receiver productivo: archivar release reproducible de la app Dexcom
-  modificada, activar `setShareIdentityEnabled(true)` en el productor y
-  aprobar anclas (paquete, versionCode, SHA-256 de firmantes).
+- Para el receiver productivo: L1 hecho y política ADR 0023 aceptada. Queda
+  implementarla y probarla en Next, sin cambiar Dexcom. No reabrir la elección
+  del productor ni presentar su modificación como un requisito pendiente.
 
 FLUJO DE TRABAJO SIMPLIFICADO (2026-10-11)
 El propietario sustituye el paso obligatorio «ADR + preguntas + aprobación»
@@ -389,12 +458,13 @@ el propietario.
 
 ANTECEDENTES DE ALCANCE (la prioridad actual está al inicio)
 Los ADR 0014, 0015, 0017 a 0022 (con R10 y R11) y la opción A del ADR 0016
-están implementados. La recepción real y el uso clínico requieren todavía sus
-decisiones específicas; el ajuste de flujo no las aprueba. El
+están implementados. El ADR 0023 ya autoriza recepción y presentación técnica;
+el uso clínico sigue sin aprobar. El ajuste de flujo no sustituye esa
+aprobación explícita. El
 receiver existe desactivado y con política `Pending` (ADR 0022). Antes de la
-validación con Dexcom real, el propietario debe archivar la release
-reproducible, activar el opt-in de identidad y aprobar las anclas; esa
-validación necesita su ADR de alcance (permiso del productor, anclas y prueba
+validación con Dexcom real, Next debe resolver la incompatibilidad de su política
+con el productor instalado y registrar sus garantías y limitaciones. Ampliar el
+ADR existente para esa entrega (permiso, política compatible y prueba
 offline sin cortar el Bluetooth del sensor, según el ADR 0022).
 Sin esas puertas, siguen abiertos sin bloqueo externo: el ADR de retención
 (E4) y, fuera de Dexcom, P4 (franjas en cambios de hora) y P6

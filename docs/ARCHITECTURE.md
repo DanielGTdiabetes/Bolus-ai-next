@@ -48,6 +48,12 @@ Debe aislarse del UI y de la red. Como mínimo deberá cubrir:
 
 Antes de implementarlo se auditará el motor actual de `bolus_ai` y se crearán vectores de referencia para demostrar paridad.
 
+La autorización del propietario del 2026-10-12 (AGENTS.md §3) permite implementar
+y ejecutar reglas candidatas trazadas para pruebas durante el desarrollo,
+incluidas entradas reales con sus limitaciones. La validación pendiente no
+impide ese trabajo; los resultados no tienen autoridad de tratamiento.
+Se conserva una única implementación en `shared/bolus-engine`.
+
 ## Persistencia local
 
 La aplicación Android deberá utilizar una base de datos durable, previsiblemente Room/SQLite, para almacenar al menos:

@@ -60,7 +60,11 @@ El primer hito técnico será deliberadamente pequeño:
 
 > Abrir Bolus AI Next en Android, recibir una lectura local de Dexcom G7 y mostrarla correctamente aunque el dispositivo no tenga conexión a Internet.
 
-Antes de implementar el cálculo de bolo se documentará y validará el motor clínico actual, especialmente IOB, DIA, ratios, ISF/CF, objetivos, redondeos y límites de seguridad.
+El propietario ha autorizado el 2026-10-12 desarrollar y ejecutar cálculos de
+prueba, también con lecturas reales, antes de terminar la app. Se documentan
+las reglas y sus validaciones pendientes, sin inventar datos y con resultados
+no utilizables para tratamiento (AGENTS.md §3). La validación clínica final y
+el cambio de autoridad siguen siendo necesarios para usar Next en tratamiento.
 
 ## Estado
 
@@ -200,8 +204,12 @@ registra tratamientos. Las versiones mínimas y el contrato Dexcom definitivos
 continúan pendientes. La [investigación de recepción local G7 en Android](docs/validation/dexcom-g7-android-local-reception-2026-09-06.md)
 identifica la aplicación Dexcom modificada por el propietario como fuente local
 primaria y la Web API como contingencia de emergencia con retraso. El puerto
-devuelve `policy_not_approved` hasta fijar una release reproducible, autenticar
-el emisor y aprobar las políticas clínicas restantes.
+devuelve `policy_not_approved` hasta aprobar una política de recepción y las
+políticas clínicas restantes. Dexcom instalada no se modifica: la política
+compatible con su envío actual está aceptada para recepción y presentación
+técnica en el [ADR 0023](docs/adr/0023-dexcom-existing-transport-trust.md)
+desde el 2026-10-12. Quedan implementación y validación; cálculo y tratamiento
+siguen bloqueados.
 
 ## Documentación para ejecutar el proyecto
 
