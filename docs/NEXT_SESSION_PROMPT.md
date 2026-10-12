@@ -5,8 +5,14 @@ Existen y están integrados: recepción Dexcom por permiso con presentación en
 Inicio y Bolo (ADR 0023), motor candidato único `0.3.0-candidate` con cálculo de
 prueba en Bolo y paridad exacta en 12 vectores de Legacy `bcac891` (ADR 0024) y
 límites del cálculo en el perfil versionado (ADR 0025). Ningún resultado es
-utilizable para tratamiento. La recepción real y todas las pruebas instrumentadas
-siguen sin ejecutarse en el Pixel.
+utilizable para tratamiento. La recepción real offline ya pasó en el Pixel antes
+y después de reiniciar. I-3 demostró que hace falta `QUERY_ALL_PACKAGES`, ya
+añadido; Diagnóstico muestra la puerta abierta y los cuatro titulares aprobados.
+`scripts/verify.ps1 -DeviceTests` pasó: 176 pruebas instrumentadas y 374 unitarias,
+incluidos los límites de perfil de PR #58. Wi-Fi y datos quedaron restaurados.
+Estado de pruebas y límites de la evidencia en
+docs/validation/pixel-dexcom-and-calculation-2026-10-12.md; prevalece sobre los
+pendientes históricos de las dos validaciones anteriores.
 
 ENTREGA 2026-10-12 — LÍMITES DEL CÁLCULO EN EL PERFIL (ADR 0025)
 Paso de redondeo, bolo máximo y corrección máxima son límites del perfil en el
@@ -18,12 +24,13 @@ sin rellenar nada. Las versiones de esquema 1 los dejan desconocidos
 comprobaciones P1, P6 y P7 del Pixel en docs/validation/profile-limits-2026-10-12.md.
 
 SIGUIENTE
-- Teléfono, cuando haya acceso: P1 a P6 de
-  docs/validation/dexcom-permission-reception-and-test-calculation-2026-10-12.md,
-  más P1, P6 y P7 de la validación de límites. P2 (I-3) decide si hace falta
-  `QUERY_ALL_PACKAGES`: sin esa evidencia no se añade. B1 sigue pendiente de
-  validación real y aprobación del informe. Prueba offline con Bluetooth activo,
-  Wi-Fi y datos móviles apagados y sin modo avión.
+- Teléfono: cálculo con perfil real confirmado (P6) y actualización sobre un
+  perfil v2 real existente (P7 de la validación de límites). B1 tiene evidencia
+  preliminar de tres lecturas en dos mensajes, pero sigue sin aprobarse: no
+  activar selección por timestamp ni vigencia clínica. No repetir I-3 ni las
+  pruebas ya ejecutadas sin cambios que lo justifiquen. En esta sesión Codex
+  hizo las pruebas del Pixel mientras Claude avanzaba desde la nube, sin
+  modificar la implementación de perfil o motor de Claude.
 - Sin teléfono: siguiente regla candidata trazada a Legacy en el motor único.
   Candidatas: historial local de insulina e IOB calculado (LC-004, LC-005), que
   sustituye el IOB manual, y fibra/Warsaw (LC-008). Resolver y registrar el SHA

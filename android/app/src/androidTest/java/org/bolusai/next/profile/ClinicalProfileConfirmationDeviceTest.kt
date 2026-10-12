@@ -555,7 +555,7 @@ internal object FrozenV1ProfileReader {
             SQLiteDatabase.openDatabase(path, null, SQLiteDatabase.OPEN_READONLY or SQLiteDatabase.NO_LOCALIZED_COLLATORS).use { db ->
                 if (db.version != ClinicalProfileSchema.V1) return ProfileRead.Failed(ProfileFailure.UNSUPPORTED_SCHEMA)
                 ClinicalProfileSchema.verify(db, ClinicalProfileSchema.V1)
-                val versions = ClinicalProfileRows.readVersions(db)
+                val versions = FrozenV1ProfileRows.readVersions(db)
                 if (versions.isNotEmpty()) ProfileHistory.Loaded(versions.sortedByDescending { it.version })
                 ProfileRead.Loaded(versions)
             }

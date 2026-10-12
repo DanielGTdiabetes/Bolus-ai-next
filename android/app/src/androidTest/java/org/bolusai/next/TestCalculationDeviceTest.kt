@@ -36,6 +36,9 @@ class TestCalculationDeviceTest {
                         ParameterSchedule.allDay(ProfileParameter.CARB_RATIO, ProfileValue.Entered(CanonicalDecimal("10"))),
                         ParameterSchedule.allDay(ProfileParameter.INSULIN_SENSITIVITY, ProfileValue.Entered(CanonicalDecimal("40"))),
                         ParameterSchedule.allDay(ProfileParameter.GLUCOSE_TARGET, ProfileValue.Entered(CanonicalDecimal("110")))))
+                    .withLimit(ProfileLimit.ROUND_STEP, ProfileValue.Entered(CanonicalDecimal("0.1")))
+                    .withLimit(ProfileLimit.MAX_BOLUS, ProfileValue.Entered(CanonicalDecimal("15")))
+                    .withLimit(ProfileLimit.MAX_CORRECTION, ProfileValue.Entered(CanonicalDecimal("5")))
                 assertTrue(repository.save(ProfileWrite(0, content, ProfileOrigin.MANUAL, null), at - 1_000,
                     "test/synthetic") is ProfileSave.Saved)
                 val profiles = ClinicalProfiles(repository, ProfileClock { at }, "test/synthetic", TimeZoneRules { true })
@@ -86,9 +89,6 @@ class TestCalculationDeviceTest {
         }
         enter(scenario, "carbs", "60")
         enter(scenario, "glucose", "190")
-        enter(scenario, "round_step", "0.1")
-        enter(scenario, "max_bolus", "15")
-        enter(scenario, "max_correction", "5")
     }
 
     @Test fun manualCalculationKeepsUnknownIobBlockedAndDiscardsResultOnEdit() {

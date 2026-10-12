@@ -808,15 +808,22 @@ Cada cambio debe indicar fase, criterio cubierto, pruebas, riesgos y pendientes.
 
 Estado en `main`: hay recepción Dexcom por permiso con presentación en Inicio y
 Bolo (ADR 0023), motor candidato único con cálculo de prueba en Bolo (ADR 0024)
-y límites del cálculo en el perfil versionado (ADR 0025). La recepción real y las
-pruebas instrumentadas siguen sin ejecutarse en el Pixel. Nada de esto autoriza
-tratamiento.
+y límites del cálculo en el perfil versionado (ADR 0025). La recepción real se
+probó en el Pixel sin Internet antes y después de reiniciar. I-3 demostró la
+necesidad de `QUERY_ALL_PACKAGES`, ya añadido; la puerta abre con los cuatro
+titulares aprobados. Véase la [evidencia actual](validation/pixel-dexcom-and-calculation-2026-10-12.md),
+que sustituye el estado pendiente de las validaciones anteriores. Nada de esto
+autoriza tratamiento.
+`scripts/verify.ps1 -DeviceTests` pasó con 176 pruebas instrumentadas y 374
+unitarias, incluidos los límites del perfil de PR #58.
 
-1. Teléfono, cuando haya acceso: P1 a P6 de la
-   [validación del 2026-10-12](validation/dexcom-permission-reception-and-test-calculation-2026-10-12.md)
-   y P1, P6 y P7 ampliados en la [validación de límites](validation/profile-limits-2026-10-12.md).
-   `QUERY_ALL_PACKAGES` solo se añade si P2 (I-3) lo demuestra, en una PR pequeña.
-   B1 sigue pendiente de validación real y aprobación del informe.
+1. Teléfono: completar el cálculo con perfil real confirmado (P6) y la
+   actualización sobre un perfil v2 real existente (P7 de la
+   [validación de límites](validation/profile-limits-2026-10-12.md)). Las
+   migraciones con archivos sintéticos están cubiertas por la suite. B1 dispone
+   de evidencia preliminar, pero sigue sin aprobación del informe; no repetir
+   la decisión I-3 ni las pruebas de recepción ya registradas sin cambios que
+   lo justifiquen.
 2. Sin depender del teléfono: la siguiente regla candidata trazada a Legacy en
    el motor único, con validación pendiente visible y sin defaults. Candidatas
    por orden: historial local de insulina e IOB calculado (LC-004, LC-005), que

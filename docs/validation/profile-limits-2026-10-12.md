@@ -35,6 +35,9 @@ No hay KVM, así que no se ejecutó ninguna prueba instrumentada.
 
 ## Comprobaciones pendientes del Pixel (no realizadas)
 
+Estado histórico de esta entrega. Resultados posteriores y pendientes vigentes
+en la [validación del Pixel](pixel-dexcom-and-calculation-2026-10-12.md).
+
 Amplían las de la [validación anterior](dexcom-permission-reception-and-test-calculation-2026-10-12.md).
 
 | ID | Comprobación | Evidencia esperada |

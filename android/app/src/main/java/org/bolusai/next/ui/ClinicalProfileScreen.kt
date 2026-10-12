@@ -695,6 +695,8 @@ internal class ClinicalProfileScreen(
         content.addView(preview)
         title.labelFor = input.id
         preview.text = previewText(field)
+        // Entering the first limit upgrades the editor schema and changes the previews of the other limits too.
+        refreshers.add { preview.text = previewText(field) }
         input.doAfterTextChanged {
             model.setInput(field.key, it?.toString().orEmpty())
             preview.text = previewText(field)

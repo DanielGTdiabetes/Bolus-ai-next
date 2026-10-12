@@ -48,6 +48,9 @@ conjunto y bloqueos) compilan, pero aún no se han ejecutado.
 
 ## Comprobaciones pendientes del Pixel (no realizadas)
 
+Estado histórico de esta entrega. Resultados posteriores y pendientes vigentes
+en la [validación del Pixel](pixel-dexcom-and-calculation-2026-10-12.md).
+
 | ID | Comprobación | Evidencia esperada (D2: sin glucosa ni transmisor en claro) |
 |---|---|---|
 | P1 | `scripts/verify.ps1 -DeviceTests` con el APK de esta PR | Suite instrumentada en verde, incluidas la migración v1→v2, los bloqueos y que un emisor sin permiso no recibe nada |
