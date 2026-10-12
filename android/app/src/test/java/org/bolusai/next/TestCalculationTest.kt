@@ -71,8 +71,8 @@ class TestCalculationTest {
         return ProfileGateState.of(record, TimeZoneRules { true })
     }
 
-    private val form = TestCalculationForm(carbs = "60", glucoseMgDl = "190", iobUnits = "0", roundStep = "0,1",
-        maxBolus = "15", maxCorrection = "5")
+    private val form = TestCalculationForm(carbs = "60", glucoseMgDl = "190", glucoseEnteredAtEpochMs = at - 60_000,
+        iobUnits = "0", roundStep = "0,1", maxBolus = "15", maxCorrection = "5")
 
     private fun reading(value: Int = 190) = LatestReadingPresentation.Reading(value, at - 120_000, 120_000,
         ApprovedPermissionSet("adr0023-i2b-2026-10-12", "c".repeat(64)), "ab12cd34", "SYNTHETIC_TREND")
@@ -139,10 +139,52 @@ class TestCalculationTest {
         assertEquals("45", (request.carbs as Input.Provided).value.grams.text)
     }
 
+    @Test fun manualGlucoseKeepsItsEntryInstantNotTheCalculationTime() {
+        val first = TestCalculation.request(at, state(), null, null, form)
+        val later = TestCalculation.request(at + 600_000, state(), null, null, form)
+        assertEquals(at - 60_000, (first.glucose as Input.Provided).value.recordedAtEpochMs)
+        assertEquals(first.glucose, later.glucose)
+        assertEquals(Input.Unavailable("glucose.manual.entry_time_unknown"),
+            TestCalculation.request(at, state(), null, null, form.copy(glucoseEnteredAtEpochMs = null)).glucose)
+    }
+
+    @Test fun dexcomProvenanceAndTransmitterEnterTheFingerprint() {
+        val dexcomForm = form.copy(glucoseChoice = GlucoseChoice.DEXCOM)
+        val base = TestCalculation.calculate(TestCalculation.request(at, state(), null, reading(), dexcomForm))
+        val otherSet = reading().copy(provenance = ApprovedPermissionSet("adr0023-i2b-2026-10-12", "d".repeat(64)))
+        val otherTx = reading().copy(transmitterShort = "ffff0000")
+        listOf(otherSet, otherTx).forEach {
+            assertTrue(base.inputFingerprintSha256 != TestCalculation.calculate(
+                TestCalculation.request(at, state(), null, it, dexcomForm)).inputFingerprintSha256)
+        }
+    }
+
+    @Test fun aNewReadingMealOrProfileDiscardsTheResultButAnUnusedSourceDoesNot() {
+        val dexcomForm = form.copy(glucoseChoice = GlucoseChoice.DEXCOM)
+        val model = TestCalculationModel()
+        model.update(dexcomForm)
+        model.store(TestCalculation.calculate(TestCalculation.request(at, state(), null, reading(), dexcomForm)), at,
+            TestCalculation.dependencies(state(), null, reading(), dexcomForm))
+        // Reloading the same reading only changes the elapsed time: the result stays.
+        model.invalidateIfChanged(TestCalculation.dependencies(state(), null, reading().copy(elapsedSinceReceptionMs = 1), dexcomForm))
+        assertTrue(model.result != null)
+        // The meal selection is not used by this form.
+        model.invalidateIfChanged(TestCalculation.dependencies(state(), MealSelection.Missing, reading(), dexcomForm))
+        assertTrue(model.result != null)
+        model.invalidateIfChanged(TestCalculation.dependencies(state(), null, reading(value = 191), dexcomForm))
+        assertNull(model.result)
+        assertTrue(model.invalidated)
+        model.store(TestCalculation.calculate(TestCalculation.request(at, state(), null, reading(), dexcomForm)), at,
+            TestCalculation.dependencies(state(), null, reading(), dexcomForm))
+        model.invalidateIfChanged(TestCalculation.dependencies(state(confirmed = false), null, reading(), dexcomForm))
+        assertNull(model.result)
+    }
+
     @Test fun changingTheFormDiscardsTheResult() {
         val model = TestCalculationModel()
         model.update(form)
-        model.store(TestCalculation.calculate(TestCalculation.request(at, state(), null, null, form)), at)
+        model.store(TestCalculation.calculate(TestCalculation.request(at, state(), null, null, form)), at,
+            TestCalculation.dependencies(state(), null, null, form))
         model.update(form)
         assertTrue(model.result != null)
         model.update(form.copy(iobUnits = "1"))

@@ -312,7 +312,8 @@ public object CandidateCodec {
         }
         input("carbs", request.carbs) { "${it.grams.text}:${it.origin.code}" }
         input("glucose", request.glucose) {
-            "${it.value.text}:${it.unit.code}:${it.origin.code}:${it.recordedAtEpochMs}:verified=${it.measurementTimeVerified}"
+            "${it.value.text}:${it.unit.code}:${it.origin.code}:${it.recordedAtEpochMs}:verified=${it.measurementTimeVerified}" +
+                ":source=${it.sourceReference}"
         }
         input("iob", request.iob) { "${it.units.text}:${it.origin}" }
         input("round_step", request.roundStep) { it.text }

@@ -280,13 +280,17 @@ class MainActivity : ComponentActivity() {
      * reading shown on screen, and runs the single engine. Nothing is recorded, confirmed or sent.
      */
     private fun renderTestCalculation() {
+        testCalculation.invalidateIfChanged(
+            TestCalculation.dependencies(profile.gate, meals.selection, dexcomReading.state, testCalculation.form))
         TestCalculationScreen(this, findViewById(R.id.screen_content), testCalculation,
             dexcomReading.state is LatestReadingPresentation.Reading, meals.selection is org.bolusai.meals.MealSelection.Reviewed,
+            now = clock,
             calculate = {
                 val now = clock()
                 val request = TestCalculation.request(now, profile.gate, meals.selection, dexcomReading.state,
                     testCalculation.form)
-                testCalculation.store(TestCalculation.calculate(request), now)
+                testCalculation.store(TestCalculation.calculate(request), now,
+                    TestCalculation.dependencies(profile.gate, meals.selection, dexcomReading.state, testCalculation.form))
                 rememberScroll()
                 render()
             },

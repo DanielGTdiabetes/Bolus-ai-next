@@ -57,7 +57,8 @@ public enum class GlucoseOrigin(public val code: String) {
 
 /**
  * One glucose value as provided. [recordedAtEpochMs] is the instant it was typed or received, not the measurement
- * time. [measurementTimeVerified] stays false until the producer timestamp semantics are approved (ADR 0023, B1).
+ * time. [sourceReference] identifies the exact source within its origin (for Dexcom: policy version, holder set and
+ * transmitter fingerprint prefix) so the input fingerprint distinguishes readings that share value and instant. [measurementTimeVerified] stays false until the producer timestamp semantics are approved (ADR 0023, B1).
  * No freshness policy is approved: the engine reports the elapsed time, it never decides that the value is current.
  */
 public data class GlucoseValue(
@@ -66,7 +67,10 @@ public data class GlucoseValue(
     public val origin: GlucoseOrigin,
     public val recordedAtEpochMs: Long,
     public val measurementTimeVerified: Boolean,
-)
+    public val sourceReference: String,
+) {
+    init { require(sourceReference.isNotBlank() && '\n' !in sourceReference) { "engine.glucose.invalid_source_reference" } }
+}
 
 public enum class CarbsOrigin(public val code: String) {
     MANUAL_ENTRY("manual_entry"),

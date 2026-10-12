@@ -36,7 +36,7 @@ internal fun request(
     minute: Input<Int> = Input.Provided(600),
     carbs: String? = "60",
     glucose: Input<GlucoseValue> = Input.Provided(GlucoseValue(q("190"), GlucoseUnitCode.MG_DL,
-        GlucoseOrigin.MANUAL_ENTRY, 1_000L, measurementTimeVerified = false)),
+        GlucoseOrigin.MANUAL_ENTRY, 1_000L, measurementTimeVerified = false, sourceReference = "manual")),
     iob: String? = "0",
     roundStep: String? = "0.1",
     maxBolus: String? = "15",
@@ -68,7 +68,7 @@ class CandidateEngineTest {
                 profile = Input.Provided(profile(vector.carbRatio, vector.sensitivity, vector.target)),
                 carbs = vector.carbs,
                 glucose = Input.Provided(GlucoseValue(q(vector.glucose), GlucoseUnitCode.MG_DL,
-                    GlucoseOrigin.MANUAL_ENTRY, 0L, false)),
+                    GlucoseOrigin.MANUAL_ENTRY, 0L, false, "manual")),
                 iob = vector.iob, roundStep = vector.roundStep, maxBolus = vector.maxBolus,
                 maxCorrection = vector.maxCorrection,
             ))
@@ -165,7 +165,7 @@ class CandidateEngineTest {
         val mmolProfile = CandidateEngine.calculate(request(profile = Input.Provided(profile(unit = GlucoseUnitCode.MMOL_L))))
         assertEquals(listOf("profile.glucose_unit.not_traced_for_candidate"), causes(mmolProfile.step(CandidateStep.CORRECTION)))
         val mmolGlucose = CandidateEngine.calculate(request(glucose = Input.Provided(GlucoseValue(q("8"),
-            GlucoseUnitCode.MMOL_L, GlucoseOrigin.MANUAL_ENTRY, 0L, false))))
+            GlucoseUnitCode.MMOL_L, GlucoseOrigin.MANUAL_ENTRY, 0L, false, "manual"))))
         assertEquals(listOf("glucose.unit_not_traced_for_candidate"), causes(mmolGlucose.step(CandidateStep.CORRECTION)))
         val noUnit = CandidateEngine.calculate(request(profile = Input.Provided(profile(unit = null))))
         assertEquals(listOf("profile.glucose_unit.not_configured"), causes(noUnit.step(CandidateStep.CORRECTION)))
@@ -183,14 +183,14 @@ class CandidateEngineTest {
 
     @Test
     fun hypoStopWarnsEvenWhenTheDoseIsBlocked() {
-        val low = Input.Provided(GlucoseValue(q("65"), GlucoseUnitCode.MG_DL, GlucoseOrigin.MANUAL_ENTRY, 0L, false))
+        val low = Input.Provided(GlucoseValue(q("65"), GlucoseUnitCode.MG_DL, GlucoseOrigin.MANUAL_ENTRY, 0L, false, "manual"))
         val blocked = CandidateEngine.calculate(request(glucose = low, iob = null))
         assertTrue(Warnings.BELOW_HYPO_STOP in blocked.warnings)
         assertTrue(blocked.total is StepOutcome.Blocked)
         val computed = CandidateEngine.calculate(request(glucose = low))
         assertEquals(0.0, units(computed.total))
         val atThreshold = CandidateEngine.calculate(request(glucose = Input.Provided(GlucoseValue(q("70"),
-            GlucoseUnitCode.MG_DL, GlucoseOrigin.MANUAL_ENTRY, 0L, false)), carbs = "0"))
+            GlucoseUnitCode.MG_DL, GlucoseOrigin.MANUAL_ENTRY, 0L, false, "manual")), carbs = "0"))
         assertFalse(Warnings.BELOW_HYPO_STOP in atThreshold.warnings)
     }
 
@@ -213,7 +213,7 @@ class CandidateEngineTest {
     @Test
     fun dexcomGlucoseKeepsItsLimitations() {
         val result = CandidateEngine.calculate(request(glucose = Input.Provided(GlucoseValue(q("190"),
-            GlucoseUnitCode.MG_DL, GlucoseOrigin.DEXCOM_PERMISSION_SET, 0L, false))))
+            GlucoseUnitCode.MG_DL, GlucoseOrigin.DEXCOM_PERMISSION_SET, 0L, false, "set:a"))))
         assertTrue(Warnings.DEXCOM_NOT_ATTRIBUTED in result.warnings)
         assertTrue(Warnings.MEASUREMENT_TIME_UNVERIFIED in result.warnings)
         assertTrue(Warnings.FRESHNESS_NOT_APPROVED in result.warnings)
@@ -227,7 +227,9 @@ class CandidateEngineTest {
         val variants = listOf(request(carbs = "61"), request(iob = null), request(roundStep = "0.5"),
             request(maxBolus = "14"), request(maxCorrection = "4"), request(minute = Input.Provided(601)),
             request(glucose = Input.Unavailable("glucose.missing")),
-            request(profile = Input.Provided(profile(confirmed = false))))
+            request(profile = Input.Provided(profile(confirmed = false))),
+            request(glucose = Input.Provided(GlucoseValue(q("190"), GlucoseUnitCode.MG_DL, GlucoseOrigin.MANUAL_ENTRY,
+                1_000L, measurementTimeVerified = false, sourceReference = "other"))))
         variants.forEach { assertNotEquals(base.inputFingerprintSha256, CandidateEngine.calculate(it).inputFingerprintSha256) }
     }
 

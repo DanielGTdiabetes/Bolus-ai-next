@@ -17,6 +17,7 @@ import org.bolusai.engine.candidate.Warnings
 import org.bolusai.next.R
 import org.bolusai.next.application.CarbsChoice
 import org.bolusai.next.application.GlucoseChoice
+import org.bolusai.next.application.TestCalculationDependencies
 import org.bolusai.next.application.TestCalculationForm
 import java.math.BigDecimal
 import java.math.RoundingMode
@@ -37,6 +38,7 @@ internal class TestCalculationModel : ViewModel() {
         private set
     var invalidated = false
         private set
+    private var dependencies: TestCalculationDependencies? = null
 
     fun update(next: TestCalculationForm) {
         if (next == form) return
@@ -46,10 +48,20 @@ internal class TestCalculationModel : ViewModel() {
         calculatedAtEpochMs = null
     }
 
-    fun store(result: CandidateResult, atEpochMs: Long) {
+    fun store(result: CandidateResult, atEpochMs: Long, dependencies: TestCalculationDependencies) {
         this.result = result
+        this.dependencies = dependencies
         calculatedAtEpochMs = atEpochMs
         invalidated = false
+    }
+
+    /** Discards the result when a reading, meal or profile it used is no longer the current one. */
+    fun invalidateIfChanged(current: TestCalculationDependencies) {
+        if (result == null || current == dependencies) return
+        result = null
+        calculatedAtEpochMs = null
+        dependencies = null
+        invalidated = true
     }
 }
 
@@ -98,6 +110,7 @@ internal class TestCalculationScreen(
     private val model: TestCalculationModel,
     private val dexcomShowsValue: Boolean,
     private val mealAvailable: Boolean,
+    private val now: () -> Long,
     private val calculate: () -> Unit,
     private val changed: () -> Unit,
 ) {
@@ -176,7 +189,9 @@ internal class TestCalculationScreen(
             model.update(model.form.copy(glucoseChoice = GlucoseChoice.DEXCOM)); changed()
         }
         if (form.glucoseChoice == GlucoseChoice.MANUAL) {
-            field(R.string.test_calc_glucose, "test_calc:glucose", form.glucoseMgDl, result) { model.form.copy(glucoseMgDl = it) }
+            field(R.string.test_calc_glucose, "test_calc:glucose", form.glucoseMgDl, result) {
+                model.form.copy(glucoseMgDl = it, glucoseEnteredAtEpochMs = now())
+            }
         }
         field(R.string.test_calc_iob, "test_calc:iob", form.iobUnits, result) { model.form.copy(iobUnits = it) }
         label(content, context.getString(R.string.test_calc_limits), bold = true)

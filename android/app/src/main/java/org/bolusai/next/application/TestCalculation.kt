@@ -1,5 +1,7 @@
 package org.bolusai.next.application
 
+import org.bolusai.dexcomg7.ApprovedPermissionSet
+import org.bolusai.dexcomg7.AuthenticatedSender
 import org.bolusai.dexcomg7.LatestReadingPresentation
 import org.bolusai.engine.candidate.CandidateEngine
 import org.bolusai.engine.candidate.CandidateRequest
@@ -30,6 +32,15 @@ import java.time.DateTimeException
 import java.time.Instant
 import java.time.ZoneId
 
+/** External inputs a result depends on; equality decides whether a stored result is still current. */
+internal data class TestCalculationDependencies(
+    val profile: Input<ProfileSnapshot>,
+    /** Null when the form does not take carbohydrates from the meal selection. */
+    val meal: Input<CarbsValue>?,
+    /** Null when the form does not take glucose from Dexcom. */
+    val dexcom: Input<GlucoseValue>?,
+)
+
 /** Where the test calculation takes glucose from. Nothing is chosen automatically. */
 internal enum class GlucoseChoice { MANUAL, DEXCOM }
 
@@ -42,6 +53,8 @@ internal data class TestCalculationForm(
     val carbs: String = "",
     val glucoseChoice: GlucoseChoice = GlucoseChoice.MANUAL,
     val glucoseMgDl: String = "",
+    /** When the manual glucose text was last edited; part of the input, never replaced by the calculation time. */
+    val glucoseEnteredAtEpochMs: Long? = null,
     val iobUnits: String = "",
     val roundStep: String = "",
     val maxBolus: String = "",
@@ -69,9 +82,7 @@ internal object TestCalculation {
             CarbsChoice.MEAL_SELECTION -> mealCarbs(meal)
         },
         glucose = when (form.glucoseChoice) {
-            GlucoseChoice.MANUAL -> quantity(form.glucoseMgDl, "glucose.manual").map {
-                GlucoseValue(it, GlucoseUnitCode.MG_DL, GlucoseOrigin.MANUAL_ENTRY, atEpochMs, measurementTimeVerified = false)
-            }
+            GlucoseChoice.MANUAL -> manualGlucose(form)
             GlucoseChoice.DEXCOM -> dexcomGlucose(dexcom)
         },
         iob = quantity(form.iobUnits, "iob.manual", absent = "iob.unknown").map { IobValue(it) },
@@ -81,6 +92,31 @@ internal object TestCalculation {
     )
 
     fun calculate(request: CandidateRequest): CandidateResult = CandidateEngine.calculate(request)
+
+    /**
+     * The inputs that come from outside the form. A result is kept only while they stay equal, so a new reading,
+     * another meal revision or another profile state never sits next to a result computed from the previous one.
+     */
+    fun dependencies(
+        profile: ProfileGateState?,
+        meal: MealSelection?,
+        dexcom: LatestReadingPresentation?,
+        form: TestCalculationForm,
+    ) = TestCalculationDependencies(
+        profile(profile),
+        if (form.carbsChoice == CarbsChoice.MEAL_SELECTION) mealCarbs(meal) else null,
+        if (form.glucoseChoice == GlucoseChoice.DEXCOM) dexcomGlucose(dexcom) else null,
+    )
+
+    private fun manualGlucose(form: TestCalculationForm): Input<GlucoseValue> =
+        when (val value = quantity(form.glucoseMgDl, "glucose.manual")) {
+            is Input.Unavailable -> value
+            is Input.Provided -> {
+                val enteredAt = form.glucoseEnteredAtEpochMs ?: return Input.Unavailable("glucose.manual.entry_time_unknown")
+                Input.Provided(GlucoseValue(value.value, GlucoseUnitCode.MG_DL, GlucoseOrigin.MANUAL_ENTRY, enteredAt,
+                    measurementTimeVerified = false, sourceReference = "manual_entry"))
+            }
+        }
 
     fun profile(state: ProfileGateState?): Input<ProfileSnapshot> = when (state) {
         null, ProfileGateState.ReadPending -> Input.Unavailable("profile.read.pending")
@@ -131,7 +167,11 @@ internal object TestCalculation {
         null -> Input.Unavailable("glucose.dexcom.read_pending")
         is LatestReadingPresentation.Reading -> Input.Provided(GlucoseValue(Quantity(presentation.valueMgDl.toString()),
             GlucoseUnitCode.MG_DL, GlucoseOrigin.DEXCOM_PERMISSION_SET, presentation.receivedAtEpochMs,
-            measurementTimeVerified = presentation.measurementTimeVerified))
+            measurementTimeVerified = presentation.measurementTimeVerified,
+            sourceReference = when (val provenance = presentation.provenance) {
+                is ApprovedPermissionSet -> "${provenance.code}:${provenance.policyVersion}:${provenance.holderSetSha256}"
+                is AuthenticatedSender -> "${provenance.code}:${provenance.packageName}@${provenance.versionCode}"
+            } + ":tx=${presentation.transmitterShort}"))
         is LatestReadingPresentation.Withheld -> Input.Unavailable("glucose.${presentation.cause.code}")
         is LatestReadingPresentation.NoReading -> Input.Unavailable("glucose.${presentation.cause.code}")
     }
