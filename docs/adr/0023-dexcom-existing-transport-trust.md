@@ -47,6 +47,13 @@ visibilidad y la validación real permanecen pendientes de ejecución. Las
 restricciones de la autorización L1 describen aquel inventario; este cambio
 documental no ejecuta acciones en el teléfono.
 
+**Ampliación posterior del propietario — 2026-10-12:** se autoriza desarrollar
+y ejecutar cálculos de prueba, también con lecturas reales, según AGENTS.md §3.
+Esta autorización separada no cambia las garantías de recepción ni valida
+clínicamente sus lecturas; los resultados no se utilizan para tratamiento.
+Las menciones a cálculo bloqueado en este ADR describen la ruta terapéutica y
+el código actual, y no impiden implementar el recorrido de prueba autorizado.
+
 ## Contexto
 
 El propietario confirma que la Dexcom modificada ya funciona y Bolus AI la usa.

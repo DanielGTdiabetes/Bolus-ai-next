@@ -60,7 +60,11 @@ El primer hito técnico será deliberadamente pequeño:
 
 > Abrir Bolus AI Next en Android, recibir una lectura local de Dexcom G7 y mostrarla correctamente aunque el dispositivo no tenga conexión a Internet.
 
-Antes de implementar el cálculo de bolo se documentará y validará el motor clínico actual, especialmente IOB, DIA, ratios, ISF/CF, objetivos, redondeos y límites de seguridad.
+El propietario ha autorizado el 2026-10-12 desarrollar y ejecutar cálculos de
+prueba, también con lecturas reales, antes de terminar la app. Se documentan
+las reglas y sus validaciones pendientes, sin inventar datos y con resultados
+no utilizables para tratamiento (AGENTS.md §3). La validación clínica final y
+el cambio de autoridad siguen siendo necesarios para usar Next en tratamiento.
 
 ## Estado
 

@@ -103,6 +103,15 @@ fail-closed, pruebas de cálculo/persistencia/sincronización, aislamiento de
 Legacy y autoridad única de tratamiento. No se empieza lógica clínica si su
 puerta de entrada no está cumplida.
 
+**Ampliación expresa del propietario — 2026-10-12:** desarrollar y ejecutar
+lecturas reales y cálculos de prueba está autorizado antes de terminar la app.
+Aplicar AGENTS.md §3, «Autorización de desarrollo y pruebas»: reglas candidatas
+trazadas, resultados no utilizables para tratamiento y conservación de estados
+de validación. La falta de aprobación terapéutica no bloquea implementar o
+simular; no esperar al cierre del hito Dexcom para desarrollar el motor.
+Los datos o reglas ausentes bloquean solo lo dependiente, sin inventar valores.
+La autorización de tratamiento real continúa pendiente.
+
 ### 3.4 Artefactos estándar
 
 Crear cuando la fase correspondiente los necesite:
@@ -737,26 +746,32 @@ una lista que deba reiniciarse ni una obligación de dividir cada capacidad:
 
 Cada cambio debe indicar fase, criterio cubierto, pruebas, riesgos y pendientes.
 
-### Prioridad de continuación — 2026-10-11
+### Prioridad de continuación — 2026-10-12
 
 La [PR #53](https://github.com/DanielGTdiabetes/Bolus-ai-next/pull/53)
 (ADR 0022 R11) quedó integrada en `origin/main` mediante `740af25` durante
 este ajuste. No queda pendiente de fusión; comprobar el CI del SHA integrado.
 
 1. Concentrar la siguiente entrega funcional en el primer hito Android: recepción
-   local Dexcom, persistencia y presentación con origen, hora y estado, sin
-   habilitar cálculo. L1 ya identificó la APK instalada y el propietario aprobó
+   local Dexcom, persistencia y presentación con origen, hora y estado. L1 ya
+   identificó la APK instalada y el propietario aprobó
    el 2026-10-12 el [ADR 0023](adr/0023-dexcom-existing-transport-trust.md).
    Implementar el recorrido completo con I-2b, B4b, C5a y las condiciones de
    B1 e I-3, sin repetir las preguntas aprobadas ni exigir identity sharing
    al productor. Los riesgos se aceptan solo para recepción/presentación técnica.
-2. Si falta evidencia de validación, dejar explícito qué bloquea y avanzar
-   solo con preparativos independientes del mismo hito. Retención, contadores,
+2. Avanzar también en el motor único y el recorrido de cálculo de prueba con
+   entradas explícitas, incluidas lecturas reales conservando sus limitaciones.
+   No esperar a terminar Dexcom ni la app completa. Presentar resultados como
+   pruebas no utilizables para tratamiento, con desglose y procedencia; no
+   sustituir reglas pendientes por defaults ni elegir divergencias en silencio.
+3. Si falta evidencia de validación, dejar explícito qué bloquea y avanzar
+   en las capacidades independientes autorizadas. Retención, contadores,
    exportación y refinamientos visuales quedan fuera de la ruta inmediata salvo
    que sean necesarios para un riesgo concreto o los priorice el propietario.
 
 El ADR 0023 es la decisión aceptada del hito: recepción y presentación técnica,
-sin habilitar cálculo ni aprobar umbral de vigencia. La aprobación del
+sin aprobar cálculo terapéutico ni umbral de vigencia. El desarrollo y ejecución
+de cálculos de prueba tienen autorización separada en AGENTS.md §3. La aprobación del
 2026-10-12 selecciona I-2b: Legacy y reloj pueden actualizarse con paquete y
 firmantes aprobados, mientras Dexcom mantiene versión exacta. Quedan pruebas
 de cobertura de visibilidad y validación real; B1 no se da por verificada.

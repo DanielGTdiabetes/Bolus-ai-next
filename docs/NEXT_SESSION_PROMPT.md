@@ -6,6 +6,18 @@ docs/EXECUTION_PLAN.md §3.3: decisiones técnicas reversibles autónomas, ADR s
 cuando corresponda, preguntas necesarias agrupadas y evidencia sin duplicación.
 Se mantienen los controles clínicos y las pruebas obligatorias.
 
+CÁLCULO DE PRUEBA AUTORIZADO — 2026-10-12
+El propietario autoriza avanzar con lecturas reales y cálculos durante el
+desarrollo; no utilizará la app para tratamiento hasta finalizarla. Aplicar
+AGENTS.md §3, «Autorización de desarrollo y pruebas». Implementar el motor único
+y su recorrido de prueba sin esperar al cierre de Dexcom ni pedir de nuevo
+permiso para desarrollar. Se admiten reglas candidatas observadas y trazadas,
+con validación pendiente explícita. Conservar las limitaciones de las lecturas
+reales; los resultados son pruebas no utilizables para tratamiento. No inventar
+valores ni reglas; bloquear solo lo que dependa de un dato ausente. No habilitar
+tratamientos reales ni escrituras a Legacy. Las prohibiciones históricas de
+«cálculo» se refieren al uso terapéutico y no bloquean esta autorización de prueba.
+
 DEXCOM INSTALADA: NO MODIFICAR
 El propietario confirma que Dexcom ya está modificada, funciona y la utiliza
 `bolus_ai`. Next debe aprovechar ese mismo transporte como sustituto de Bolus AI.
@@ -58,8 +70,9 @@ futura requiere contrato y validación propios, sin bloquear el hito Dexcom
 actual ni atribuir al productor Dexcom los mensajes de la app del reloj.
 La aprobación del 2026-10-12 no autoriza cambios en la app del reloj ni uso
 clínico de sus futuras retransmisiones.
-Siguiente paso: implementar el plan aceptado como una sola entrega funcional
-de Next, con pruebas y validación. La aprobación no equivale a implementación
+Siguiente paso: implementar el plan aceptado de recepción y presentación y
+avanzar con el cálculo de prueba autorizado, en entregas funcionales completas.
+La aprobación no equivale a implementación
 ni a recepción real verificada; el código actual continúa con Pending.
 
 La PR #53 (ADR 0022 R11) ya está integrada en `origin/main` mediante
