@@ -21,7 +21,7 @@ public data class ObservationSummary(
     val collapsedInMessage: Int,
     val conflicts: Int,
     val lastReceivedAtEpochMs: Long?,
-    val lastSender: AuthenticatedSender?,
+    val lastProvenance: MessageProvenance?,
 ) {
     public val status: ObservedReadingStatus get() = ObservedReadingStatus.NOT_APPROVED_FOR_USE
 
@@ -44,7 +44,7 @@ public data class ObservationSummary(
                 collapsedInMessage = messages.sumOf { it.collapsedInMessage },
                 conflicts = read.readings.count { it.conflictOf != null },
                 lastReceivedAtEpochMs = last?.receivedAtEpochMs,
-                lastSender = last?.sender,
+                lastProvenance = last?.provenance,
             )
         }
     }

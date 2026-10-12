@@ -7,6 +7,7 @@ import org.bolusai.dexcomg7.DexcomG7ParseResult
 import org.bolusai.dexcomg7.DexcomG7Payload
 import org.bolusai.dexcomg7.DexcomG7PayloadParser
 import org.bolusai.dexcomg7.DexcomObservationStore
+import org.bolusai.dexcomg7.ObservationWrite
 import org.bolusai.engine.InputKind
 import org.bolusai.engine.UnavailabilityReason
 import org.bolusai.engine.UnavailableInput
@@ -20,8 +21,9 @@ import java.io.Closeable
 import java.util.concurrent.Executors
 
 /**
- * Production configuration of the receiver (ADR 0022, R6). The policy stays Pending until the owner approves a
- * reproducible producer release and its anchors; verify.ps1 rejects any approved policy in production code.
+ * Production configuration of the receiver. The strict per-message policy (ADR 0022, R6) stays Pending: the installed
+ * producer does not share its identity, and verify.ps1 rejects any approved strict policy in production code. With it
+ * Pending, production uses the approved permission set of ADR 0023 instead ([DexcomPermissionIntake]).
  */
 internal object DexcomReceiverConfiguration {
     const val ACTION = "com.dexcom.cgm.EXTERNAL_BROADCAST"
@@ -37,6 +39,20 @@ internal sealed interface DexcomReceipt {
     data class SenderRejected(val outcome: DexcomG7ReceptionOutcome.SenderRejected, val payloadReads: Int) : DexcomReceipt
 
     data class Recorded(val recording: DexcomG7Recording, val payloadReads: Int) : DexcomReceipt
+
+    /** Permission path (ADR 0023): the gate is closed, extras never read, nothing stored but a durable block. */
+    data class GateRejected(val gate: PermissionGate.Closed, val payloadReads: Int) : DexcomReceipt {
+        val glucose: UnavailableInput get() = UnavailableInput(InputKind.GLUCOSE, UnavailabilityReason.POLICY_NOT_APPROVED)
+    }
+
+    /**
+     * Permission path (ADR 0023): the gate was open and the message was appended, or the append failed visibly. The
+     * readings stay NOT_APPROVED_FOR_USE, so glucose stays blocked for the clinical boundary.
+     */
+    data class Admitted(val write: ObservationWrite, val payloadReads: Int) : DexcomReceipt {
+        val glucose: UnavailableInput get() = UnavailableInput(InputKind.GLUCOSE,
+            if (write is ObservationWrite.Failed) UnavailabilityReason.PERSISTENCE_FAILED else UnavailabilityReason.POLICY_NOT_APPROVED)
+    }
 
     /**
      * Opening, recording or closing the store threw (R10). Only the stage is kept: never the exception text nor the
@@ -185,9 +201,10 @@ internal class DexcomG7Intake(
 }
 
 /**
- * Entry point for the observed Dexcom G7 broadcast (ADR 0022). Declared disabled in the manifest; only `adb shell pm
- * enable` turns it on (R1). With the Pending policy every message is rejected before its extras are read. Nothing here
- * makes glucose available, shows a reading or calls the network.
+ * Entry point for the observed Dexcom G7 broadcast. Declared disabled in the manifest; only `adb shell pm enable` turns
+ * it on (ADR 0022 R1, ADR 0023 I-7). The manifest requires the Dexcom permission from the sender (ADR 0023, part I,
+ * point 1). With the strict policy Pending, every message goes through the permission gate before its extras are read.
+ * Nothing here makes glucose available to the clinical boundary or calls the network.
  */
 open class DexcomG7Receiver : BroadcastReceiver() {
     /** Overridden only by instrumentation, with a synthetic policy for the synthetic sender (R6). */
@@ -201,8 +218,43 @@ open class DexcomG7Receiver : BroadcastReceiver() {
     internal open fun openStore(context: Context): SqliteDexcomObservationStore =
         SqliteDexcomObservationStore(context, ids = AndroidObservationIds, hasher = AndroidTransmitterHasher)
 
+    /** Fresh holder readings for the permission gate. Overridden only by instrumentation with a synthetic snapshot. */
+    internal open fun holderSnapshot(context: Context): () -> HolderSnapshot = AndroidHolderSnapshotSource(context)
+
     final override fun onReceive(context: Context, intent: Intent) {
-        val intake = DexcomG7Intake(DexcomReceiverConfiguration.ACTION, trustPolicy())
+        val policy = trustPolicy()
+        if (policy is DexcomSenderTrustPolicy.Pending) receiveByPermission(context, intent) else receiveStrict(context, intent, policy)
+    }
+
+    /**
+     * ADR 0023: action, reception instant, then everything else on the writer thread. Android already enforced the
+     * receiver permission before calling onReceive; the gate checks the holders before any extra is read.
+     */
+    private fun receiveByPermission(context: Context, intent: Intent) {
+        if (intent.action != DexcomReceiverConfiguration.ACTION) {
+            deliver(DexcomReceipt.IgnoredAction(intent.action))
+            return
+        }
+        val receivedAt = try {
+            wallClock.nowEpochMs()
+        } catch (_: Exception) {
+            deliver(DexcomReceipt.IntakeFailed(DexcomIntakeFailure.CLOCK_FAILED, 0))
+            return
+        }
+        val pending = goAsync()
+        val application = context.applicationContext
+        writer.execute {
+            try {
+                deliver(DexcomPermissionIntake().process(receivedAt, { openStore(application) },
+                    holderSnapshot(application), wallClock) { intent.readDexcomPayload() })
+            } finally {
+                pending.finish()
+            }
+        }
+    }
+
+    private fun receiveStrict(context: Context, intent: Intent, policy: DexcomSenderTrustPolicy) {
+        val intake = DexcomG7Intake(DexcomReceiverConfiguration.ACTION, policy)
         // accept() turns exceptions of authentication, extras, parser and clock into IntakeFailed (R11).
         val step = intake.accept(intent.action, { senderEvidence(context) }, wallClock) {
             intent.readDexcomPayload()

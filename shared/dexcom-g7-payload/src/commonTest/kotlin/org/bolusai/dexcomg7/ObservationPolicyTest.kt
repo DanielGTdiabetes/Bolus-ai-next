@@ -168,7 +168,7 @@ class ObservationPolicyTest {
         store.record(observed(reading(0, 10)))
         store.record(ObservationInput.PayloadUnreadable(2, sender))
         store.record(ObservationInput.PayloadRejected(3, sender, DexcomG7PayloadRejection(DexcomG7RejectionCode.EMPTY_BATCH)))
-        assertTrue(store.messages.all { it.sender == sender })
+        assertTrue(store.messages.all { it.provenance == sender })
         assertEquals(listOf("a".repeat(64), "b".repeat(64)), sender.signerCertificateSha256)
     }
 

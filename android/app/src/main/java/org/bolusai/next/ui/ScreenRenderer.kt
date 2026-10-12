@@ -37,6 +37,7 @@ internal class ScreenRenderer(
     private val renderMeals: ((MealKind) -> Unit)? = null,
     private val renderSelection: (() -> Unit)? = null,
     private val renderProfile: (() -> Unit)? = null,
+    private val renderTestCalculation: (() -> Unit)? = null,
 ) {
     private fun dp(value: Int) = (value * context.resources.displayMetrics.density).toInt()
     private fun color(id: Int) = context.getColor(id)
@@ -143,13 +144,13 @@ internal class ScreenRenderer(
     }
 
     fun render(destination: Destination, state: UnavailableOverview, settings: SettingsSection,
-               blocking: BlockingView? = null, dexcomLog: DexcomLogView? = null) {
+               blocking: BlockingView? = null, dexcomLog: DexcomLogView? = null, dexcomReading: DexcomReadingView? = null) {
         check(!state.allowsCalculation && !state.allowsTreatment)
         content.removeAllViews()
         when (destination) {
-            Destination.HOME -> home(state)
+            Destination.HOME -> home(state, dexcomReading)
             Destination.MORE -> menu()
-            Destination.BOLUS, Destination.MANUAL, Destination.OFFLINE_BOLUS -> bolus(state, destination, blocking)
+            Destination.BOLUS, Destination.MANUAL, Destination.OFFLINE_BOLUS -> bolus(state, destination, blocking, dexcomReading)
             Destination.COMPANION -> {
                 info(R.string.alerts_title, R.string.alerts_detail)
                 link(Destination.FORECAST)
@@ -236,7 +237,23 @@ internal class ScreenRenderer(
         }
     }
 
-    private fun home(state: UnavailableOverview) {
+    /**
+     * Technical presentation of the latest Dexcom reading (ADR 0023, C1): composed lines only. The clinical status card
+     * above stays "sin lectura" for calculation: nothing here reaches the overview or the engine.
+     */
+    private fun dexcomReading(view: DexcomReadingView?) {
+        if (view == null) return
+        card().also { box ->
+            text(box, R.string.dexcom_reading_title, 17f, true)
+            view.value?.let { text(box, context.getString(it.id, *it.args.toTypedArray()), 28f, true).tag = "dexcom_reading_value" }
+            view.lines.forEachIndexed { index, line ->
+                text(box, context.getString(line.id, *line.args.toTypedArray()), 13f, ink = R.color.secondary_text).tag =
+                    "dexcom_reading_line_$index"
+            }
+        }
+    }
+
+    private fun home(state: UnavailableOverview, reading: DexcomReadingView?) {
         heading(R.string.overview_intro)
         text(content, R.string.overview_detail, ink = R.color.secondary_text)
         card().also {
@@ -249,6 +266,7 @@ internal class ScreenRenderer(
             text(it, R.string.glucose_metadata, 13f, ink = R.color.on_hero)
             link(Destination.FORECAST, parent = it)
         }
+        dexcomReading(reading)
         val metrics = LinearLayout(context).apply {
             orientation = if (context.resources.configuration.fontScale > 1.3f) LinearLayout.VERTICAL else LinearLayout.HORIZONTAL
             content.addView(this)
@@ -295,13 +313,14 @@ internal class ScreenRenderer(
         }
     }
 
-    private fun bolus(state: UnavailableOverview, destination: Destination, blocking: BlockingView?) {
+    private fun bolus(state: UnavailableOverview, destination: Destination, blocking: BlockingView?, reading: DexcomReadingView?) {
         info(R.string.calculation_blocked,
             if (destination == Destination.BOLUS) R.string.calculation_detail else R.string.manual_detail,
             R.color.non_authoritative_background)
         disabled(R.string.calculate_disabled, "calculate")
         heading(R.string.inputs_title)
         glucose(state)
+        if (destination == Destination.BOLUS) dexcomReading(reading)
         info(R.string.iob_absent, R.string.iob_detail)
         info(R.string.profile_absent, R.string.profile_detail)
         link(Destination.SETTINGS)
@@ -313,6 +332,8 @@ internal class ScreenRenderer(
         link(Destination.MEALS, R.string.manual_drafts_link)
         link(Destination.FAVORITES)
         link(Destination.FOODS)
+        // ADR 0024: test calculation only in Bolo; the confirm button below stays disabled.
+        if (destination == Destination.BOLUS) renderTestCalculation?.invoke()
         disabled(R.string.confirm_disabled, "confirm")
         details(blocking)
     }

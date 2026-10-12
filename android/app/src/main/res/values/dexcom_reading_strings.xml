@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- ADR 0023, part II: technical presentation only. Never "actual", never attributed to Dexcom, never converted. -->
+    <string name="dexcom_reading_title">Última lectura Dexcom recibida</string>
+    <string name="dexcom_reading_reading">Leyendo el registro local…</string>
+    <string name="dexcom_reading_value">%1$d mg/dL</string>
+    <string name="dexcom_reading_received">Recibida hace %1$d min, a las %2$s. Tiempo contado desde la recepción</string>
+    <string name="dexcom_reading_measurement">Hora de medida: no verificada</string>
+    <string name="dexcom_reading_freshness">Vigencia sin política aprobada: no se presenta como actual</string>
+    <string name="dexcom_reading_provenance_set">Recibida mediante permiso de un emisor del conjunto aprobado, no atribuida a Dexcom</string>
+    <string name="dexcom_reading_provenance_strict">Emisor autenticado: %1$s</string>
+    <string name="dexcom_reading_status">No aprobada para uso clínico</string>
+    <string name="dexcom_reading_details">Transmisor %1$s…, tendencia del productor %2$s</string>
+    <string name="dexcom_reading_withheld_outside">Valor fuera del intervalo emitido por el productor (1–400). No se muestra el número</string>
+    <string name="dexcom_reading_withheld_conflict">Conflicto entre observaciones de esta lectura. No se muestra el número</string>
+    <string name="dexcom_reading_withheld_clock">El reloj del dispositivo es anterior a la recepción. No se muestra el número</string>
+    <string name="dexcom_reading_withheld_received">Recibida a las %1$s</string>
+    <string name="dexcom_reading_receiver_disabled">Receptor Dexcom desactivado. Se activa por adb durante la validación</string>
+    <string name="dexcom_reading_next_permission_missing">Next no tiene concedido el permiso de Dexcom. Se concede por adb durante la validación</string>
+    <string name="dexcom_reading_policy_pending">Recepción pendiente de una comprobación</string>
+    <string name="dexcom_reading_durable_block">Recepción bloqueada por un cambio en los titulares, las anclas o el permiso. Requiere aprobación nueva</string>
+    <string name="dexcom_reading_no_reading">No hay ninguna lectura registrada</string>
+    <string name="dexcom_reading_log_unreadable">No se pudo leer el registro local</string>
+    <string name="dexcom_reading_last_rejected">El último mensaje recibido fue rechazado</string>
+    <string name="dexcom_reading_selection_pending">El último mensaje no identifica una única lectura. Selección pendiente de verificar la hora de medida (B1)</string>
+    <string name="dexcom_reading_code">Código: %1$s</string>
+</resources>

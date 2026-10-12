@@ -95,7 +95,7 @@ class DexcomLogDiagnosticsDeviceTest {
                 assertTrue(text.startsWith("dexcom_receiver.component=disabled_by_default\ndexcom_receiver.policy=pending\n"))
                 assertTrue(text.contains("dexcom_log.status=dexcom_g7.reading.not_approved_for_use"))
                 assertTrue(text.contains("dexcom_log.readings_stored=1"))
-                assertTrue(text.contains("dexcom_log.last_sender=example.sender@42"))
+                assertTrue(text.contains("dexcom_log.last_provenance=authenticated_sender:example.sender@42"))
                 assertFalse(text.contains("187"))
                 assertFalse(text.contains("SYNTHETIC_TREND"))
                 assertTrue(viewOrNull(activity, "blocking_codes") != null)
@@ -110,8 +110,9 @@ class DexcomLogDiagnosticsDeviceTest {
         ActivityScenario.launch(MainActivity::class.java).use { scenario ->
             openDiagnostics(scenario)
             await(scenario, "failed") {
-                lines(it).text.toString() == "dexcom_receiver.component=disabled_by_default\n" +
-                    "dexcom_receiver.policy=pending\ndexcom_observation.unsupported_schema"
+                // ADR 0023: the permission gate lines follow the log lines.
+                lines(it).text.toString().startsWith("dexcom_receiver.component=disabled_by_default\n" +
+                    "dexcom_receiver.policy=pending\ndexcom_observation.unsupported_schema\ndexcom_reception.policy=")
             }
         }
     }

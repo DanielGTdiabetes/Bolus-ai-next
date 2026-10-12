@@ -23,7 +23,7 @@ class ObservationSummaryTest {
         val summary = ObservationSummary.of(ObservationRead.Loaded(emptyList(), emptyList()))
         assertEquals(0, summary.messages)
         assertNull(summary.lastReceivedAtEpochMs)
-        assertNull(summary.lastSender)
+        assertNull(summary.lastProvenance)
         assertEquals(ObservedReadingStatus.NOT_APPROVED_FOR_USE, summary.status)
     }
 
@@ -50,7 +50,7 @@ class ObservationSummaryTest {
                 collapsedInMessage = 3,
                 conflicts = 1,
                 lastReceivedAtEpochMs = 5,
-                lastSender = newer,
+                lastProvenance = newer,
             ),
             ObservationSummary.of(read),
         )

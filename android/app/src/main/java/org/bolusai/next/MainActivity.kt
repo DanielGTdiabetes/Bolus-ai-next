@@ -31,8 +31,15 @@ import org.bolusai.next.ui.DexcomLogBlock
 import org.bolusai.next.ui.DexcomLogModel
 import org.bolusai.next.ui.DexcomLogView
 import org.bolusai.next.glucose.dexcom.DexcomReceiverStatus
+import org.bolusai.next.glucose.dexcom.readDexcomPresentation
 import org.bolusai.next.glucose.dexcom.storage.readDexcomObservationLog
+import org.bolusai.dexcomg7.LatestReadingPresentation
 import org.bolusai.dexcomg7.ObservationSummaryRead
+import org.bolusai.next.application.TestCalculation
+import org.bolusai.next.ui.DexcomReadingBlock
+import org.bolusai.next.ui.DexcomReadingModel
+import org.bolusai.next.ui.TestCalculationModel
+import org.bolusai.next.ui.TestCalculationScreen
 import org.bolusai.next.ui.ScreenRenderer
 import org.bolusai.next.ui.SettingsSection
 import org.bolusai.next.ui.MealDraftModel
@@ -71,6 +78,8 @@ class MainActivity : ComponentActivity() {
     private lateinit var dexcomLog: DexcomLogModel
     /** Folded Dexcom log block of Diagnóstico; not saved, folds on another destination and after recreation (F3). */
     private var dexcomLogOpen = false
+    private lateinit var dexcomReading: DexcomReadingModel
+    private lateinit var testCalculation: TestCalculationModel
     private val overview = ReadOverview(ReadLocalGlucoseStatus(PendingDexcomSource))
     private val backCallback = object : OnBackPressedCallback(false) {
         override fun handleOnBackPressed() = goBack()
@@ -116,8 +125,18 @@ class MainActivity : ComponentActivity() {
             }
         })[DexcomLogModel::class.java]
         dexcomLog.changed = { if (navigation.current == Destination.DIAGNOSTICS) { rememberScroll(); render() } }
+        dexcomReading = ViewModelProvider(this, object : ViewModelProvider.Factory {
+            @Suppress("UNCHECKED_CAST")
+            override fun <T : ViewModel> create(modelClass: Class<T>): T {
+                val reader = dexcomPresentationReader ?: { now -> readDexcomPresentation(applicationContext, now) }
+                return DexcomReadingModel(reader, clock) as T
+            }
+        })[DexcomReadingModel::class.java]
+        dexcomReading.changed = { if (showsDexcomReading(navigation.current)) { rememberScroll(); render() } }
+        testCalculation = ViewModelProvider(this)[TestCalculationModel::class.java]
         renderer = ScreenRenderer(this, findViewById(R.id.screen_content), ::open,
-            { settingsSection = it; profileDetailsOpen = false; render() }, ::renderMeals, ::renderSelection, ::renderProfile)
+            { settingsSection = it; profileDetailsOpen = false; render() }, ::renderMeals, ::renderSelection, ::renderProfile,
+            ::renderTestCalculation)
         meals.changed = { render() }
         // Keep the reading position while the profile section rebuilds after a model change.
         // Bolo and Diagnóstico repaint too, so a finished read replaces the pending one in their details (B7).
@@ -157,6 +176,7 @@ class MainActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         refreshReview(navigation.current)
+        if (showsDexcomReading(navigation.current)) dexcomReading.load()
         val position = pausedPosition
         pausedPosition = null
         if (!isReviewDestination(navigation.current) && position != null) {
@@ -207,6 +227,7 @@ class MainActivity : ComponentActivity() {
         meals.selectionChanged = null
         profile.changed = null
         dexcomLog.changed = null
+        dexcomReading.changed = null
         super.onDestroy()
     }
 
@@ -250,6 +271,29 @@ class MainActivity : ComponentActivity() {
         return "android/${info.versionName ?: "unknown"}($code)".filter { it.code in 0x20..0x7e }.take(128)
     }
 
+    /** ADR 0023, C1: Inicio and Bolo show the latest reading, read-only, on every entry and resume. */
+    private fun showsDexcomReading(destination: Destination): Boolean =
+        destination == Destination.HOME || destination == Destination.BOLUS
+
+    /**
+     * ADR 0024: the test calculation reads the profile state already loaded for Bolo, the meal selection and the
+     * reading shown on screen, and runs the single engine. Nothing is recorded, confirmed or sent.
+     */
+    private fun renderTestCalculation() {
+        TestCalculationScreen(this, findViewById(R.id.screen_content), testCalculation,
+            dexcomReading.state is LatestReadingPresentation.Reading, meals.selection is org.bolusai.meals.MealSelection.Reviewed,
+            calculate = {
+                val now = clock()
+                val request = TestCalculation.request(now, profile.gate, meals.selection, dexcomReading.state,
+                    testCalculation.form)
+                testCalculation.store(TestCalculation.calculate(request), now)
+                rememberScroll()
+                render()
+            },
+            changed = { rememberScroll(); render() },
+        ).render()
+    }
+
     private fun renderSelection() {
         MealSelectionScreen(this, findViewById(R.id.screen_content), meals) { record ->
             val edit = {
@@ -280,10 +324,15 @@ class MainActivity : ComponentActivity() {
             blockingDetailsDestination = destination
             // ADR 0021, F2: each entry into Diagnóstico reads the log afresh; no other screen reads it.
             if (destination == Destination.DIAGNOSTICS) dexcomLog.load()
+            if (showsDexcomReading(destination)) dexcomReading.load()
         }
         if (destination == Destination.DIAGNOSTICS && dexcomLog.state == null) dexcomLog.load()
         val state = overview.execute()
-        renderer.render(destination, state, settingsSection, blockingView(destination, state), dexcomLogView(destination))
+        val reading = if (showsDexcomReading(destination)) {
+            DexcomReadingBlock.view(dexcomReading.state, java.time.ZoneId.systemDefault())
+        } else null
+        renderer.render(destination, state, settingsSection, blockingView(destination, state), dexcomLogView(destination),
+            reading)
         val bar = findViewById<LinearLayout>(R.id.bottom_navigation)
         bar.removeAllViews()
         Destination.primary.forEach { tab ->
@@ -319,5 +368,9 @@ class MainActivity : ComponentActivity() {
         var profileOperationIds: OperationIds? = null
         /** Process-local test seam for the Dexcom log of Diagnóstico (ADR 0021); production reads the app database. */
         var dexcomLogReader: (() -> ObservationSummaryRead)? = null
+        /** Process-local test seam for the latest reading of Inicio and Bolo (ADR 0023); production reads the app log. */
+        var dexcomPresentationReader: ((Long) -> LatestReadingPresentation)? = null
+        /** Wall clock of the presentation and the test calculation; injectable for deterministic tests. */
+        var clock: () -> Long = { System.currentTimeMillis() }
     }
 }

@@ -134,7 +134,9 @@ class NavigationDeviceTest {
                 assertFalse("Operation became enabled: ${it.tag}", it.isEnabled)
                 assertFalse("Operation has a click handler: ${it.tag}", it.hasOnClickListeners())
             }
-            assertTrue(views(root).none { it is android.widget.EditText })
+            // ADR 0024: the only editable fields of the navigation shell are the test calculation inputs of Bolo.
+            val fields = views(root).filter { it is android.widget.EditText }
+            assertTrue(fields.all { destination == Destination.BOLUS && it.tag?.toString()?.startsWith("test_calc:") == true })
         }
     }
 

@@ -8,6 +8,7 @@ import android.content.pm.PackageManager
 import android.os.Bundle
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import org.bolusai.dexcomg7.AuthenticatedSender
 import org.bolusai.dexcomg7.DexcomG7RejectionCode
 import org.bolusai.dexcomg7.ObservationIds
 import org.bolusai.dexcomg7.ObservationRead
@@ -30,8 +31,9 @@ import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 
 /**
- * ADR 0022: the receiver is declared disabled, rejects every sender under the production Pending policy without reading
- * extras or opening the log, and records only what an authenticated sender sent. Synthetic sender APK, synthetic
+ * ADR 0022 and ADR 0023: the receiver is declared disabled and guarded by the Dexcom permission, so a sender without
+ * it gets nothing through. The strict path, injected through a dynamically registered probe with a synthetic policy,
+ * records only what an authenticated sender sent; the permission gate itself is covered by JVM tests. Synthetic sender APK, synthetic
  * policy, synthetic payloads and a synthetic database file only; the app's own log is never opened (DexcomStorageGuard).
  */
 @RunWith(AndroidJUnit4::class)
@@ -75,7 +77,7 @@ class DexcomG7ReceiverDeviceTest {
     }
 
     @Test
-    fun manifestDeclaresOneDisabledExportedReceiverForTheObservedActionOnly() {
+    fun manifestDeclaresOneDisabledExportedReceiverForTheObservedActionGuardedByTheDexcomPermission() {
         val info = context.packageManager.getPackageInfo(
             context.packageName,
             PackageManager.PackageInfoFlags.of(
@@ -86,8 +88,13 @@ class DexcomG7ReceiverDeviceTest {
         assertEquals(DexcomG7Receiver::class.java.name, receiver.name)
         assertFalse(receiver.enabled)
         assertTrue(receiver.exported)
-        assertNull(receiver.permission)
-        assertTrue(info.requestedPermissions.orEmpty().none { it.startsWith("com.dexcom.") || it == "android.permission.INTERNET" })
+        // ADR 0023, part I, point 1 and I-6: the receiver requires the producer's permission and Next requests it.
+        assertEquals(DexcomApprovedPermissionSet.PERMISSION, receiver.permission)
+        assertEquals(listOf(DexcomApprovedPermissionSet.PERMISSION),
+            info.requestedPermissions.orEmpty().filter { it.startsWith("com.dexcom.") })
+        assertTrue(info.requestedPermissions.orEmpty().none {
+            it == "android.permission.INTERNET" || it == "android.permission.QUERY_ALL_PACKAGES"
+        })
         val observed = Intent(DexcomReceiverConfiguration.ACTION).setPackage(context.packageName)
         assertTrue(context.packageManager.queryBroadcastReceivers(observed, PackageManager.ResolveInfoFlags.of(0)).isEmpty())
         assertEquals(
@@ -107,22 +114,26 @@ class DexcomG7ReceiverDeviceTest {
     }
 
     @Test
-    fun enabledWithThePendingPolicyRejectsTheSyntheticSenderWithoutReadingOrStoring() {
+    fun enabledReceiverGetsNothingFromASenderWithoutTheDexcomPermission() {
+        // ADR 0023 acceptance: the synthetic sender does not hold the permission, so Android never delivers, even with
+        // the observed action and extras copied. Nothing is read or stored.
         val existedBefore = realLog().exists()
         enable()
         fixture(shareIdentity = true, payload(FIXTURE_PACKAGE))
-        val receipt = next() as DexcomReceipt.SenderRejected
-        assertEquals(0, receipt.payloadReads)
-        assertEquals(DexcomSenderAuthenticationFailure.POLICY_NOT_APPROVED, receipt.outcome.authentication.failure)
-        assertEquals("input.glucose.policy_not_approved", receipt.outcome.glucose.code)
+        assertNull(receipts.poll(5, TimeUnit.SECONDS))
         assertEquals(existedBefore, realLog().exists())
     }
 
     @Test
-    fun enabledReceiverIgnoresAnotherActionWithoutAuthenticating() {
+    fun enabledReceiverIgnoresAnotherActionWithoutCheckingTheGate() {
         enable()
         context.sendBroadcast(Intent("org.bolusai.next.test.OTHER_ACTION").setComponent(component))
-        assertEquals(DexcomReceipt.IgnoredAction("org.bolusai.next.test.OTHER_ACTION"), next())
+        // The sender here is Next itself: Android delivers only if Next already holds the permission (I-6, by adb).
+        if (context.checkSelfPermission(DexcomApprovedPermissionSet.PERMISSION) == PackageManager.PERMISSION_GRANTED) {
+            assertEquals(DexcomReceipt.IgnoredAction("org.bolusai.next.test.OTHER_ACTION"), next())
+        } else {
+            assertNull(receipts.poll(3, TimeUnit.SECONDS))
+        }
     }
 
     @Test
@@ -134,9 +145,10 @@ class DexcomG7ReceiverDeviceTest {
         val log = readSynthetic()
         val message = log.messages.single()
         assertEquals(StoredMessageOutcome.OBSERVED, message.outcome)
-        assertEquals(FIXTURE_PACKAGE, message.sender.packageName)
-        assertEquals(fixtureVersion(), message.sender.versionCode)
-        assertEquals(fixtureDigests().sorted(), message.sender.signerCertificateSha256)
+        val sender = message.provenance as AuthenticatedSender
+        assertEquals(FIXTURE_PACKAGE, sender.packageName)
+        assertEquals(fixtureVersion(), sender.versionCode)
+        assertEquals(fixtureDigests().sorted(), sender.signerCertificateSha256)
         assertEquals(ObservedReadingStatus.NOT_APPROVED_FOR_USE, log.readings.single().status)
     }
 

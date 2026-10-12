@@ -89,7 +89,12 @@ public enum class ProducerUnitClaim(public val code: String) {
  * (decision D2). Names outside a conservative grammar are only counted, once per distinct name.
  */
 public class ObservedDexcomG7Message(
-    public val authenticatedPackage: String,
+    /**
+     * The package proven by per-message sender authentication (strict path, ADR 0019), or null when the message was
+     * admitted by the approved permission set (ADR 0023): then the `packageName` extra was only checked to be present
+     * text and stays an unverified claim that is not kept.
+     */
+    public val authenticatedPackage: String?,
     readings: List<ObservedDexcomG7Reading>,
     public val collapsedDuplicateCount: Int,
     unknownTopLevelFields: List<String>,
@@ -112,7 +117,7 @@ public class ObservedDexcomG7Message(
             other.unreportableUnknownFieldCount == unreportableUnknownFieldCount
 
     override fun hashCode(): Int {
-        var result = authenticatedPackage.hashCode()
+        var result = authenticatedPackage?.hashCode() ?: 0
         result = 31 * result + readings.hashCode()
         result = 31 * result + collapsedDuplicateCount
         result = 31 * result + unknownTopLevelFields.hashCode()
@@ -146,11 +151,20 @@ public object DexcomG7PayloadParser {
      */
     public fun parse(payload: DexcomG7Payload, authenticatedPackage: String): DexcomG7ParseResult {
         require(authenticatedPackage.isNotBlank()) { "The authenticated package must be known before parsing" }
-        return try {
-            DexcomG7ParseResult.Parsed(parseMessage(payload, authenticatedPackage))
-        } catch (rejected: PayloadRejected) {
-            DexcomG7ParseResult.Rejected(rejected.rejection)
-        }
+        return parseOrReject(payload, authenticatedPackage)
+    }
+
+    /**
+     * Parser for messages admitted by the approved permission set (ADR 0023, plan step 1). No sender package is known,
+     * so the `packageName` extra must still be present non-blank text, but it is never compared, trusted or kept.
+     * Every other rule is identical to [parse].
+     */
+    public fun parseUnverifiedSender(payload: DexcomG7Payload): DexcomG7ParseResult = parseOrReject(payload, null)
+
+    private fun parseOrReject(payload: DexcomG7Payload, authenticatedPackage: String?): DexcomG7ParseResult = try {
+        DexcomG7ParseResult.Parsed(parseMessage(payload, authenticatedPackage))
+    } catch (rejected: PayloadRejected) {
+        DexcomG7ParseResult.Rejected(rejected.rejection)
     }
 
     private class PayloadRejected(val rejection: DexcomG7PayloadRejection) : Exception(rejection.code.code)
@@ -158,7 +172,7 @@ public object DexcomG7PayloadParser {
     private fun reject(code: DexcomG7RejectionCode, field: String? = null, index: Int? = null): Nothing =
         throw PayloadRejected(DexcomG7PayloadRejection(code, field, index))
 
-    private fun parseMessage(payload: DexcomG7Payload, authenticatedPackage: String): ObservedDexcomG7Message {
+    private fun parseMessage(payload: DexcomG7Payload, authenticatedPackage: String?): ObservedDexcomG7Message {
         if (payload.action != ObservedDexcomG7Contract.ACTION) reject(DexcomG7RejectionCode.WRONG_ACTION)
         val extras = payload.extras
 
@@ -167,7 +181,7 @@ public object DexcomG7PayloadParser {
             reject(DexcomG7RejectionCode.UNSUPPORTED_SENSOR, ObservedDexcomG7Contract.SENSOR_TYPE)
         }
         val packageClaim = text(extras, ObservedDexcomG7Contract.PACKAGE_NAME, null)
-        if (packageClaim != authenticatedPackage) {
+        if (authenticatedPackage != null && packageClaim != authenticatedPackage) {
             reject(DexcomG7RejectionCode.PACKAGE_CLAIM_MISMATCH, ObservedDexcomG7Contract.PACKAGE_NAME)
         }
         val batch = group(extras, ObservedDexcomG7Contract.GLUCOSE_VALUES, null)

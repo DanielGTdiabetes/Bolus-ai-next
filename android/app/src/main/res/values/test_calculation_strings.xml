@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- ADR 0024 and AGENTS.md §3: test calculation only. Never usable for treatment, never recorded or synced. -->
+    <string name="test_calc_title">Cálculo de prueba</string>
+    <string name="test_calc_banner">PRUEBA · NO UTILIZAR PARA TRATAMIENTO. Reglas candidatas observadas en Legacy, validación pendiente. No se registra ni se sincroniza.</string>
+    <string name="test_calc_carbs_source">Hidratos</string>
+    <string name="test_calc_carbs_manual">Introducir a mano</string>
+    <string name="test_calc_carbs_meal">Usar la comida seleccionada</string>
+    <string name="test_calc_carbs">Hidratos (g)</string>
+    <string name="test_calc_glucose_source">Glucosa</string>
+    <string name="test_calc_glucose_manual">Introducir a mano (mg/dL)</string>
+    <string name="test_calc_glucose_dexcom">Usar la última lectura Dexcom mostrada</string>
+    <string name="test_calc_glucose">Glucosa (mg/dL)</string>
+    <string name="test_calc_iob">IOB manual (U). Vacío = desconocido, nunca 0</string>
+    <string name="test_calc_limits">Parámetros de prueba, no guardados en el perfil</string>
+    <string name="test_calc_round_step">Paso de redondeo (U)</string>
+    <string name="test_calc_max_bolus">Bolo máximo (U)</string>
+    <string name="test_calc_max_correction">Corrección máxima (U)</string>
+    <string name="test_calc_run">Calcular prueba</string>
+    <string name="test_calc_invalidated">Los datos cambiaron: el resultado anterior se ha descartado</string>
+    <string name="test_calc_total">Total de prueba: %1$s U</string>
+    <string name="test_calc_total_blocked">Total bloqueado</string>
+    <string name="test_calc_step_computed">%1$s: %2$s U</string>
+    <string name="test_calc_step_blocked">%1$s: bloqueado (%2$s)</string>
+    <string name="test_calc_fact">   %1$s = %2$s</string>
+    <string name="test_calc_step_meal">A) Comida</string>
+    <string name="test_calc_step_correction">B) Corrección</string>
+    <string name="test_calc_step_correction_limit">B2) Límite de corrección</string>
+    <string name="test_calc_step_iob">C) IOB sobre corrección positiva</string>
+    <string name="test_calc_step_rounding">D) Redondeo</string>
+    <string name="test_calc_step_max_bolus">E) Bolo máximo</string>
+    <string name="test_calc_step_hypo_stop">F) Parada por glucosa baja de Legacy</string>
+    <string name="test_calc_warnings">Avisos</string>
+    <string name="test_calc_not_applied">Reglas de Legacy no aplicadas: %1$s</string>
+    <string name="test_calc_identity">Motor %1$s · reglas %2$s · Legacy %3$s · validación %4$s</string>
+    <string name="test_calc_fingerprint">Huella de entradas: %1$s</string>
+    <string name="test_calc_calculated_at">Calculado a las %1$s</string>
+</resources>
