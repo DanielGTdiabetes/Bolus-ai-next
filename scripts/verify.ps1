@@ -243,10 +243,11 @@ try {
     if ($engineCurves.Count -eq 0 -or (($engineCurves -join ",") -cne ($profileCurves -join ","))) {
         throw "Profile and engine insulin curves differ (ADR 0027): engine [$($engineCurves -join ', ')], profile [$($profileCurves -join ', ')]"
     }
-    # ADR 0026, section 5: the candidate IOB has no producer yet. No Android source may call it until the profile carries
-    # the insulin action and a local dose history exists; Bolo keeps the manual IOB.
+    # ADR 0026, section 5: only the JVM test with a synthetic history may call candidate IOB. Bolo keeps manual IOB.
+    $syntheticIobTest = Join-Path $repositoryRoot "android\app\src\test\java\org\bolusai\next\TestCalculationTest.kt"
     $iobConsumers = @(Get-ChildItem -LiteralPath (Join-Path $repositoryRoot "android") -Recurse -File |
-        Where-Object { $_.FullName -notmatch '[\\/]build[\\/]' -and $_.Extension -in @(".kt", ".kts", ".java") } |
+        Where-Object { $_.FullName -ne $syntheticIobTest -and $_.FullName -notmatch '[\\/]build[\\/]' -and
+            $_.Extension -in @(".kt", ".kts", ".java") } |
         Select-String -Pattern 'org\.bolusai\.engine\.iob|CandidateIob' -List)
     if ($iobConsumers.Count -gt 0) {
         throw "The candidate IOB has no approved producer yet (ADR 0026): $($iobConsumers.Path -join ', ')"

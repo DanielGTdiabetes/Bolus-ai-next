@@ -197,12 +197,26 @@ golden vectors clínicos.
   alterado hace fallar la verificación. Sin red se puede omitir con
   `-SkipLegacyVectors`, con aviso visible; la CI no lo omite y fija Python 3.13.
 - `verify.ps1` exige además que ambos resultados mantengan
-  `usableForTreatment = false` y validación `pending`, y que ningún código Android
-  use todavía `org.bolusai.engine.iob`.
+  `usableForTreatment = false` y validación `pending`. En Android el único
+  consumidor permitido es `TestCalculationTest`, en el conjunto de pruebas JVM.
 - No se ejecutó nada contra Legacy ni sus despliegues. La captura usa una copia
   local separada.
 - Queda pendiente la aprobación clínica de curvas, tablas, bolo extendido y del
   rango del pico.
+
+### Prueba con historial sintético — 2026-11-22
+
+El propietario eligió un historial exclusivamente sintético para esta prueba
+de la fase 6. `TestCalculationTest` encadena una versión de perfil sintética
+confirmada, un historial en memoria con cobertura explícita, `CandidateIob` y
+el motor de cálculo de prueba. Comprueba el efecto del IOB en el total, el cero
+con una lista vacía y cobertura suficiente, el bloqueo con historial ausente o
+insuficiente y el rechazo de un perfil sin confirmar.
+
+La prueba usa la entrada actual de IOB de `CandidateRequest`, que etiqueta el
+valor como manual. Un adaptador para Bolo deberá conservar la procedencia y la
+huella del IOB calculado. La pantalla Bolo sigue con IOB manual y la elección
+del origen de las dosis reales queda pendiente.
 
 ## Condiciones para revisar este ADR
 
