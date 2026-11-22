@@ -23,7 +23,7 @@ sin rellenar nada. Las versiones de esquema 1 los dejan desconocidos
 (`profile.<código>.not_in_schema`) y bloquean solo B2, D y E. Evidencia y
 comprobaciones P1, P6 y P7 del Pixel en docs/validation/profile-limits-2026-10-12.md.
 
-PR #60, AÚN SIN INTEGRAR — IOB CANDIDATO EN EL MOTOR (ADR 0026)
+PR #60 INTEGRADA EN `01c51de` — IOB CANDIDATO EN EL MOTOR (ADR 0026)
 `org.bolusai.engine.iob.CandidateIob` calcula el IOB desde un historial de dosis
 explícito con las curvas de Legacy `bcac891` y el bolo extendido. Paridad exacta
 en 19 vectores capturados con scripts/legacy-vectors/capture_iob_vectors.py.
@@ -34,7 +34,7 @@ IOB manual. Paridad de Walsh en iOS sin comprobar (exp de la plataforma).
 La ventana usa la duración efectiva de las tablas sin estirar (regresión del
 falso cero con DIA 4,99 h). verify.ps1 y la CI reproducen los vectores de Legacy.
 
-PR #60, AÚN SIN INTEGRAR — ACCIÓN DE LA INSULINA EN EL PERFIL (ADR 0027)
+PR #60 INTEGRADA EN `01c51de` — ACCIÓN DE LA INSULINA EN EL PERFIL (ADR 0027)
 DIA (h), curva y pico (min enteros) en el esquema de contenido 3, sin defaults
 ni rangos. `clinical-profile.db` v4 migra desde v1 a v3 sin rellenar nada. Las
 versiones anteriores la dejan desconocida. Aún no se traduce a `InsulinAction`.
@@ -46,6 +46,13 @@ permiso conservado; Legacy y Dexcom sin cambios. Evidencia y límites en
 docs/validation/profile-insulin-action-2026-10-12.md. El propietario autorizó
 integrar la PR #60 de prueba el 2026-10-12; no habilita uso terapéutico.
 
+CONTINUACIÓN — IOB CON HISTORIAL SINTÉTICO (2026-11-22)
+El propietario eligió historial sintético para esta prueba. `TestCalculationTest`
+ejercita el recorrido en JVM desde el perfil confirmado y la cobertura de dosis
+hasta el IOB candidato y el total de prueba. Ver ADR 0026, «Prueba con historial
+sintético». Bolo conserva el IOB manual. Antes de conectarlo al historial real,
+queda elegir su origen y llevar al cálculo la procedencia y huella del IOB.
+
 SIGUIENTE
 - Teléfono: cálculo con perfil real confirmado (P6) y actualización sobre un
   perfil v2 real existente (P7 de la validación de límites). B1 tiene evidencia
@@ -54,12 +61,10 @@ SIGUIENTE
   pruebas ya ejecutadas sin cambios que lo justifiquen. En esta sesión Codex
   hizo las pruebas del Pixel mientras Claude avanzaba desde la nube, sin
   modificar la implementación de perfil o motor de Claude.
-- Sin teléfono: historial local de insulina, en entrega separada y con decisión
-  del propietario sobre su origen (Next no registra tratamientos reales);
-  preguntarla agrupada. Después, traducir el perfil a `InsulinAction` y conectar
-  `CandidateIob` al cálculo de prueba en lugar del IOB manual. Luego
-  fibra/Warsaw (LC-008). Resolver y registrar el SHA remoto de Legacy
-  antes de usarlo.
+- Sin teléfono: productor del historial local de insulina, en entrega separada
+  tras decidir el origen de las dosis reales. Después, conectar `CandidateIob`
+  a Bolo con procedencia explícita. Luego fibra/Warsaw (LC-008). Resolver y
+  registrar el SHA remoto de Legacy antes de una nueva auditoría.
 No repetir las decisiones ya aprobadas.
 
 CONTINUACIÓN ACTIVA — 2026-10-12

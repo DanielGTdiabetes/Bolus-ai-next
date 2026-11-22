@@ -7,8 +7,17 @@ import org.bolusai.dexcomg7.WithheldCause
 import org.bolusai.engine.candidate.CandidateStep
 import org.bolusai.engine.candidate.GlucoseOrigin
 import org.bolusai.engine.candidate.Input
+import org.bolusai.engine.candidate.IobValue
+import org.bolusai.engine.candidate.Quantity
 import org.bolusai.engine.candidate.StepOutcome
 import org.bolusai.engine.candidate.Warnings
+import org.bolusai.engine.iob.CandidateIob
+import org.bolusai.engine.iob.DoseHistory
+import org.bolusai.engine.iob.InsulinAction
+import org.bolusai.engine.iob.InsulinCurve
+import org.bolusai.engine.iob.InsulinDose
+import org.bolusai.engine.iob.IobOutcome
+import org.bolusai.engine.iob.IobRequest
 import org.bolusai.meals.DraftField
 import org.bolusai.meals.MealContent
 import org.bolusai.meals.MealKind
@@ -26,6 +35,7 @@ import org.bolusai.profile.ConfirmationContract
 import org.bolusai.profile.ConfirmationEvent
 import org.bolusai.profile.ConfirmationEventKind
 import org.bolusai.profile.GlucoseUnit
+import org.bolusai.profile.InsulinCurveCode
 import org.bolusai.profile.OperationId
 import org.bolusai.profile.ParameterSchedule
 import org.bolusai.profile.ProfileCatalog
@@ -42,11 +52,13 @@ import org.bolusai.profile.ProfileValue
 import org.bolusai.profile.ProfileVersion
 import org.bolusai.profile.Setting
 import org.bolusai.profile.TimeZoneRules
+import org.bolusai.profile.VersionConfirmation
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.math.BigDecimal
 
 /** ADR 0024 and ADR 0025: the test calculation only translates explicit inputs; synthetic profile and readings only. */
 class TestCalculationTest {
@@ -89,6 +101,83 @@ class TestCalculationTest {
         assertFalse(result.usableForTreatment)
         assertTrue(Warnings.TEST_ONLY in result.warnings)
     }
+
+    @Test fun syntheticDoseHistoryFeedsOnlyTheCandidateCalculation() {
+        val profile = insulinActionProfile()
+        val history = syntheticDoseHistory()
+        val iob = CandidateIob.calculate(IobRequest(at, Input.Provided(syntheticAction(profile)), Input.Provided(history)))
+        val computed = iob.outcome as IobOutcome.Computed
+        assertFalse(iob.usableForTreatment)
+        assertEquals(1.0, computed.units, 0.0)
+        assertEquals("synthetic-dose", computed.contributions.single().doseId)
+
+        val result = TestCalculation.calculate(requestWithSyntheticIob(profile, computed))
+        assertEquals(7.0, (result.total as StepOutcome.Computed).units, 0.0)
+        assertFalse(result.usableForTreatment)
+        assertTrue(Warnings.TEST_ONLY in result.warnings)
+
+        val empty = CandidateIob.calculate(IobRequest(at, Input.Provided(syntheticAction(profile)),
+            Input.Provided(history.copy(doses = emptyList())))).outcome as IobOutcome.Computed
+        assertEquals(0.0, empty.units, 0.0)
+        val withEmptyHistory = TestCalculation.calculate(requestWithSyntheticIob(profile, empty))
+        assertEquals(8.0, (withEmptyHistory.total as StepOutcome.Computed).units, 0.0)
+        assertFalse(withEmptyHistory.usableForTreatment)
+    }
+
+    @Test fun insufficientOrUnavailableSyntheticHistoryDoesNotBecomeZeroIob() {
+        val profile = insulinActionProfile()
+        val action = Input.Provided(syntheticAction(profile))
+        val shortHistory = Input.Provided(syntheticDoseHistory().copy(coveredFromEpochMs = at - 2 * 3_600_000L))
+        val missingHistory = Input.Unavailable("iob.history.unavailable")
+        for ((history, cause) in listOf(shortHistory to "iob.history.insufficient_window", missingHistory to missingHistory.cause)) {
+            val blocked = CandidateIob.calculate(IobRequest(at, action, history)).outcome as IobOutcome.Blocked
+            assertEquals(listOf(cause), blocked.causes)
+            val result = TestCalculation.calculate(requestWithSyntheticIob(profile, blocked))
+            assertEquals(listOf(cause), (result.step(CandidateStep.IOB) as StepOutcome.Blocked).causes)
+            assertTrue(result.total is StepOutcome.Blocked)
+            assertFalse(result.usableForTreatment)
+        }
+    }
+
+    @Test fun anUnconfirmedProfileCannotProduceSyntheticIob() {
+        val profile = insulinActionProfile(confirmed = false)
+        val iob = CandidateIob.calculate(IobRequest(at, Input.Provided(syntheticAction(profile)),
+            Input.Provided(syntheticDoseHistory())))
+        val blocked = iob.outcome as IobOutcome.Blocked
+        assertEquals(listOf("profile.unconfirmed"), blocked.causes)
+        assertTrue(TestCalculation.calculate(requestWithSyntheticIob(profile, blocked)).total is StepOutcome.Blocked)
+    }
+
+    private fun insulinActionProfile(confirmed: Boolean = true): ProfileGateState.Evaluated =
+        state(confirmed, content()
+            .withLimit(ProfileLimit.INSULIN_DIA, value("4"))
+            .withInsulinCurve(Setting.Declared(InsulinCurveCode.LINEAR))) as ProfileGateState.Evaluated
+
+    private fun syntheticAction(profile: ProfileGateState.Evaluated): InsulinAction {
+        val version = profile.latest
+        val curve = (version.content.insulinCurve as Setting.Declared).value
+        val dia = (version.content.limit(ProfileLimit.INSULIN_DIA) as ProfileValue.Entered).decimal
+        return InsulinAction(version.version, version.contentSha256, profile.confirmation is VersionConfirmation.Active,
+            requireNotNull(InsulinCurve.fromCode(curve.code)), Quantity(dia.text),
+            peakMinutes = Input.Unavailable("profile.insulin_peak.not_configured"))
+    }
+
+    private fun syntheticDoseHistory() = DoseHistory(
+        sourceReference = "synthetic-test-history",
+        coveredFromEpochMs = at - 4 * 3_600_000L,
+        coveredUntilEpochMs = at,
+        maxExtendedMinutes = 0,
+        doses = listOf(InsulinDose("synthetic-dose", at - 2 * 3_600_000L, Quantity("2"), extendedMinutes = 0)),
+    )
+
+    // This bridge exists only in the test source set. IobValue currently tags every provided value as manual.
+    // The fixture is exactly representable by Quantity. A future actual adapter must preserve IOB provenance.
+    private fun requestWithSyntheticIob(profile: ProfileGateState, outcome: IobOutcome) =
+        TestCalculation.request(at, profile, null, null, form.copy(iobUnits = "")).copy(iob = when (outcome) {
+            is IobOutcome.Computed -> Input.Provided(IobValue(Quantity(BigDecimal.valueOf(outcome.units)
+                .stripTrailingZeros().toPlainString())))
+            is IobOutcome.Blocked -> Input.Unavailable(outcome.causes.single())
+        })
 
     @Test fun theLocalMinuteComesFromTheProfileZone() {
         assertEquals(Input.Provided(630), TestCalculation.localMinute(state(), at))
