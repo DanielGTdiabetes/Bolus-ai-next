@@ -65,7 +65,6 @@ class ShadowReplayTest {
         val cases = mapOf(
             compare("glucose" to null) to "legacy.glucose_absent",
             compare("glucose_stale" to "true") to "legacy.glucose_stale",
-            compare("autosens_ratio" to "1.1") to "legacy.autosens_active",
             compare("techne_enabled" to "true", "trend" to "SingleUp") to "legacy.techne_rounding_possible",
             compare("exercise" to "true") to "legacy.exercise_reduction_applied",
             compare("max_iob" to "5") to "legacy.max_iob_ceiling_applies",
@@ -81,6 +80,34 @@ class ShadowReplayTest {
             assertTrue(reason in result.reasons, "$reason in ${result.reasons}")
             assertTrue(result.components.isEmpty())
         }
+    }
+
+    @Test fun autosensIsReplayedWithTheAdjustedRatiosTheTraceStores() {
+        // Ratio 1.1: Legacy divided 10 g/U and 40 mg/dL/U and stored 9.091 and 36.364. Meal 6.6 U, correction 2.2 U.
+        val result = compare("autosens_ratio" to "1.1", "cr" to "9.091", "isf" to "36.364", "expected.meal_u" to "6.6",
+            "expected.correction_u" to "2.2", "expected.total_u" to "8.8")
+        assertEquals(ShadowClass.MATCH, result.shadowClass)
+        assertEquals(listOf("autosens.effective_ratios_replayed"), result.reasons)
+        val wrong = compare("autosens_ratio" to "1.1", "cr" to "9.091", "isf" to "36.364", "expected.total_u" to "8.0")
+        assertEquals(ShadowClass.MISMATCH, wrong.shadowClass)
+        assertTrue("autosens.effective_ratios_replayed" in wrong.reasons)
+    }
+
+    @Test fun theThreeDecimalsOfAnAdjustedRatioExplainAComponentButNeverATotal() {
+        // Ratio 4 g/U with autosens 0.9 is 4.4444..., stored as 4.444. Legacy: 17.8 / 4.4444 = 4.005 -> stored 4.0.
+        // Replayed with 4.444 the meal is 4.0054: 0.0054 from the stored value, with the same 4.0 U total.
+        val adjusted = arrayOf<Pair<String, String?>>("autosens_ratio" to "0.9", "carbs" to "17.8", "cr" to "4.444",
+            "glucose" to "110", "round_step" to "0.5", "expected.meal_u" to "4.0", "expected.correction_u" to "0.0")
+        val result = compare(*adjusted, "expected.total_u" to "4.0")
+        assertEquals(ShadowClass.MATCH_WITHIN_TRACE_PRECISION, result.shadowClass)
+        assertEquals(listOf("autosens.effective_ratio_rounded_to_three_decimals", "autosens.effective_ratios_replayed"),
+            result.reasons)
+        // A different total is never explained by the ratio.
+        assertEquals(ShadowClass.MISMATCH, compare(*adjusted, "expected.total_u" to "4.5").shadowClass)
+        // Without autosens the ratio is exact, so the same component difference is a mismatch.
+        assertEquals(ShadowClass.MISMATCH, compare(*adjusted, "autosens_ratio" to "1.0", "expected.total_u" to "4.0").shadowClass)
+        // A component further away than the three decimals allow stays a mismatch.
+        assertEquals(ShadowClass.MISMATCH, compare(*adjusted, "expected.meal_u" to "4.02", "expected.total_u" to "4.0").shadowClass)
     }
 
     @Test fun whatDoesNotChangeTheDoseStaysComparable() {

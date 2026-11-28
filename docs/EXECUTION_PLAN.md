@@ -859,9 +859,11 @@ rastro de cada cálculo en `treatments.calculation_trace`, pero ninguna lectura
 lo devuelve. La herramienta fuera de línea repite esos cálculos en el motor
 único y los clasifica (coincide, coincide con matices, difiere, no comparable).
 Extractor que minimiza los datos, paquete `engine.shadow` y módulo
-`tools/shadow-replay`. Sin red y sin escritura. Fase 9, puntos 1 a 5. Falta
-ejecutarla con datos reales, que requieren acceso de solo lectura concedido
-por el propietario, y la comparación de lo escrito en Dexcom y Nightscout.
+`tools/shadow-replay`. Sin red y sin escritura. Fase 9, puntos 1 a 5.
+Ejecutada el 2026-11-28 con los 325 cálculos reales de Legacy: 318 comparables,
+318 coincidencias, 0 diferencias y 7 no comparables por reducción de ejercicio
+([validación](validation/shadow-replay-real-data-2026-11-28.md)). Falta la
+comparación de lo escrito en Dexcom y Nightscout.
 
 ### Secuencia de capacidades
 

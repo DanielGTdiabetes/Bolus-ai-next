@@ -72,13 +72,13 @@ MyFitnessPal para comparar, porque los nutrientes vienen de la fila de Legacy.
 | `MATCH` | mismas componentes y total con las entradas del rastro |
 | `MATCH_SETTINGS_UNVERIFIED` | coincide, pero con nutrientes y sin poder verificar por `config_hash` que las reglas de fibra y Warsaw eran las exportadas |
 | `MATCH_STRATEGY_INFERRED` | coincide solo con la estrategia Warsaw `normal`, que el rastro no guarda |
-| `MATCH_WITHIN_TRACE_PRECISION` | el total de Legacy queda dentro del intervalo que explican los 2 decimales del IOB guardado |
+| `MATCH_WITHIN_TRACE_PRECISION` | el total de Legacy queda dentro del intervalo que explican los 2 decimales del IOB guardado, o el total coincide y una componente se aparta lo que explican los 3 decimales del ratio ajustado por autosens |
 | `MISMATCH` | entradas equivalentes y resultado distinto: hay que explicarlo, reproducirlo y cubrirlo con una prueba |
 | `NOT_COMPARABLE` | no se puede demostrar que las entradas sean equivalentes; nunca cuenta como coincidencia |
 
 No comparable, con su código: falta un campo del rastro; un valor no es
 representable; glucosa ausente o caducada (Legacy calcula sin corrección, Next
-bloquea); autosens activo; Techne con tendencia; reducción por ejercicio; el
+bloquea); Techne con tendencia; reducción por ejercicio; el
 techo de IOB habría recortado; Next bloquea; o hay diferencia con reglas sin
 verificar. Una diferencia con reglas sin verificar no se achaca a una regla.
 
@@ -87,6 +87,13 @@ decimales y `1e-9` en el total. Son consecuencia del formato del rastro, no
 umbrales clínicos.
 
 Un interruptor de Legacy apagado se repite como factor `0` (ADR 0029).
+
+Autosens no excluye: solo cambia el ratio y la sensibilidad, y el rastro guarda
+ambos ya ajustados. La repetición los usa tal cual y lo anota con
+`autosens.effective_ratios_replayed`.
+
+Resultado con los datos reales:
+[validación del 2026-11-28](../validation/shadow-replay-real-data-2026-11-28.md).
 
 ### 3. Privacidad
 
