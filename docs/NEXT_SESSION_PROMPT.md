@@ -87,8 +87,16 @@ cambia el cálculo respecto de `bcac891`.
 MYFITNESSPAL — DECISIÓN DEL PROPIETARIO 2026-11-28
 Health Connect descartado (retraso y fallos). Hacer el enlace por sesión de
 MyFitnessPal (cookies), como Hermes en Legacy, pero en el propio móvil y sin
-servidor. Auditar antes los scripts de Hermes en Legacy, solo lectura. El BMAX
-ya no existe: lo sustituye el EVO-X2.
+servidor. El BMAX ya no existe: lo sustituye el EVO-X2.
+Auditoría y diseño en docs/adr/0032-myfitnesspal-session-on-device.md, en estado
+propuesto. Condición del propietario: no puede crear conflicto con `bolus_ai`
+(sesión propia en el móvil, solo lectura, nada hacia Legacy, solo a petición,
+interruptor apagado por defecto). Bloqueado por una entrada: el código que habla
+con MyFitnessPal (`mfp_adapter.py`, `mfp_wrapper.py`, `cookie_auth.py`) no está
+en el repositorio de Legacy, sino en el mini PC, en `/opt/hermes-mcp/myfitnesspal`.
+No inventar direcciones ni formatos: pedir ese código al propietario (sin su
+`.env`) y una respuesta real saneada del diario. La clave de host SSH del mini
+PC no está aceptada en este equipo; no aceptarla sin su permiso.
 
 ESCRITURA EN DEXCOM — AVISO DEL PROPIETARIO 2026-11-28
 Legacy escribe en el historial de la app Dexcom todos los bolos y la insulina

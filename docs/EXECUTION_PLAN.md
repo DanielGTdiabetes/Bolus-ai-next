@@ -851,6 +851,9 @@ auditar en solo lectura `scripts/hermes/mfp_sync_trigger.py`,
 `scripts/hermes/sync_to_bolus.py` y `docs/HERMES_MYFITNESSPAL_BOLUS_SYNC.md`.
 Las cookies nunca entran en logs, fixtures ni en el repositorio. El host BMAX
 ya no existe; lo sustituye el EVO-X2, y cualquier mención al BMAX es histórica.
+Auditoría, condición de no interferir con `bolus_ai` y diseño propuesto en el
+[ADR 0032](adr/0032-myfitnesspal-session-on-device.md). Falta el código del
+adaptador, que está en el mini PC y no en el repositorio de Legacy.
 
 ### Entrega de modo sombra por repetición — 2026-11-28
 
