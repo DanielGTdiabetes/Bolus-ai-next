@@ -12,11 +12,14 @@
     <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES"
         tools:ignore="QueryAllPackagesPermission" />
     <!-- ADR 0032: only the MyFitnessPal link uses the network, in one session class limited by code to MyFitnessPal's
-         own hosts, switched off by default. The local calculation path never needs it. verify.ps1 keeps it so. -->
+         own hosts, switched off by default. The local calculation path never needs it. verify.ps1 keeps it so.
+         The network security configuration makes the system enforce the same hosts: no certificate is trusted
+         anywhere else, whatever route a request takes (redirect, web socket, service worker). -->
     <uses-permission android:name="android.permission.INTERNET" />
     <application
         android:allowBackup="false"
         android:usesCleartextTraffic="false"
+        android:networkSecurityConfig="@xml/network_security_config"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="false"
         android:icon="@drawable/ic_launcher"

@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    ADR 0032, "Límite de red impuesto por el sistema". The platform, not only the request filter of the session,
+    limits where this app can hold an HTTPS conversation: by default no certificate authority is trusted, so a TLS
+    handshake with any host fails before a request, an address or a cookie is sent. Only the hosts of the
+    MyFitnessPal link trust the system authorities. They must equal MfpHosts.resourceAllowed: the unit test
+    MfpNetworkSecurityConfigTest and scripts/verify.ps1 keep both in step. Cleartext traffic is never permitted.
+    No user-added authority, no debug override and no pin: nothing here may widen the limit.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors />
+    </base-config>
+    <domain-config cleartextTrafficPermitted="false">
+        <domain includeSubdomains="true">myfitnesspal.com</domain>
+        <domain includeSubdomains="false">challenges.cloudflare.com</domain>
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </domain-config>
+</network-security-config>

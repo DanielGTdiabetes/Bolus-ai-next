@@ -44,6 +44,9 @@ internal object MfpLinkGuard {
  *   the store is excluded from backups like every other file of the app.
  * - Every request is checked against [MfpHosts] before it leaves; anything else is answered locally with an empty
  *   403 and its host is listed in [blockedHosts] for the user.
+ * - The filter is not the only limit: the network security configuration of the app trusts no certificate outside
+ *   those hosts, so a connection the filter never saw cannot carry a request. A certificate error is never
+ *   overridden here: the client keeps the default, which cancels the load.
  * - Read only: the view loads pages the user opens and the diary of one day. Nothing is posted by Next, and the
  *   extraction script only reads the loaded page. Nothing reaches Legacy, Hermes or Telegram.
  * - No page can call into the app: no JavaScript interface is ever added.

@@ -7,11 +7,17 @@ import org.bolusai.mfp.MfpDate
  * for this link alone, and this is where it is limited by code: every request of the session goes through
  * [mainFrameAllowed] or [resourceAllowed] before it leaves the phone.
  *
+ * The filter runs in a callback of the web view, which is not asked about every connection: it never sees
+ * the destination of a redirected resource (shown on the Pixel, ADR 0032).
+ * So the same hosts are also the only ones whose certificates the system trusts for this app:
+ * `res/xml/network_security_config.xml` must name exactly [DOMAIN] with its subdomains and [CHALLENGE_HOST].
+ * `MfpNetworkSecurityConfigTest` and `verify.ps1` fail when the two differ.
+ *
  * Nothing here points at Legacy, the NAS, Render or the mini PC, and `verify.ps1` keeps it so.
  */
 internal object MfpHosts {
     const val DIARY_HOST = "www.myfitnesspal.com"
-    private const val DOMAIN = "myfitnesspal.com"
+    const val DOMAIN = "myfitnesspal.com"
 
     /**
      * Cloudflare's challenge, which MyFitnessPal's sign-in page embeds. Observed on the Pixel on 2026-11-28: with it
