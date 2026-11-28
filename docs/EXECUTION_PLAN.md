@@ -827,8 +827,10 @@ IOB a mano e IOB calculado por `CandidateIob` con la acción de la insulina del
 perfil. El IOB conserva su procedencia en la huella del bolo. Registro sin
 empezar, ilegible o que no cubre toda la acción bloquea; nunca es `0 U`. Las
 entradas son anotaciones locales sin autoridad de tratamiento y sin
-sincronización. Fase 6, puntos 4 y 5, y fase 7 en modo de prueba. Pendiente la
-prueba en el Pixel.
+sincronización. Fase 6, puntos 4 y 5, y fase 7 en modo de prueba.
+`verify.ps1 -DeviceTests` pasó en el Pixel con 189 pruebas instrumentadas; el
+recorrido manual en Bolo queda pendiente
+([validación](validation/local-dose-ledger-2026-11-28.md)).
 
 ### Secuencia de capacidades
 

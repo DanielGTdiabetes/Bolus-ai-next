@@ -41,7 +41,14 @@ intención (`eventId`, clave de idempotencia):
   dosis de insulina rápida quedan anotadas. Solo puede existir uno.
 - `Dose`: unidades en decimal canónico (máximo 6 enteros y 3 decimales, límite
   de representación), instante del reloj inyectado, origen `test_calculation`
-  (con la huella de entradas del cálculo) o `user_note`.
+  o `user_note`. Una dosis de `test_calculation` guarda en su misma fila el
+  registro inmutable del cálculo (`CalculationRecord`): el texto canónico de la
+  petición al motor (entradas normalizadas, versión y huella del perfil, motor y
+  reglas), cuya SHA-256 es la huella de entradas, y el texto del resultado
+  (pasos, hechos, total, avisos, reglas no aplicadas e IOB usado con sus
+  dosis). Así el cálculo sigue siendo auditable tras cerrar la app. El IOB se
+  guarda con su huella, su valor y las dosis con insulina restante; su petición
+  completa se reconstruye del propio registro, que es append-only.
 - `Void`: anula una dosis; la fila original se conserva.
 
 Un reintento con el mismo `eventId` y el mismo contenido es `Replayed`, no una
@@ -97,7 +104,10 @@ El formulario elige el IOB: a mano (por defecto, como hasta ahora) o calculado
 del historial. Bajo el cálculo aparece el registro: empezar, anotar una dosis
 puesta ahora, registrar el total de prueba como bolo puesto y anular. Cada alta
 pide confirmación explícita y se guarda antes de repintar. Registrar el total
-descarta el resultado para que no pueda anotarse dos veces. El resultado
+descarta el resultado para que no pueda anotarse dos veces. El motor redondea
+en binario (`0,1 × 3 = 0,30000000000000004`): al registrar el total solo se
+elimina ese ruido, por debajo de `1e-9`; un total con decimales reales más allá
+del tercero no se redondea y no puede registrarse desde el botón. El resultado
 muestra el desglose del IOB o las causas del bloqueo; un IOB bloqueado nunca se
 muestra como cero.
 
@@ -124,6 +134,10 @@ muestra como cero.
   una dosis en el total, procedencia en la huella, anulación, bloqueos por
   historial desconocido, ventana insuficiente, perfil sin acción o sin
   confirmar y dosis futura, y la opción manual sin cambios.
+- `DoseHistoryCalculationTest` cubre además el registro de auditoría (huella que
+  coincide con la petición, rechazo de un resultado de otra petición) y el
+  ruido binario del total.
+- Evidencia de dispositivo: [validación](../validation/local-dose-ledger-2026-11-28.md).
 - `SqliteDoseLedgerDeviceTest` (dispositivo): reapertura, reintento, rechazos
   sin escritura, append-only, esquema ajeno o más nuevo y barrera de
   instrumentación.

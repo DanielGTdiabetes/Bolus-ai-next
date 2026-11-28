@@ -29,6 +29,7 @@ object DoseLedgerCodes {
     const val UNITS_NOT_CANONICAL = "dose_ledger.units_not_canonical"
     const val UNITS_NOT_POSITIVE = "dose_ledger.units_not_positive"
     const val INVALID_FINGERPRINT = "dose_ledger.invalid_calculation_fingerprint"
+    const val INVALID_CALCULATION_RECORD = "dose_ledger.invalid_calculation_record"
     const val FINGERPRINT_ORIGIN_MISMATCH = "dose_ledger.calculation_fingerprint_origin_mismatch"
     const val INVALID_WRITER = "dose_ledger.invalid_writer"
     const val TRACKING_NOT_STARTED = "dose_ledger.tracking_not_started"
@@ -42,6 +43,19 @@ object DoseLedgerCodes {
     const val UNSUPPORTED_SCHEMA = "dose_ledger.unsupported_schema"
     const val CORRUPT_ROW = "dose_ledger.corrupt_row"
     const val UNAVAILABLE_IN_INSTRUMENTATION = "dose_ledger.unavailable_in_instrumentation"
+}
+
+/**
+ * Immutable audit record of the test calculation a dose came from, stored with the dose so it survives the process
+ * (AGENTS.md section 6). [requestText] is the canonical text of the engine request (normalised inputs, profile version
+ * and fingerprint, engine and rule set) whose SHA-256 is [inputSha256]; [resultText] is the breakdown, total, warnings
+ * and identities of the result, including the IOB used. The ledger stores them verbatim and never interprets them.
+ */
+data class CalculationRecord(val inputSha256: String, val requestText: String, val resultText: String) {
+    companion object {
+        /** Technical storage bound of each text, not a clinical limit. */
+        const val MAX_TEXT_LENGTH = 65_536
+    }
 }
 
 /** One appended fact. [eventId] is the idempotency key chosen once per user intent. [atEpochMs] is the injected clock. */
@@ -64,8 +78,8 @@ sealed interface DoseEvent {
         override val writer: String,
         val unitsText: String,
         val origin: DoseOrigin,
-        /** Input fingerprint of the test calculation the dose came from; only for [DoseOrigin.TEST_CALCULATION]. */
-        val calculationSha256: String?,
+        /** The test calculation the dose came from; present exactly for [DoseOrigin.TEST_CALCULATION]. */
+        val calculation: CalculationRecord?,
     ) : DoseEvent
 
     /** Voids the dose [doseEventId]; the dose row stays in the ledger. */
@@ -94,9 +108,12 @@ object DoseEvents {
             is DoseEvent.Dose -> when {
                 !UNITS.matches(event.unitsText) -> DoseLedgerCodes.UNITS_NOT_CANONICAL
                 event.unitsText == "0" -> DoseLedgerCodes.UNITS_NOT_POSITIVE
-                event.calculationSha256 != null && !SHA256.matches(event.calculationSha256) ->
+                event.calculation != null && !SHA256.matches(event.calculation.inputSha256) ->
                     DoseLedgerCodes.INVALID_FINGERPRINT
-                (event.origin == DoseOrigin.TEST_CALCULATION) != (event.calculationSha256 != null) ->
+                event.calculation != null && listOf(event.calculation.requestText, event.calculation.resultText)
+                    .any { it.isEmpty() || it.length > CalculationRecord.MAX_TEXT_LENGTH } ->
+                    DoseLedgerCodes.INVALID_CALCULATION_RECORD
+                (event.origin == DoseOrigin.TEST_CALCULATION) != (event.calculation != null) ->
                     DoseLedgerCodes.FINGERPRINT_ORIGIN_MISMATCH
                 else -> null
             }
@@ -208,8 +225,8 @@ class DoseHistoryLog(private val ledger: DoseLedger, private val clock: DoseCloc
     fun startTracking(eventId: String): AppendOutcome =
         ledger.append(DoseEvent.TrackingStarted(eventId, clock.nowEpochMs(), writer))
 
-    fun noteDose(eventId: String, unitsText: String, origin: DoseOrigin, calculationSha256: String?): AppendOutcome =
-        ledger.append(DoseEvent.Dose(eventId, clock.nowEpochMs(), writer, unitsText, origin, calculationSha256))
+    fun noteDose(eventId: String, unitsText: String, origin: DoseOrigin, calculation: CalculationRecord?): AppendOutcome =
+        ledger.append(DoseEvent.Dose(eventId, clock.nowEpochMs(), writer, unitsText, origin, calculation))
 
     fun voidDose(eventId: String, doseEventId: String): AppendOutcome =
         ledger.append(DoseEvent.Void(eventId, clock.nowEpochMs(), writer, doseEventId))

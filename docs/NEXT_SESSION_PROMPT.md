@@ -64,7 +64,13 @@ de tratamiento y sin sincronización. `main` de Legacy era `e48c4ab` ese día; l
 reglas siguen fijadas en `bcac891` y la diferencia no está auditada.
 Las pruebas que quieran un registro en dispositivo inyectan
 `MainActivity.doseLedgerFactory`; sin ella el registro es no disponible.
-Pendiente: `SqliteDoseLedgerDeviceTest` y recorrido manual en el Pixel.
+Una dosis registrada desde un cálculo guarda en su fila el registro de auditoría
+(petición canónica y resultado). `verify.ps1 -DeviceTests`: 189 instrumentadas OK
+en el Pixel. En ese Pixel el receptor Dexcom de Next está habilitado para la
+recepción real: antes de las pruebas `pm default-state` y después `pm enable`,
+ambos con `run-as org.bolusai.next` (docs/validation/local-dose-ledger-2026-11-28.md).
+Pendiente: recorrido manual del registro en Bolo y prueba instrumentada de sus
+diálogos.
 
 SIGUIENTE
 - Teléfono: cálculo con perfil real confirmado (P6) y actualización sobre un
@@ -539,9 +545,13 @@ docs/EXECUTION_PLAN.md §3.3. Un ADR breve cubre cambios estructurales o de
 seguridad relevantes; las decisiones rutinarias dentro del alcance autorizado
 se resuelven durante la implementación. Preguntar juntos los puntos clínicos
 o de alcance pendientes y aprovechar aprobaciones ya registradas.
-Conservar PR a `main`, revisión automática de Codex, corrección y regresión de
-hallazgos válidos, respuesta y resolución de hilos, y CI «Verify» (Windows)
-en verde antes de fusionar. No repetir rondas sin cambios o motivos pendientes.
+Conservar PR a `main` y CI «Verify» (Windows) en verde antes de fusionar. Desde
+el 2026-11-28 no se usa Codex: su revisión automática no es puerta de entrega ni
+se responden sus hilos; un hallazgo válido se corrige con su regresión. Ese día
+el propietario delegó en Claude la responsabilidad del proyecto: decide lo
+técnico y fusiona las PR de prueba con verificación local y CI en verde. Siguen
+reservadas al propietario la autorización de uso terapéutico y cualquier cambio
+en Legacy o producción. No repetir rondas sin cambios o motivos pendientes.
 En sesiones cloud sin SDK: instalar Android SDK 36
 (commandlinetools + `platforms;android-36`, `build-tools;36.0.0`) en el
 directorio temporal y exportar `ANDROID_HOME`; PowerShell 7 portátil sirve para

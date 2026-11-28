@@ -62,6 +62,7 @@ import org.bolusai.insulin.AppendOutcome
 import org.bolusai.insulin.DoseClock
 import org.bolusai.insulin.DoseHistoryLog
 import org.bolusai.insulin.DoseOrigin
+import org.bolusai.next.application.CalculationAudit
 import org.bolusai.next.application.IobChoice
 import org.bolusai.next.doses.ClosableDoseLedger
 import org.bolusai.next.doses.DoseStorageGuard
@@ -322,7 +323,7 @@ class MainActivity : ComponentActivity() {
                     TestCalculation.iob(now, profile.gate, doses)
                 } else null
                 testCalculation.store(TestCalculation.calculate(request), now, TestCalculation.dependencies(
-                    profile.gate, meals.selection, dexcomReading.state, testCalculation.form, doses), iob)
+                    profile.gate, meals.selection, dexcomReading.state, testCalculation.form, doses), iob, request)
                 rememberScroll()
                 render()
             },
@@ -337,7 +338,10 @@ class MainActivity : ComponentActivity() {
      */
     private fun renderDoseHistory() {
         val result = testCalculation.result
-        val total = (result?.total as? StepOutcome.Computed)?.units?.let(DoseHistoryText::totalUnits)
+        val request = testCalculation.request
+        // A total can be noted only with the request it came from, so its audit record is complete.
+        val total = (result?.total as? StepOutcome.Computed)?.units?.takeIf { request != null }
+            ?.let(DoseHistoryText::totalUnits)
         fun confirmed(question: String, append: (String) -> AppendOutcome, after: () -> Unit = {}) {
             val eventId = doseEventIds()
             android.app.AlertDialog.Builder(this).setMessage(question)
@@ -365,9 +369,9 @@ class MainActivity : ComponentActivity() {
                 }
             },
             registerTotal = { units ->
-                val fingerprint = checkNotNull(result).inputFingerprintSha256
+                val audit = CalculationAudit.record(checkNotNull(request), checkNotNull(result), testCalculation.iob)
                 confirmed(DoseHistoryText.noteQuestion(units),
-                    { doseHistory.log.noteDose(it, units, DoseOrigin.TEST_CALCULATION, fingerprint) }) {
+                    { doseHistory.log.noteDose(it, units, DoseOrigin.TEST_CALCULATION, audit) }) {
                     testCalculation.discard()
                 }
             },

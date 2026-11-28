@@ -10,6 +10,7 @@ import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.lifecycle.ViewModel
+import org.bolusai.engine.candidate.CandidateRequest
 import org.bolusai.engine.candidate.CandidateResult
 import org.bolusai.engine.candidate.CandidateStep
 import org.bolusai.engine.candidate.Input
@@ -42,6 +43,9 @@ internal class TestCalculationModel : ViewModel() {
         private set
     var calculatedAtEpochMs: Long? = null
         private set
+    /** The exact request [result] was computed from, kept to build the audit record of a noted dose (ADR 0028). */
+    var request: CandidateRequest? = null
+        private set
     /** The candidate IOB the result used, when the form takes the IOB from the dose history (ADR 0028). */
     var iob: IobResult? = null
         private set
@@ -54,6 +58,7 @@ internal class TestCalculationModel : ViewModel() {
         form = next
         if (result != null) invalidated = true
         result = null
+        request = null
         iob = null
         calculatedAtEpochMs = null
     }
@@ -61,13 +66,16 @@ internal class TestCalculationModel : ViewModel() {
     /** Drops the result after it was noted as an administered dose, so it cannot be noted twice. */
     fun discard() {
         result = null
+        request = null
         iob = null
         calculatedAtEpochMs = null
         dependencies = null
     }
 
-    fun store(result: CandidateResult, atEpochMs: Long, dependencies: TestCalculationDependencies, iob: IobResult? = null) {
+    fun store(result: CandidateResult, atEpochMs: Long, dependencies: TestCalculationDependencies, iob: IobResult? = null,
+              request: CandidateRequest? = null) {
         this.result = result
+        this.request = request
         this.iob = iob
         this.dependencies = dependencies
         calculatedAtEpochMs = atEpochMs
@@ -78,6 +86,7 @@ internal class TestCalculationModel : ViewModel() {
     fun invalidateIfChanged(current: TestCalculationDependencies) {
         if (result == null || current == dependencies) return
         result = null
+        request = null
         iob = null
         calculatedAtEpochMs = null
         dependencies = null

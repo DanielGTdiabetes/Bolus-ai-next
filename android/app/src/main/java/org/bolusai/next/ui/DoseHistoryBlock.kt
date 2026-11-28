@@ -19,6 +19,7 @@ import org.bolusai.insulin.LedgerRead
 import org.bolusai.next.R
 import org.bolusai.next.doses.ClosableDoseLedger
 import java.math.BigDecimal
+import java.math.RoundingMode
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -95,14 +96,22 @@ internal object DoseHistoryText {
     fun registerTotal(unitsText: String) = "Registrar ${units(unitsText)} U como bolo puesto ahora"
 
     /**
-     * The canonical text of a computed total, or null when it is zero or not representable with three decimals. It is
-     * the exact value the engine returned, never rounded here.
+     * The canonical text of a computed total, or null when it is zero or not representable with three decimals, the
+     * representation bound of the ledger. The engine rounds in binary (`round(value / step) * step`), so 0.3 U arrives
+     * as 0.30000000000000004: only that binary noise, below [REPRESENTATION_NOISE], is removed. A total with real
+     * digits beyond the third decimal is never rounded here; it cannot be noted from the button.
      */
     fun totalUnits(total: Double): String? {
         if (!total.isFinite() || total <= 0.0) return null
-        val text = BigDecimal.valueOf(total).stripTrailingZeros().toPlainString()
-        return text.takeIf { Quantity.isCanonical(it) }
+        val exact = BigDecimal(total)
+        val decimal = exact.setScale(3, RoundingMode.HALF_EVEN)
+        if (exact.subtract(decimal).abs() > REPRESENTATION_NOISE) return null
+        val text = decimal.stripTrailingZeros().toPlainString()
+        return text.takeIf { Quantity.isCanonical(it) && it != "0" }
     }
+
+    /** Far below the third decimal and far above the binary error of a double in the representable range. */
+    private val REPRESENTATION_NOISE = BigDecimal("0.000000001")
 }
 
 /** Views of the dose ledger inside Bolo. Builds views only; the activity confirms and appends. */

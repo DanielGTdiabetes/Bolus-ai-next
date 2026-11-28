@@ -5,6 +5,7 @@ import android.database.sqlite.SQLiteDatabase
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import org.bolusai.insulin.AppendOutcome
+import org.bolusai.insulin.CalculationRecord
 import org.bolusai.insulin.DoseEvent
 import org.bolusai.insulin.DoseHistoryLog
 import org.bolusai.insulin.DoseLedgerCodes
@@ -27,7 +28,7 @@ class SqliteDoseLedgerDeviceTest {
     private val context: Context = InstrumentationRegistry.getInstrumentation().targetContext
     private val name = "synthetic-insulin-doses-test.db"
     private var now = 1_000L
-    private val sha = "a".repeat(64)
+    private val sha = CalculationRecord("a".repeat(64), "codec=synthetic\ncarbs=60:manual_entry\n", "total=7.0\n")
 
     @Before fun clean() { context.deleteDatabase(name) }
     @After fun cleanUp() { context.deleteDatabase(name) }

@@ -10,7 +10,7 @@ class DoseLedgerTest {
     private var now = 1_000L
     private val ledger = InMemoryDoseLedger()
     private val log = DoseHistoryLog(ledger, { now }, "test/synthetic")
-    private val sha = "a".repeat(64)
+    private val sha = CalculationRecord("a".repeat(64), "request", "result")
 
     private fun state() = (log.read() as LedgerRead.Available).state
 
@@ -34,6 +34,14 @@ class DoseLedgerTest {
         assertEquals(AppendOutcome.Appended, log.noteDose("d1", "2.5", DoseOrigin.TEST_CALCULATION, sha))
         assertEquals(listOf(DoseEvent.Dose("d1", 5_000, "test/synthetic", "2.5", DoseOrigin.TEST_CALCULATION, sha)),
             state().doses)
+    }
+
+    @Test fun theSameIdWithAnotherCalculationRecordIsAConflict() {
+        log.startTracking("t1")
+        log.noteDose("d1", "2", DoseOrigin.TEST_CALCULATION, sha)
+        assertEquals(AppendOutcome.Replayed, log.noteDose("d1", "2", DoseOrigin.TEST_CALCULATION, sha))
+        assertEquals(AppendOutcome.Rejected(DoseLedgerCodes.EVENT_ID_CONFLICT),
+            log.noteDose("d1", "2", DoseOrigin.TEST_CALCULATION, sha.copy(resultText = "other")))
     }
 
     @Test fun aRetryOfTheSameIntentIsAReplayAndNeverASecondDose() {
@@ -65,7 +73,10 @@ class DoseLedgerTest {
             Triple("1.2345", DoseOrigin.USER_NOTE, null) to DoseLedgerCodes.UNITS_NOT_CANONICAL,
             Triple("1", DoseOrigin.USER_NOTE, sha) to DoseLedgerCodes.FINGERPRINT_ORIGIN_MISMATCH,
             Triple("1", DoseOrigin.TEST_CALCULATION, null) to DoseLedgerCodes.FINGERPRINT_ORIGIN_MISMATCH,
-            Triple("1", DoseOrigin.TEST_CALCULATION, "xyz") to DoseLedgerCodes.INVALID_FINGERPRINT,
+            Triple("1", DoseOrigin.TEST_CALCULATION, sha.copy(inputSha256 = "xyz")) to DoseLedgerCodes.INVALID_FINGERPRINT,
+            Triple("1", DoseOrigin.TEST_CALCULATION, sha.copy(requestText = "")) to DoseLedgerCodes.INVALID_CALCULATION_RECORD,
+            Triple("1", DoseOrigin.TEST_CALCULATION, sha.copy(resultText = "x".repeat(CalculationRecord.MAX_TEXT_LENGTH + 1))) to
+                DoseLedgerCodes.INVALID_CALCULATION_RECORD,
         )
         cases.forEachIndexed { index, (input, code) ->
             assertEquals(AppendOutcome.Rejected(code), log.noteDose("d$index", input.first, input.second, input.third))

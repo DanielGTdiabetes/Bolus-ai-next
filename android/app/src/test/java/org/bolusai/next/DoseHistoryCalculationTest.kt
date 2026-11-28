@@ -11,6 +11,7 @@ import org.bolusai.insulin.DoseHistoryLog
 import org.bolusai.insulin.DoseOrigin
 import org.bolusai.insulin.InMemoryDoseLedger
 import org.bolusai.insulin.LedgerRead
+import org.bolusai.next.application.CalculationAudit
 import org.bolusai.next.application.IobChoice
 import org.bolusai.next.application.TestCalculation
 import org.bolusai.next.application.TestCalculationForm
@@ -192,8 +193,48 @@ class DoseHistoryCalculationTest {
         assertEquals("7", DoseHistoryText.totalUnits(7.0))
         assertEquals("3.55", DoseHistoryText.totalUnits(3.55))
         assertNull(DoseHistoryText.totalUnits(0.0))
+        // Binary noise of the engine rounding (0.1 * 3, 0.05 * 7) is not a real digit.
+        assertEquals("0.3", DoseHistoryText.totalUnits(0.1 * 3))
+        assertEquals("0.35", DoseHistoryText.totalUnits(0.05 * 7))
+        assertEquals("14.95", DoseHistoryText.totalUnits(299 * 0.05))
+        assertNull(DoseHistoryText.totalUnits(1.0005))
+        assertNull(DoseHistoryText.totalUnits(0.0000000001))
         assertNull(DoseHistoryText.totalUnits(1.23456))
         assertNull(DoseHistoryText.totalUnits(Double.NaN))
+    }
+
+    @Test fun theAuditRecordOfANotedTotalSurvivesInTheLedgerAndMatchesItsFingerprint() {
+        log.startTracking("t1")
+        now = at - 2 * hour
+        log.noteDose("d1", "2", DoseOrigin.USER_NOTE, null)
+        val request = TestCalculation.request(at, profile(), null, null, form, log.read())
+        val result = TestCalculation.calculate(request)
+        val iob = TestCalculation.iob(at, profile(), log.read())
+        val audit = CalculationAudit.record(request, result, iob)
+        assertEquals(result.inputFingerprintSha256, audit.inputSha256)
+        assertEquals(audit.inputSha256, java.security.MessageDigest.getInstance("SHA-256")
+            .digest(audit.requestText.toByteArray()).joinToString("") { "%02x".format(it) })
+        for (line in listOf("usable_for_treatment=false", "validation=pending", "input_sha256=${audit.inputSha256}",
+            "total=7.0", "step.meal=6.0", "step.iob.fact.iob_u=1.0", "warning=iob.calculated_candidate_unverified",
+            "iob.input_sha256=${iob.inputFingerprintSha256}", "iob.units=1.0", "iob.dose.d1=units:2.0;elapsed_min:120.0;remaining:1.0")) {
+            assertTrue(line, line in audit.resultText.lines())
+        }
+        assertTrue("carbs=60:manual_entry" in audit.requestText.lines())
+        now = at
+        assertEquals(AppendOutcome.Appended, log.noteDose("d2", "7", DoseOrigin.TEST_CALCULATION, audit))
+        assertEquals(audit, (log.read() as LedgerRead.Available).state.doses.last().calculation)
+    }
+
+    @Test fun anAuditRecordNeverCombinesAResultWithAnotherRequest() {
+        log.startTracking("t1")
+        val request = TestCalculation.request(at, profile(), null, null, form, log.read())
+        val other = TestCalculation.calculate(TestCalculation.request(at + 1, profile(), null, null, form, log.read()))
+        try {
+            CalculationAudit.record(request, other, null)
+            org.junit.Assert.fail("a result must match its request")
+        } catch (expected: IllegalStateException) {
+            assertEquals("calculation_audit.request_does_not_match_result", expected.message)
+        }
     }
 
     @Test fun theIobBreakdownNeverShowsABlockedIobAsZero() {

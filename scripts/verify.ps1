@@ -246,6 +246,7 @@ try {
     # ADR 0026, section 5, and ADR 0028: on Android the candidate IOB is called only by the test calculation, which
     # feeds it the local dose ledger, by its screen, which shows the breakdown, and by their JVM tests.
     $iobAllowed = @("android\app\src\main\java\org\bolusai\next\application\TestCalculation.kt",
+        "android\app\src\main\java\org\bolusai\next\application\CalculationAudit.kt",
         "android\app\src\main\java\org\bolusai\next\ui\TestCalculationScreen.kt",
         "android\app\src\test\java\org\bolusai\next\TestCalculationTest.kt",
         "android\app\src\test\java\org\bolusai\next\DoseHistoryCalculationTest.kt") |

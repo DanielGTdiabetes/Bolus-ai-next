@@ -8,6 +8,7 @@ import android.database.sqlite.SQLiteDatabase
 import android.database.sqlite.SQLiteDatabaseCorruptException
 import android.database.sqlite.SQLiteOpenHelper
 import org.bolusai.insulin.AppendOutcome
+import org.bolusai.insulin.CalculationRecord
 import org.bolusai.insulin.DoseEvent
 import org.bolusai.insulin.DoseLedger
 import org.bolusai.insulin.DoseLedgerCodes
@@ -65,10 +66,14 @@ internal object DoseLedgerSchema {
             units TEXT,
             origin TEXT CHECK (origin IS NULL OR origin IN ('test_calculation', 'user_note')),
             calculation_sha256 TEXT CHECK (calculation_sha256 IS NULL OR length(calculation_sha256) = 64),
+            calculation_request TEXT CHECK (calculation_request IS NULL OR length(calculation_request) > 0),
+            calculation_result TEXT CHECK (calculation_result IS NULL OR length(calculation_result) > 0),
             void_of TEXT REFERENCES dose_events(event_id),
             status TEXT NOT NULL CHECK (status = 'local_note_not_treatment_authority'),
             CHECK ((kind = 'dose') = (units IS NOT NULL AND origin IS NOT NULL)),
             CHECK (kind = 'dose' OR (units IS NULL AND origin IS NULL AND calculation_sha256 IS NULL)),
+            CHECK ((calculation_sha256 IS NULL) = (calculation_request IS NULL) AND
+                (calculation_sha256 IS NULL) = (calculation_result IS NULL)),
             CHECK ((origin = 'test_calculation') = (calculation_sha256 IS NOT NULL) OR origin IS NULL),
             CHECK ((kind = 'void') = (void_of IS NOT NULL))
         )
@@ -166,8 +171,8 @@ internal class SqliteDoseLedger(context: Context, name: String? = DATABASE_NAME)
     /** Every event in append order, or null when a row cannot be decoded strictly. */
     private fun events(db: SQLiteDatabase): List<DoseEvent>? {
         val events = mutableListOf<DoseEvent>()
-        db.rawQuery("SELECT event_id, kind, at_ms, writer, units, origin, calculation_sha256, void_of, status " +
-            "FROM dose_events ORDER BY seq", null).use {
+        db.rawQuery("SELECT event_id, kind, at_ms, writer, units, origin, calculation_sha256, void_of, status, " +
+            "calculation_request, calculation_result FROM dose_events ORDER BY seq", null).use {
             while (it.moveToNext()) events += decode(it) ?: return null
         }
         return events
@@ -181,7 +186,7 @@ internal class SqliteDoseLedger(context: Context, name: String? = DATABASE_NAME)
         return when (c.getString(1)) {
             "tracking_started" -> DoseEvent.TrackingStarted(id, at, writer)
             "dose" -> DoseEvent.Dose(id, at, writer, c.getString(4), DoseOrigin.fromCode(c.getString(5)) ?: return null,
-                if (c.isNull(6)) null else c.getString(6))
+                if (c.isNull(6)) null else CalculationRecord(c.getString(6), c.getString(9), c.getString(10)))
             "void" -> DoseEvent.Void(id, at, writer, c.getString(7))
             else -> null
         }
@@ -198,7 +203,11 @@ internal class SqliteDoseLedger(context: Context, name: String? = DATABASE_NAME)
                 put("kind", "dose")
                 put("units", event.unitsText)
                 put("origin", event.origin.code)
-                event.calculationSha256?.let { put("calculation_sha256", it) }
+                event.calculation?.let {
+                    put("calculation_sha256", it.inputSha256)
+                    put("calculation_request", it.requestText)
+                    put("calculation_result", it.resultText)
+                }
             }
             is DoseEvent.Void -> {
                 put("kind", "void")
