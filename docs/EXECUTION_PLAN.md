@@ -869,10 +869,14 @@ lectura estable del módulo común; importación comida a comida a un borrador
 con la identidad de MyFitnessPal, sin cambiar el esquema de comidas; valores
 desconocidos sin dato, nunca `0`. Probada en JVM y en el Pixel con datos sintéticos
 (`OK (198 tests)`,
-[validación](validation/mfp-link-device-2026-11-28.md)). **Sin hacer todavía:**
-el inicio de sesión real, la página real saneada y la prueba de la segunda sesión (lista en el ADR 0032,
-«Pendiente con el Pixel y el propietario»). Hasta pasarlas la fase 8 no está
-cubierta.
+[validación](validation/mfp-link-device-2026-11-28.md)) y con la sesión real
+del propietario: inicio de sesión, lectura, importación y Hermes leyendo
+después ([validación](validation/mfp-link-real-session-2026-11-28.md)). El día
+se confirma con la dirección o con el campo de fecha de la propia página, y se
+admite `challenges.cloudflare.com` solo como recurso. **Sin hacer todavía:**
+la página real saneada como fixture, la decisión del propietario sobre la
+fibra ausente y un equivalente del disparo automático y del aviso remoto de
+Legacy. Hasta entonces la fase 8 no está cubierta.
 
 ### Entrega de modo sombra por repetición — 2026-11-28
 

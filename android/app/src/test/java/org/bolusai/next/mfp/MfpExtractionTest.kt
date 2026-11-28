@@ -16,7 +16,7 @@ class MfpExtractionTest {
     private fun answer(vararg lines: String): String =
         "\"" + lines.joinToString("\\n").replace("\"", "\\\"") + "\""
 
-    private val start = arrayOf("mfp-extract-v1", "url https%3A%2F%2Fwww.myfitnesspal.com%2Ffood%2Fdiary%3Fdate%3D2026-01-15",
+    private val start = arrayOf("mfp-extract-v2", "url https%3A%2F%2Fwww.myfitnesspal.com%2Ffood%2Fdiary%3Fdate%3D2026-01-15",
         "title Synthetic%20diary", "challenge 0", "locked 0")
 
     @Test fun readsMealsFoodsAndCellsAsUninterpretedText() {
@@ -45,8 +45,23 @@ class MfpExtractionTest {
         assertNull(page.httpStatus)
     }
 
+    @Test fun theDayThePageDeclaresIsPassedAsWritten() {
+        val today = "url https%3A%2F%2Fwww.myfitnesspal.com%2Ffood%2Fdiary"
+        val page = requireNotNull(MfpExtraction.decode(answer("mfp-extract-v2", today, start[2], start[3], start[4],
+            "day 2026-01-15", "meal", "h Breakfast", "h Calories", "h Carbs", "h Fat", "h Protein", "h Fiber",
+            "food Synthetic%20oats%2C%2040%20g", "c 150", "c 27", "c 2.5", "c 5", "c 4", "end"), null))
+
+        assertEquals(listOf("2026-01-15"), page.declaredDates)
+        // The address has no date: the page's own statement is what attributes it to the day.
+        val meal = (MfpTestData.interpreter.interpret(MfpTestData.date, page) as MfpDiaryReading.Diary).meals.single()
+        assertEquals("mfp:2026-01-15:breakfast", meal.id.text)
+        assertEquals(listOf("", "x"), requireNotNull(MfpExtraction.decode(
+            answer(*start, "day ", "day x", "end"), null)).declaredDates)
+        assertTrue(requireNotNull(MfpExtraction.decode(answer(*start, "end"), null)).declaredDates.isEmpty())
+    }
+
     @Test fun flagsAndStatusArePassedThroughNeverAssumed() {
-        val page = requireNotNull(MfpExtraction.decode(answer("mfp-extract-v1", "url https%3A%2F%2Fexample.org%2F",
+        val page = requireNotNull(MfpExtraction.decode(answer("mfp-extract-v2", "url https%3A%2F%2Fexample.org%2F",
             "title Just%20a%20moment", "challenge 1", "locked 1", "end"), 403))
         assertTrue(page.challengeMarker && page.lockedDiaryMarker)
         assertEquals(403, page.httpStatus)
@@ -58,7 +73,8 @@ class MfpExtractionTest {
         val bad = listOf(
             null, "null", "", "\"\"", "{}", "mfp-extract-v1",
             answer(*start),                                                    // no end
-            answer("mfp-extract-v2", *start.drop(1).toTypedArray(), "end"),    // another version
+            answer("mfp-extract-v1", *start.drop(1).toTypedArray(), "end"),    // another version
+            answer(*start, "meal", "h A", "day 2026-01-15", "end"),            // the day after a meal
             answer(*start, "h Breakfast", "end"),                              // header cell without meal
             answer(*start, "food x", "end"),                                   // food without meal
             answer(*start, "meal", "c 1", "end"),                              // cell without food
@@ -69,8 +85,8 @@ class MfpExtractionTest {
             answer(*start, "meal", "h %C3", "end"),                            // truncated UTF-8
             answer(*start, "meal", "h %ff", "end"),                            // invalid UTF-8
             answer(*start, "meal", "h %4", "end"),                             // truncated escape
-            answer("mfp-extract-v1", start[1], start[2], "challenge 2", "locked 0", "end"),
-            answer("mfp-extract-v1", start[2], start[1], "challenge 0", "locked 0", "end"),
+            answer("mfp-extract-v2", start[1], start[2], "challenge 2", "locked 0", "end"),
+            answer("mfp-extract-v2", start[2], start[1], "challenge 0", "locked 0", "end"),
             answer(*start, "end").dropLast(1),                                 // not a closed string literal
         )
         bad.forEach { assertNull(it.toString(), MfpExtraction.decode(it, 200)) }
@@ -93,6 +109,7 @@ class MfpExtractionTest {
     @Test fun scriptOnlyReadsThePage() {
         val script = MfpExtraction.SCRIPT
         assertTrue(script.contains("tr.meal_header") && script.contains("span.macro-value") && script.contains("cf-challenge"))
+        assertTrue(script.contains("input#date_selector"))
         listOf("fetch(", "XMLHttpRequest", "sendBeacon", "document.cookie", "localStorage", "sessionStorage", ".submit(",
             ".click(", "innerHTML =", "location.href =", "location.assign", "eval(", "postMessage").forEach {
             assertFalse(it, script.contains(it))

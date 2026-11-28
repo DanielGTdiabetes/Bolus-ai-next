@@ -38,7 +38,9 @@ internal fun page(
     challengeMarker: Boolean = false,
     lockedDiaryMarker: Boolean = false,
     httpStatus: Int? = null,
-): MfpDiaryPage = MfpDiaryPage(finalUrl, title, challengeMarker, lockedDiaryMarker, meals.toList(), httpStatus)
+    declaredDates: List<String> = emptyList(),
+): MfpDiaryPage =
+    MfpDiaryPage(finalUrl, title, challengeMarker, lockedDiaryMarker, meals.toList(), httpStatus, declaredDates)
 
 internal fun diary(page: MfpDiaryPage): MfpDiaryReading.Diary =
     interpreter.interpret(DAY, page) as MfpDiaryReading.Diary

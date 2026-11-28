@@ -86,6 +86,13 @@ internal class MfpWebSession(context: Context, private val answers: ((String) ->
 
     val blockedHosts: List<String> get() = synchronized(blocked) { blocked.toList() }
 
+    /**
+     * Address of the last page a reading extracted, after every redirect, without its fragment. Shown to the user when
+     * a reading fails, so "this is not the requested day" can be told from the address itself. Never logged or stored.
+     */
+    @Volatile var lastReadAddress: String? = null
+        private set
+
     /** Shows a page in the view. Only for an explicit action of the user. */
     fun open(url: String) {
         if (MfpHosts.mainFrameAllowed(url)) view.loadUrl(url) else block(url)
@@ -182,6 +189,7 @@ internal class MfpWebSession(context: Context, private val answers: ((String) ->
             }
             view.evaluateJavascript(MfpExtraction.SCRIPT) { answer ->
                 val page = MfpExtraction.decode(answer, request.httpStatus)
+                lastReadAddress = page?.finalUrl?.substringBefore('#')?.take(MAX_ADDRESS_SHOWN)
                 finish(request, page?.let { MfpPageLoad.Loaded(it) } ?: MfpPageLoad.Failed(MfpFailure.TRANSPORT_FAILED))
             }
         }
@@ -190,6 +198,9 @@ internal class MfpWebSession(context: Context, private val answers: ((String) ->
     companion object {
         /** How long one page load may take. A technical bound of the transport, not a clinical value. */
         const val LOAD_TIMEOUT_MS: Long = 30_000
+
+        /** How much of the last address is shown to the user. */
+        const val MAX_ADDRESS_SHOWN = 300
 
         /** How many blocked hosts are listed for the user. */
         const val MAX_BLOCKED_LISTED = 50

@@ -18,6 +18,7 @@ internal object SyntheticMfpDiary {
         <!DOCTYPE html>
         <html><head><meta charset="utf-8"><title>Synthetic diary</title></head><body>
         <img src="$THIRD_PARTY" alt="">
+        <input type="hidden" value="$DATE" name="hidden_date_selector" id="date_selector">
         <table>
           <tr class="meal_header">
             <td class="first alt">Breakfast</td>

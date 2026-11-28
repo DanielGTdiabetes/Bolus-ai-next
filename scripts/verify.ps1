@@ -357,8 +357,8 @@ try {
     }
     $mfpHostsText = Get-Content -Raw -LiteralPath $mfpHostsSource
     $namedHosts = @([regex]::Matches($mfpHostsText, '(?i)\b[a-z0-9.-]+\.(com|net|org|io|app|dev|es)\b') | ForEach-Object { $_.Value.ToLowerInvariant() } | Sort-Object -Unique)
-    if (($namedHosts -join ",") -cne "myfitnesspal.com,www.myfitnesspal.com") {
-        throw "The MyFitnessPal link may only name MyFitnessPal's own hosts (ADR 0032): $($namedHosts -join ', ')"
+    if (($namedHosts -join ",") -cne "challenges.cloudflare.com,myfitnesspal.com,www.myfitnesspal.com") {
+        throw "The MyFitnessPal link may only name MyFitnessPal's own hosts and the Cloudflare challenge its sign-in embeds (ADR 0032): $($namedHosts -join ', ')"
     }
     $mfpForbidden = @(Get-ChildItem -LiteralPath $appMain -Recurse -File |
         Select-String -Pattern 'addJavascriptInterface|api/integrations|sync-now|onrender\.com|\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b' -List)

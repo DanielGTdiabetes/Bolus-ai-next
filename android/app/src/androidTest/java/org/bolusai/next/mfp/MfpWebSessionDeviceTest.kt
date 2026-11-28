@@ -50,6 +50,7 @@ class MfpWebSessionDeviceTest {
         assertEquals(SyntheticMfpDiary.URL, loaded.page.finalUrl)
         assertEquals("Synthetic diary", loaded.page.title)
         assertFalse(loaded.page.challengeMarker || loaded.page.lockedDiaryMarker)
+        assertEquals(listOf(SyntheticMfpDiary.DATE), loaded.page.declaredDates)
         assertEquals(listOf("Breakfast", "Calories", "Carbs", "Fat", "Protein", "Fiber"),
             loaded.page.meals[0].header.map { it.trim() })
         val diary = interpreter.interpret(date, loaded.page) as MfpDiaryReading.Diary

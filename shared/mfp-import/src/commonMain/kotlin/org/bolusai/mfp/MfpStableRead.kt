@@ -23,8 +23,14 @@ sealed interface MfpStableReading {
      * identities that were not the same in the last two loads (edited, added or removed in between): they are not
      * imported and must be read again later. [loads] is how many loads were needed, two or three.
      */
-    data class Stable(val date: MfpDate, val meals: List<MfpMeal>, val changed: List<MfpMealId>, val loads: Int) :
-        MfpStableReading
+    data class Stable(
+        val date: MfpDate,
+        val meals: List<MfpMeal>,
+        val changed: List<MfpMealId>,
+        val loads: Int,
+        /** Column names of the last load, as [MfpDiaryReading.Diary.columns]. */
+        val columns: List<String> = emptyList(),
+    ) : MfpStableReading
 
     /** A load failed or was not a diary. Nothing from the loads before it is returned. */
     data class Failed(val failure: MfpFailure, val loads: Int) : MfpStableReading
@@ -60,7 +66,7 @@ class ReadStableMfpDiary(
                 val changed = (previous.meals.map { it.id } + current.meals.map { it.id }).distinct()
                     .filter { it !in stableIds }
                 if (changed.isEmpty() || load == MAX_LOADS) {
-                    return MfpStableReading.Stable(date, stable, changed, load)
+                    return MfpStableReading.Stable(date, stable, changed, load, current.columns)
                 }
             }
             previous = current

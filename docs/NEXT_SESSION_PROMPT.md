@@ -126,7 +126,17 @@ página sintética: `verify.ps1 -DeviceTests`, `OK (198 tests)`, con
 (docs/validation/mfp-link-device-2026-11-28.md). Nada se ha probado contra
 MyFitnessPal. Android 17 añade solo `ACCESS_LOCAL_NETWORK` a la app; Next no lo
 declara.
-SIGUIENTE PASO, con el Pixel y el propietario (ADR 0032, «Pendiente con el
+VALIDADO CON LA SESIÓN REAL el 2026-11-28
+(docs/validation/mfp-link-real-session-2026-11-28.md): el inicio de sesión
+necesita `challenges.cloudflare.com` (admitido solo como recurso); para el día
+de hoy MyFitnessPal quita `date=` de la dirección y el día se confirma con
+`input#date_selector` (`MfpDiaryPage.declaredDates`); totales reales correctos;
+importación sin duplicar; Hermes siguió leyendo con su sesión. El diario del
+propietario no tiene columna de fibra (cambiarla es de pago): Next la deja sin
+dato y Hermes envía `0` a `bolus_ai`. Decisión pendiente del propietario: regla
+para la fibra ausente de las comidas de MyFitnessPal. Vigilar unos días que
+`bolus_ai` sigue importando.
+PASOS ANTERIORES, ya hechos salvo la página saneada (ADR 0032, «Pendiente con el
 Pixel y el propietario»): inicio de sesión real y
 lectura de un día, anotando los hosts bloqueados; página real saneada como
 fixture (cabeceras y separador de miles de `/es/`); y prueba controlada de que

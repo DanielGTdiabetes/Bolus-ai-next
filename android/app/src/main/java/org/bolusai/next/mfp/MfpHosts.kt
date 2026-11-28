@@ -13,6 +13,13 @@ internal object MfpHosts {
     const val DIARY_HOST = "www.myfitnesspal.com"
     private const val DOMAIN = "myfitnesspal.com"
 
+    /**
+     * Cloudflare's challenge, which MyFitnessPal's sign-in page embeds. Observed on the Pixel on 2026-11-28: with it
+     * blocked the sign-in fails with a captcha verification error. Allowed only as something a page loads, never as
+     * the page shown. The other hosts that page asked for (analytics, telemetry, consent manager) stay blocked.
+     */
+    const val CHALLENGE_HOST = "challenges.cloudflare.com"
+
     /** The page the Legacy adapter reads (ADR 0032, "Adaptador del mini PC"): a read-only GET of one day. */
     fun diaryUrl(date: MfpDate): String = "https://$DIARY_HOST/food/diary?date=${date.text}"
 
@@ -22,12 +29,12 @@ internal object MfpHosts {
     /** The page shown in the session view: HTTPS and exactly the diary host. */
     fun mainFrameAllowed(url: String): Boolean = host(url) == DIARY_HOST
 
-    /** What a page may load: HTTPS from MyFitnessPal's own domain, or content that needs no connection. */
+    /** What a page may load: HTTPS from MyFitnessPal's own domain or [CHALLENGE_HOST], or content that needs no connection. */
     fun resourceAllowed(url: String): Boolean {
         val scheme = url.substringBefore(':', "").lowercase()
         if (scheme == "data" || scheme == "blob" || scheme == "about") return true
         val host = host(url) ?: return false
-        return host == DOMAIN || host.endsWith(".$DOMAIN")
+        return host == DOMAIN || host.endsWith(".$DOMAIN") || host == CHALLENGE_HOST
     }
 
     /**

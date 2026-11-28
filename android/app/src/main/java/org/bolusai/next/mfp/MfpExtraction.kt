@@ -15,8 +15,9 @@ import java.nio.charset.CodingErrorAction
  * The script answers with lines, one fact each, every text percent-encoded so no page content can imitate a line:
  *
  * ```text
- * mfp-extract-v1
+ * mfp-extract-v2
  * url <text>        title <text>        challenge 0|1        locked 0|1
+ * day <text>        the `value` attribute of each `input#date_selector`, before any meal
  * meal              one per `tr.meal_header`, followed by
  * h <text>          the text before any child element of each header cell
  * food <text>       a following row without `class`: the text of the link of its first cell
@@ -25,7 +26,7 @@ import java.nio.charset.CodingErrorAction
  * ```
  */
 internal object MfpExtraction {
-    const val VERSION = "mfp-extract-v1"
+    const val VERSION = "mfp-extract-v2"
 
     val SCRIPT: String = """
         (function () {
@@ -35,6 +36,8 @@ internal object MfpExtraction {
           var out = ['$VERSION', 'url ' + enc(location.href), 'title ' + enc(document.title),
             'challenge ' + (html.indexOf('cf-challenge') >= 0 ? '1' : '0'),
             'locked ' + (html.toLowerCase().indexOf('diary is locked with a key') >= 0 ? '1' : '0')];
+          var days = document.querySelectorAll('input#date_selector');
+          for (var d = 0; d < days.length; d++) out.push('day ' + enc(days[d].getAttribute('value')));
           var headers = document.querySelectorAll('tr.meal_header');
           for (var i = 0; i < headers.length; i++) {
             var row = headers[i];
@@ -77,6 +80,7 @@ internal object MfpExtraction {
         val challenge = flag(lines[3], "challenge ") ?: return null
         val locked = flag(lines[4], "locked ") ?: return null
 
+        val days = mutableListOf<String>()
         val meals = mutableListOf<MfpMealRows>()
         var header: MutableList<String>? = null
         var foods = mutableListOf<MfpFoodRow>()
@@ -95,6 +99,11 @@ internal object MfpExtraction {
         }
         for (line in lines.subList(5, lines.size - 1)) {
             when {
+                line.startsWith("day ") -> {
+                    // The page's own day comes before any meal.
+                    if (header != null || meals.isNotEmpty()) return null
+                    days.add(value(line, "day ") ?: return null)
+                }
                 line == "meal" -> { closeMeal(); header = mutableListOf() }
                 line.startsWith("h ") -> {
                     // Header cells come before any food of their meal.
@@ -115,7 +124,7 @@ internal object MfpExtraction {
             }
         }
         closeMeal()
-        return MfpDiaryPage(url, title, challenge, locked, meals, httpStatus)
+        return MfpDiaryPage(url, title, challenge, locked, meals, httpStatus, days)
     }
 
     private fun value(line: String, prefix: String): String? =

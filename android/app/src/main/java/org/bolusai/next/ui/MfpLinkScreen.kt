@@ -109,6 +109,12 @@ internal object MfpLinkText {
         is MfpImportOutcome.Failed -> "No se ha importado (${outcome.code})."
     }
 
+    fun columns(names: List<String>): String =
+        "Columnas que muestra tu diario en MyFitnessPal: ${names.joinToString(", ").ifEmpty { "ninguna" }}. " +
+            "Un nutriente sin columna queda sin dato."
+
+    fun address(url: String): String = "Dirección final de la última página leída: $url"
+
     fun blocked(hosts: List<String>): String =
         "Direcciones que la página pidió y Next no dejó salir: ${hosts.joinToString(", ")}"
 }
@@ -121,6 +127,8 @@ internal class MfpLinkScreen(
     /** The session view when one exists. It is created only by an explicit action while the link is on. */
     private val web: View?,
     private val blockedHosts: List<String>,
+    /** Final address of the last page read, shown with a failed reading. */
+    private val lastReadAddress: String?,
     private val signedOut: Boolean,
     private val zone: ZoneId,
     private val toggle: (Boolean) -> Unit,
@@ -190,11 +198,14 @@ internal class MfpLinkScreen(
 
     private fun result(view: MfpReadingView) {
         when (val reading = view.reading) {
-            is MfpStableReading.Failed ->
+            is MfpStableReading.Failed -> {
                 label(MfpLinkText.failure(reading.failure), "mfp:failure", ink = R.color.error_text)
+                lastReadAddress?.let { label(MfpLinkText.address(it), "mfp:address", 12f, ink = R.color.secondary_text) }
+            }
             is MfpStableReading.Stable -> {
                 label(MfpLinkText.readAt(view.readAtEpochMs, zone, reading.loads), "mfp:read_at", 13f,
                     ink = R.color.secondary_text)
+                label(MfpLinkText.columns(reading.columns), "mfp:columns", 13f, ink = R.color.secondary_text)
                 if (reading.changed.isNotEmpty()) {
                     label(MfpLinkText.changed(reading.changed.map { it.text }), "mfp:changed", ink = R.color.error_text)
                 }

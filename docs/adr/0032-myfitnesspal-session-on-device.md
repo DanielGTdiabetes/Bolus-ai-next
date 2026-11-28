@@ -2,10 +2,10 @@
 
 - Estado: **aceptado; primera y segunda entrega implementadas** (módulo común
   `shared/mfp-import` y enlace Android con `WebView`, interruptor e importación
-  al borrador). Las pruebas de dispositivo pasan en el Pixel con una página
-  sintética. **Sin probar todavía con una sesión real**: faltan el inicio de
-  sesión del propietario, la página real saneada y la prueba controlada de la
-  segunda sesión
+  al borrador). Probado en el Pixel con una página sintética y, el 2026-11-28,
+  con la sesión real del propietario: inicio de sesión, lectura de dos días,
+  importación de una comida y comprobación de que Hermes sigue leyendo. Falta
+  la página real saneada como fixture
 - Fecha: 2026-11-28
 - Fase y criterio de aceptación: fase 8 (enlace MyFitnessPal con independencia
   del cálculo local)
@@ -382,12 +382,57 @@ sintética servida por la propia prueba, sin red.
 
 1. Hecho: `scripts/verify.ps1 -DeviceTests`, `OK (198 tests)`. El `WebView`
    informa el estado HTTP de una página rechazada (403).
-2. Inicio de sesión real del propietario y lectura de un día. Anotar qué hosts
-   aparecen bloqueados y si el inicio de sesión funciona con ellos.
-3. Página real saneada como fixture: texto exacto de las cabeceras y separador
-   de miles de la versión `/es/`.
-4. Prueba controlada de la segunda sesión: comprobar que Hermes sigue leyendo
-   después de iniciar sesión en Next.
+2. Hecho el 2026-11-28: inicio de sesión real y lectura de dos días (véase
+   «Validación con la sesión real»).
+3. Pendiente: página real saneada como fixture. Las cabeceras ya están
+   confirmadas; el separador de miles de la versión `/es/` sigue sin
+   comprobar (la página se sirvió en inglés).
+4. Hecho el 2026-11-28: Hermes sigue leyendo tras la segunda sesión.
+
+## Validación con la sesión real (2026-11-28)
+
+Con el propietario, en el Pixel
+([validación](../validation/mfp-link-real-session-2026-11-28.md)). Lo
+observado cambió tres cosas:
+
+1. **Comprobación de Cloudflare.** Con solo los hosts de MyFitnessPal el
+   inicio de sesión falla con un error de verificación de captcha. La página
+   pide `challenges.cloudflare.com`, que ahora se admite únicamente como
+   recurso de una página, nunca como página mostrada. Los demás dominios que
+   piden la página de inicio de sesión y el diario (publicidad, analítica,
+   telemetría y el gestor de consentimiento) siguen bloqueados y el diario se
+   lee igual.
+2. **El día de hoy no va en la dirección.** MyFitnessPal redirige
+   `/food/diary?date=<hoy>` a `/food/diary`; para otro día conserva `date=`.
+   La página declara su día en `input#date_selector` (atributo `value`,
+   `AAAA-MM-DD`). El día queda confirmado si al menos una fuente lo declara (la
+   dirección o ese campo) y ninguna declara otro. Una página sin ninguna
+   declaración nunca se toma por «hoy». El formato `AAAA-MM-DD` del parámetro
+   es correcto: con el día anterior la dirección lo conserva y el diario es el
+   de ese día.
+3. **Columnas visibles.** El resultado de una lectura muestra las columnas del
+   diario, para que «sin dato» se entienda. Cuando una lectura falla se muestra
+   la dirección final de la última página leída.
+
+Confirmado con datos reales: la tabla tiene la forma descrita en este ADR, las
+cabeceras se leen en inglés y en minúsculas, los totales coinciden con los que
+el propietario ve en MyFitnessPal, dos cargas bastan y la importación crea el
+borrador y no lo duplica.
+
+**Fibra.** El diario del propietario muestra calorías, hidratos, grasa,
+proteína, sodio y azúcar; cambiar las columnas exige la versión de pago. Next
+deja la fibra sin dato. El adaptador de Hermes, releído ese día en solo
+lectura, devuelve `0.0` cuando el nutriente no está en la tabla
+(`mfp_adapter._nutrient`), así que `bolus_ai` recibe fibra `0` en todas las
+comidas de MyFitnessPal. Next no copia ese cero. Queda como decisión del
+propietario si quiere declarar una regla para la fibra ausente de estas
+comidas; mientras tanto Bolo la pide.
+
+**Segunda sesión.** Tras el inicio de sesión en Next, el disparador de Hermes
+se activó al cerrar la app de MyFitnessPal y leyó el diario con su propia
+sesión: cookies presentes, respuesta 200, mismas comidas, `no_changes`, sin
+fallos. No hay evidencia a más de unos minutos; una invalidación posterior se
+vería como fallos de sesión en Hermes.
 
 ## Alternativas descartadas
 

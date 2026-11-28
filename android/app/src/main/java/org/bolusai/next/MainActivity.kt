@@ -433,7 +433,7 @@ class MainActivity : ComponentActivity() {
      */
     private fun renderMfp() {
         MfpLinkScreen(this, findViewById(R.id.screen_content), mfp, mfpSession?.view,
-            mfpSession?.blockedHosts.orEmpty(), mfpSignedOut, java.time.ZoneId.systemDefault(),
+            mfpSession?.blockedHosts.orEmpty(), mfpSession?.lastReadAddress, mfpSignedOut, java.time.ZoneId.systemDefault(),
             toggle = { enabled ->
                 if (mfp.setEnabled(enabled) && !enabled) closeMfpSession()
                 mfpSignedOut = false
