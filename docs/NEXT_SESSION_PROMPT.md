@@ -106,10 +106,15 @@ SIGUIENTE
   pruebas ya ejecutadas sin cambios que lo justifiquen. En esta sesión Codex
   hizo las pruebas del Pixel mientras Claude avanzaba desde la nube, sin
   modificar la implementación de perfil o motor de Claude.
-- Modo sombra (fase 9, ADR 0030): la herramienta de repetición está hecha y
-  probada con datos sintéticos. Falta ejecutarla con datos reales: el
-  propietario decide cómo dar acceso de solo lectura a `treatments` y a los
-  ajustes de Legacy. Triar cada `MISMATCH` y añadir su prueba. Los datos
+- Modo sombra (fase 9, ADR 0030): ejecutado el 2026-11-28 con los 325
+  cálculos reales de Legacy: 318 comparables, 318 coincidencias, 0 diferencias,
+  7 no comparables por reducción de ejercicio
+  (docs/validation/shadow-replay-real-data-2026-11-28.md). El propietario
+  autorizó leer la base del NAS por Portainer, solo `SELECT`; usar `psql` sin
+  terminal y con `-P pager=off`, o se queda colgado. Para que esos 7 sean
+  comparables hay que implementar la reducción por ejercicio. Repetir la
+  exportación cuando haya más cálculos. Triar cada `MISMATCH` y añadir su
+  prueba. Los datos
   reales y el detalle no entran en el repositorio; solo el resumen de
   recuentos. Legacy también está instalada en el Pixel y puede consultarse en
   solo lectura. La sombra en vivo en el móvil y la comparación de lo escrito

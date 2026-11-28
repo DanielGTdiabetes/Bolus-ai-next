@@ -27,7 +27,7 @@ import kotlin.math.max
  * database, records a treatment or changes Legacy: the caller passes minimised text records and gets a comparison.
  *
  * A comparison is a match only when the inputs are known to be equivalent. Anything Legacy applied that Next does
- * not (autosens, Techne, exercise, IOB ceiling, stale or absent glucose) or anything the trace does not carry makes
+ * not (Techne, exercise, IOB ceiling, stale or absent glucose) or anything the trace does not carry makes
  * the record not comparable; an unexplained difference is a mismatch and is never counted as a match.
  */
 public enum class ShadowClass {
@@ -40,7 +40,7 @@ public enum class ShadowClass {
     /** Same result only with the `normal` Warsaw strategy, which the trace does not record. */
     MATCH_STRATEGY_INFERRED,
 
-    /** Same result within the two decimals the trace keeps of the IOB. */
+    /** Same result within what the trace keeps: two decimals of the IOB, three of the autosens-adjusted ratios. */
     MATCH_WITHIN_TRACE_PRECISION,
 
     /** Equivalent inputs, different result. To be explained, reproduced and covered by a test. */
@@ -88,6 +88,9 @@ public object ShadowReplay {
 
     /** The total is stored unrounded; only binary noise is tolerated. */
     public const val TOTAL_TOLERANCE: Double = 1e-9
+
+    /** Half of the last decimal the trace keeps of the ratio and the sensitivity adjusted by autosens. */
+    public const val TRACE_RATIO_HALF_STEP: Double = 0.0005
 
     /** Half of the last decimal the trace keeps of the IOB. */
     public const val TRACE_IOB_HALF_STEP: Double = 0.005
@@ -169,10 +172,13 @@ public object ShadowReplay {
             "true" -> reasons += "legacy.glucose_stale"
             else -> reasons += "trace.missing.glucose_stale"
         }
+        // Autosens only changes the ratio and the sensitivity, and the trace stores both already adjusted (with three
+        // decimals), so the replay uses them as given. It is noted, not excluded.
+        val notes = mutableListOf<String>()
         when (val ratio = f["autosens_ratio"]?.toDoubleOrNull()) {
             null -> reasons += "trace.missing.autosens_ratio"
             1.0 -> Unit
-            else -> if (ratio.isFinite()) reasons += "legacy.autosens_active" else reasons += "trace.missing.autosens_ratio"
+            else -> if (ratio.isFinite()) notes += "autosens.effective_ratios_replayed" else reasons += "trace.missing.autosens_ratio"
         }
         when (f["techne_enabled"]) {
             "false" -> Unit
@@ -248,7 +254,7 @@ public object ShadowReplay {
             val unverified = !settingsVerified
             return ShadowComparison(calculation.reference,
                 if (unverified && klass == ShadowClass.MATCH) ShadowClass.MATCH_SETTINGS_UNVERIFIED else klass,
-                why.toList() + if (unverified) listOf("settings.unverified_for_nutrients") else emptyList(), list)
+                why.toList() + (if (unverified) listOf("settings.unverified_for_nutrients") else emptyList()) + notes, list)
         }
         if (baseDiffs.all { it.equal }) return matched(ShadowClass.MATCH, baseDiffs)
 
@@ -270,12 +276,30 @@ public object ShadowReplay {
         ) {
             return matched(ShadowClass.MATCH_WITHIN_TRACE_PRECISION, baseDiffs, "iob.trace_rounded_to_two_decimals")
         }
+        // With autosens the trace stores the adjusted ratio and sensitivity with three decimals. The same total with
+        // components inside the error those decimals allow is explained by the trace, not by a rule.
+        if (notes.isNotEmpty() && baseDiffs.first { it.name == "total_u" }.equal) {
+            val mealSlack = abs(baseDiffs.first { it.name == "meal_u" }.next) * TRACE_RATIO_HALF_STEP / cr!!.value
+            val correctionSlack = abs(baseDiffs.first { it.name == "correction_u" }.next) * TRACE_RATIO_HALF_STEP / isf!!.value
+            val explained = baseDiffs.all {
+                val slack = when (it.name) {
+                    "meal_u" -> mealSlack
+                    "correction_u", "iob_applied_u" -> correctionSlack
+                    else -> 0.0
+                }
+                abs(it.legacy - it.next) <= it.tolerance + slack
+            }
+            if (explained) {
+                return matched(ShadowClass.MATCH_WITHIN_TRACE_PRECISION, baseDiffs,
+                    "autosens.effective_ratio_rounded_to_three_decimals")
+            }
+        }
         if (!settingsVerified) {
             reasons += "settings.unverified_for_nutrients"
             return notComparable()
         }
         return ShadowComparison(calculation.reference, ShadowClass.MISMATCH,
-            baseDiffs.filterNot { it.equal }.map { "differs.${it.name}" }, baseDiffs)
+            baseDiffs.filterNot { it.equal }.map { "differs.${it.name}" } + notes, baseDiffs)
     }
 
     public fun compareAll(input: ShadowInput): List<ShadowComparison> = input.calculations.map { compare(it, input.settings) }
