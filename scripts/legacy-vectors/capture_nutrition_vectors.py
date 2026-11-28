@@ -16,6 +16,7 @@ import pathlib
 import subprocess
 import sys
 
+sys.dont_write_bytecode = True  # never leave a generated file next to the scripts
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 from capture_candidate_vectors import kotlin_double, load_core  # noqa: E402
 
