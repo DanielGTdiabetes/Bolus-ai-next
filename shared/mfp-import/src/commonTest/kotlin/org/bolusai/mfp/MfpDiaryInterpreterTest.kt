@@ -143,6 +143,19 @@ class MfpDiaryInterpreterTest {
         assertEquals(MfpFailure.entries.size, MfpFailure.entries.map { it.code }.toSet().size)
     }
 
+    /** A page in another language reads no nutrient and names the meals differently: it is not imported at all. */
+    @Test fun aDiaryWithoutAnyKnownNutrientColumnIsNotAReading() {
+        val spanish = listOf("Calorías", "Carbohidratos", "Grasas", "Proteínas", "Fibra")
+        assertEquals(MfpFailure.COLUMNS_NOT_RECOGNIZED, failure(page(mealRows("Desayuno", OATS, columns = spanish))))
+        assertEquals(MfpFailure.COLUMNS_NOT_RECOGNIZED,
+            failure(page(mealRows("Breakfast", food("Synthetic salt, 1 g", "400", "0"), columns = listOf("Sodium", "Sugar")))))
+        assertEquals(MfpFailure.COLUMNS_NOT_RECOGNIZED, failure(page(MfpMealRows(listOf("Breakfast"), listOf(OATS)))))
+        // One known column is enough: the others stay unknown, as before.
+        val onlyCarbs = diary(page(mealRows("Breakfast", food("Synthetic rice, 100 g", "28"), columns = listOf("Carbs"))))
+        assertEquals(known(28_000), onlyCarbs.meals.single().totals.carbohydrates)
+        assertEquals(unknown(MfpUnknown.COLUMN_ABSENT), onlyCarbs.meals.single().totals.fat)
+    }
+
     /** Observed on the real page: for today MyFitnessPal drops `date=` from the address and the page states the day. */
     @Test fun thePageItselfMayStateTheDayWhenTheAddressDoesNot() {
         val rows = mealRows("Breakfast", OATS)

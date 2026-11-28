@@ -71,6 +71,9 @@ internal object MfpLinkText {
         MfpFailure.DATE_NOT_CONFIRMED -> "La página no confirma que sea el día pedido. No se atribuye a ese día."
         MfpFailure.UNEXPECTED_PAGE -> "La página no es el diario. Si pide iniciar sesión, hazlo abajo y vuelve a leer."
         MfpFailure.AMBIGUOUS_MEALS -> "El diario tiene una comida sin nombre o dos con el mismo nombre; no se pueden distinguir."
+        MfpFailure.COLUMNS_NOT_RECOGNIZED -> "El diario no muestra ninguna columna que Next reconozca (hidratos, grasa, " +
+            "proteína, fibra o energía, con sus nombres en inglés). Puede que la página haya llegado en otro idioma. " +
+            "No se importa nada."
         MfpFailure.TRANSPORT_FAILED -> "No se pudo cargar la página: sin red, tiempo agotado o respuesta ilegible."
     } + " (${failure.code}) $NOT_USED"
 
