@@ -1,7 +1,9 @@
 # ADR 0032: enlace MyFitnessPal por sesión en el propio móvil
 
-- Estado: **propuesto**, con la auditoría completa. Recoge las decisiones del
-  propietario, cómo lee Legacy el diario y el diseño. No hay código todavía
+- Estado: **aceptado; primera entrega implementada** (módulo común
+  `shared/mfp-import`, sin red ni sesión). La segunda entrega (red, `WebView`,
+  importación al borrador y pruebas en el Pixel) sigue pendiente y necesita al
+  propietario
 - Fecha: 2026-11-28
 - Fase y criterio de aceptación: fase 8 (enlace MyFitnessPal con independencia
   del cálculo local)
@@ -153,8 +155,9 @@ y la analiza:
   SHA-256 del contenido canónico, para distinguir comida nueva, revisión y
   reimportación idéntica.
 - Misma regla de estabilidad: dos lecturas consecutivas iguales.
-- Mismo control de coherencia: total de hidratos frente a la suma de alimentos.
-  El umbral de 1 g es un valor de Legacy; se adopta como candidato observado.
+- El control de coherencia de Legacy (total de hidratos frente a la suma de
+  alimentos, 1 g) no se adopta: la auditoría del adaptador mostró que compara
+  dos valores salidos de las mismas filas. En Next el total es la suma.
 - Importación a un borrador de comida revisable con hidratos, grasa, proteína y
   fibra como total en gramos, conservando origen, identidad, revisión, instante
   de lectura y lista de alimentos. Un macro que MyFitnessPal no dé queda sin
@@ -205,6 +208,79 @@ misma sesión del navegador (la página se carga en el `WebView` y se extraen la
 filas con un guion mínimo; la interpretación queda en el módulo común),
 interruptor apagado por defecto, importación al borrador de comida con su
 procedencia y pruebas en dispositivo con una página local saneada.
+
+## Primera entrega implementada (2026-11-28)
+
+Módulo `shared/mfp-import`, paquete `org.bolusai.mfp`, Kotlin Multiplatform
+como `shared/meal-drafts`. No depende de ningún otro módulo ni de APIs de
+plataforma, no abre conexiones y nada lo usa todavía; `scripts/verify.ps1` lo
+comprueba. No se usó el teléfono, la red ni ninguna sesión. Legacy no se
+volvió a leer: las reglas salen de este ADR.
+
+- **Entrada** (`MfpDiaryPage`): dirección final, título, marca `cf-challenge`,
+  marca de diario protegido, estado HTTP si la plataforma lo conoce (si no,
+  `null`; nunca se supone 200) y, por comida, los textos de las celdas de la
+  cabecera y las filas de alimentos (nombre y textos de celdas). Todo texto
+  sin interpretar.
+- **Interpretación** (`MfpDiaryInterpreter`): nombre de comida y columnas sin
+  espacios alrededor y en minúsculas, `carbs` = `carbohydrates`, columnas de
+  la primera cabecera para todas las comidas, celdas sobrantes ignoradas. Se
+  leen hidratos, grasa, proteína, fibra y calorías; las demás columnas se
+  ignoran. Las comidas sin alimentos se omiten.
+- **Números** (`MfpAmount`): milésimas exactas en `Long`, sin `Double`. Valor
+  conocido o desconocido con motivo: `mfp.value.column_absent`,
+  `column_ambiguous`, `cell_absent`, `unreadable`, `negative` y
+  `food_unknown`. El total de una comida es la suma exacta de sus alimentos y
+  es desconocido si lo es alguno. Desconocido nunca vale `0`.
+- **Fallos** (`MfpFailure`), en este orden: `mfp.page.host_not_allowed`,
+  `consent_required`, `challenge`, `blocked`, `session_rejected` (401, 403),
+  `rate_limited` (429), `server_error` (500 o más), `diary_locked`,
+  `unexpected` (otro estado que no sea 2xx o ninguna cabecera de comida),
+  `date_not_confirmed` y `ambiguous_meals`. `mfp.read.transport_failed` queda
+  para el puerto de lectura.
+- **Identidad y revisión**: `mfp:<fecha>:<comida>` y SHA-256 del texto
+  canónico `mfp-meal-revision-v1` (una línea por dato, orden fijo, `\`, salto
+  de línea y retorno de carro escapados, desconocido escrito como `unknown`).
+  El hash llega por el puerto `MfpSha256`. `compare` distingue comida nueva,
+  revisión nueva y reimportación idéntica.
+- **Estabilidad** (`ReadStableMfpDiary`): puertos `MfpDiaryReader` y
+  `MfpPause`. Dos cargas separadas por la pausa de 4 s; si difieren, una
+  tercera. Devuelve las comidas de la última carga cuya revisión coincide con
+  la anterior y la lista de identidades que cambiaron, aparecieron o
+  desaparecieron entre las dos últimas. Si una carga falla no se devuelve nada
+  de las anteriores, y cada llamada vuelve a cargar.
+
+Diferencias de seguridad añadidas al implementar, además de las del plan:
+
+1. **Coma decimal.** La librería de Legacy borra las comas, así que `1,5` se
+   leería como `15`. Aquí una coma solo se acepta como separador de miles
+   (entre dígitos y seguida de exactamente tres dígitos); cualquier otra deja
+   el valor desconocido.
+2. **Forma del número.** Tras el filtrado solo se acepta `dígitos` o
+   `dígitos.dígitos` con un máximo de 9 enteros y 3 decimales (límite de
+   representación, no clínico). `.5`, `5.`, `1.2.3` o más decimales son
+   desconocidos.
+3. **Día confirmado.** La dirección final debe llevar `date=` con el día
+   pedido; si falta o es otro, `mfp.page.date_not_confirmed`. Evita atribuir a
+   un día el diario de otro si MyFitnessPal redirige.
+4. **Identidades únicas.** Una comida sin nombre o dos con el mismo nombre dan
+   `mfp.page.ambiguous_meals`. Una columna repetida en la cabecera deja ese
+   nutriente desconocido.
+5. **Cantidad y unidad.** La expresión es la de este ADR con las letras y
+   dígitos Unicode escritos de forma explícita, porque `\w` solo es Unicode en
+   Python; así `ración` no se corta. La cantidad se guarda como texto.
+
+Pendiente de comprobar con una página real (punto 1 de «Lo que falta»): el
+texto exacto de las cabeceras (el extractor debe entregar el texto anterior a
+cualquier elemento hijo, como hace la librería) y si la versión `/es/` usa el
+punto como separador de miles; en ese caso `1.234` se leería como 1,234 y no
+como 1234. Si un nombre de columna no coincide, el nutriente queda
+desconocido, no en `0`.
+
+Pruebas: 28 en `commonTest` con datos sintéticos (interpretación, cada motivo
+de desconocido, cada fallo, host, fechas, texto canónico, identidad y
+revisión, estabilidad a la segunda y a la tercera, inestable, comidas añadidas
+o quitadas, fallo sin reutilizar lecturas y reimportación idéntica).
 
 ## Alternativas descartadas
 
