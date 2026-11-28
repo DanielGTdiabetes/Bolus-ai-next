@@ -157,6 +157,16 @@ el enlace inyectan `MainActivity.mfpSwitchFactory` y `MainActivity.mfpAnswers`.
 Sin decidir: equivalente del disparo automático al cerrar MyFitnessPal y del
 aviso remoto de revisión de Legacy.
 
+BLOQUEO DURABLE DE DEXCOM LEVANTADO — 2026-11-28
+Next no registraba lecturas en el Pixel desde el 2026-11-15: bloqueo durable
+`producer_version_changed` tras un cambio de versión de Dexcom ese día (luego
+reinstalada en 4537, mismo firmante, otro binario). El propietario decidió
+levantarlo: política `adr0023-i2b-2026-11-28`, mismas anclas y conjunto.
+Gluroo solicita el permiso Dexcom sin tenerlo: si lo obtiene, o si Dexcom
+cambia de versión, vuelve el bloqueo y hace falta decisión nueva. Pendiente:
+que Diagnóstico muestre el bloqueo guardado (`gate_now` no lo consulta).
+Ver docs/validation/dexcom-durable-block-2026-11-28.md.
+
 ESCRITURA EN DEXCOM — AVISO DEL PROPIETARIO 2026-11-28
 Legacy escribe en el historial de la app Dexcom todos los bolos y la insulina
 basal (también hidratos, ejercicio y notas): el Companion envía broadcasts a
