@@ -11,8 +11,12 @@
          docs/validation/pixel-dexcom-and-calculation-2026-10-12.md. This exception applies to this permission only. -->
     <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES"
         tools:ignore="QueryAllPackagesPermission" />
+    <!-- ADR 0032: only the MyFitnessPal link uses the network, in one session class limited by code to MyFitnessPal's
+         own hosts, switched off by default. The local calculation path never needs it. verify.ps1 keeps it so. -->
+    <uses-permission android:name="android.permission.INTERNET" />
     <application
         android:allowBackup="false"
+        android:usesCleartextTraffic="false"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="false"
         android:icon="@drawable/ic_launcher"

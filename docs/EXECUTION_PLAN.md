@@ -862,9 +862,17 @@ estable, identidad `mfp:<fecha>:<comida>`, revisión SHA-256 y lectura estable
 no configurada es desconocido, nunca `0`, y el total de una comida es
 desconocido si lo es algún alimento. Cubre de la fase 8 la parte de dominio de
 los puntos 2 y 4 (identidad, huella, comida nueva, revisión y reimportación).
-Falta la segunda entrega, con el Pixel y el propietario: permiso de red
-limitado a MyFitnessPal, inicio de sesión en `WebView`, importación al borrador
-revisable y pruebas en dispositivo. Hasta entonces la fase 8 no está cubierta.
+Segunda entrega escrita el 2026-11-28: enlace Android en Ajustes del móvil,
+apagado por defecto. Permiso de red usado solo por la sesión `WebView`,
+limitada por código a los hosts de MyFitnessPal; lectura a petición con la
+lectura estable del módulo común; importación comida a comida a un borrador
+con la identidad de MyFitnessPal, sin cambiar el esquema de comidas; valores
+desconocidos sin dato, nunca `0`. Probada en JVM y en el Pixel con datos sintéticos
+(`OK (198 tests)`,
+[validación](validation/mfp-link-device-2026-11-28.md)). **Sin hacer todavía:**
+el inicio de sesión real, la página real saneada y la prueba de la segunda sesión (lista en el ADR 0032,
+«Pendiente con el Pixel y el propietario»). Hasta pasarlas la fase 8 no está
+cubierta.
 
 ### Entrega de modo sombra por repetición — 2026-11-28
 

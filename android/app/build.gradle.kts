@@ -48,6 +48,8 @@ dependencies {
     implementation(project(":shared:dexcom-g7-payload"))
     // ADR 0028: local dose ledger; the engine never depends on it, the app translates it into a DoseHistory.
     implementation(project(":shared:insulin-history"))
+    // ADR 0032: interpretation of the MyFitnessPal diary; verify.ps1 limits it to the link files.
+    implementation(project(":shared:mfp-import"))
 
     testImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test:runner:1.7.0")

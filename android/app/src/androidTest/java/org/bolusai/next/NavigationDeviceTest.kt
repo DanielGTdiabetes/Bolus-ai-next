@@ -266,10 +266,12 @@ class NavigationDeviceTest {
         }
     }
 
-    @Test fun appHasNoInternetPermissionAndColdEntryContainsOnlyUnavailableData() {
+    @Test fun networkLinkIsOffAndColdEntryContainsOnlyUnavailableData() {
         val context = instrumentation.targetContext
-        assertEquals(PackageManager.PERMISSION_DENIED,
+        // ADR 0032: the Internet permission exists for the MyFitnessPal link alone, and that link is off here.
+        assertEquals(PackageManager.PERMISSION_GRANTED,
             context.packageManager.checkPermission("android.permission.INTERNET", context.packageName))
+        assertEquals(false, MainActivity.mfpSwitch(context).enabled)
         launch().use { scenario ->
             assertRoute(scenario, Destination.HOME)
             scenario.onActivity { activity ->

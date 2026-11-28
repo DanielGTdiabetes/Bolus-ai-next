@@ -17,6 +17,8 @@ class ProfileIsolationTestRunner : AndroidJUnitRunner() {
         ProfileStorageGuard.activateForInstrumentation()
         DexcomStorageGuard.activateForInstrumentation()
         org.bolusai.next.doses.DoseStorageGuard.activateForInstrumentation()
+        // ADR 0032: no test reaches MyFitnessPal, the app's own cookies or its stored switch.
+        org.bolusai.next.mfp.MfpLinkGuard.activateForInstrumentation()
         super.onCreate(arguments)
     }
 }

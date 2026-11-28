@@ -237,6 +237,15 @@ tratamiento; nada se sincroniza. Véase el
 de la página del diario de MyFitnessPal: comidas con totales exactos o valores
 desconocidos, fallos con código estable, identidad, revisión y lectura estable.
 No abre conexiones ni guarda sesión; la carga de la página, la pausa y el
-SHA-256 son puertos que pondrá la plataforma. Nada lo usa todavía: el adaptador
-Android con `WebView` es la segunda entrega del
+SHA-256 son puertos que pone la plataforma.
+
+En Android el enlace es la única parte de la app que usa la red. Nace apagado.
+`MfpWebSession` es la única clase que abre conexiones: un `WebView` con la
+sesión del usuario, limitado por `MfpHosts` a los hosts de MyFitnessPal por
+HTTPS. `MfpExtraction` saca el texto de la página y el módulo común lo
+interpreta. `ImportMfpMeal` convierte una comida leída en un borrador revisable
+de `shared/meal-drafts`, con la identidad de MyFitnessPal y sin tocar el
+esquema; el motor, el perfil, el registro de dosis y Dexcom no ven datos de
+MyFitnessPal. El camino local de cálculo no depende de este enlace. Detalle y
+pendientes de dispositivo en el
 [ADR 0032](adr/0032-myfitnesspal-session-on-device.md).

@@ -73,6 +73,19 @@ import org.bolusai.next.ui.DoseHistoryScreen
 import org.bolusai.next.ui.DoseHistoryText
 import org.bolusai.profile.DecimalInput
 import org.bolusai.profile.DecimalInputs
+import org.bolusai.mfp.MfpDate
+import org.bolusai.mfp.MfpDiaryReader
+import org.bolusai.mfp.MfpMeal
+import org.bolusai.next.application.ImportMfpMeal
+import org.bolusai.next.mfp.MfpHosts
+import org.bolusai.next.mfp.MfpLinkGuard
+import org.bolusai.next.mfp.MfpLinkSwitch
+import org.bolusai.next.mfp.MfpWebSession
+import org.bolusai.next.mfp.StoredMfpLinkSwitch
+import org.bolusai.next.mfp.VolatileMfpLinkSwitch
+import org.bolusai.next.ui.MfpLinkModel
+import org.bolusai.next.ui.MfpLinkScreen
+import org.bolusai.next.ui.MfpLinkText
 import java.util.UUID
 
 class MainActivity : ComponentActivity() {
@@ -97,6 +110,13 @@ class MainActivity : ComponentActivity() {
     private lateinit var dexcomReading: DexcomReadingModel
     private lateinit var testCalculation: TestCalculationModel
     private lateinit var doseHistory: DoseHistoryModel
+    private lateinit var mfp: MfpLinkModel
+    /**
+     * ADR 0032: the MyFitnessPal session exists only while the link is on and its screen is open. It is built by an
+     * explicit action of the user and destroyed on leaving the screen, on switching the link off and with the activity.
+     */
+    private var mfpSession: MfpWebSession? = null
+    private var mfpSignedOut = false
     private val overview = ReadOverview(ReadLocalGlucoseStatus(PendingDexcomSource))
     private val backCallback = object : OnBackPressedCallback(false) {
         override fun handleOnBackPressed() = goBack()
@@ -158,9 +178,16 @@ class MainActivity : ComponentActivity() {
                 return DoseHistoryModel(ledger, DoseHistoryLog(ledger, DoseClock { clock() }, writer())) as T
             }
         })[DoseHistoryModel::class.java]
+        mfp = ViewModelProvider(this, object : ViewModelProvider.Factory {
+            @Suppress("UNCHECKED_CAST")
+            override fun <T : ViewModel> create(modelClass: Class<T>): T =
+                MfpLinkModel(mfpSwitch(applicationContext), clock,
+                    java.time.Instant.ofEpochMilli(clock()).atZone(java.time.ZoneId.systemDefault()).toLocalDate().toString()) as T
+        })[MfpLinkModel::class.java]
+        mfp.changed = { if (navigation.current == Destination.MOBILE_SETTINGS) { rememberScroll(); render() } }
         renderer = ScreenRenderer(this, findViewById(R.id.screen_content), ::open,
             { settingsSection = it; profileDetailsOpen = false; render() }, ::renderMeals, ::renderSelection, ::renderProfile,
-            ::renderTestCalculation)
+            ::renderTestCalculation, ::renderMfp)
         meals.changed = { render() }
         // Keep the reading position while the profile section rebuilds after a model change.
         // Bolo and Diagnóstico repaint too, so a finished read replaces the pending one in their details (B7).
@@ -201,6 +228,7 @@ class MainActivity : ComponentActivity() {
         super.onResume()
         refreshReview(navigation.current)
         if (showsDexcomReading(navigation.current)) dexcomReading.load()
+        mfpSession?.resume()
         val position = pausedPosition
         pausedPosition = null
         if (!isReviewDestination(navigation.current) && position != null) {
@@ -217,6 +245,7 @@ class MainActivity : ComponentActivity() {
     override fun onPause() {
         rememberScroll()
         pausedPosition = navigation.current to findViewById<ScrollView>(R.id.screen_scroll).scrollY
+        mfpSession?.pause()
         super.onPause()
     }
 
@@ -252,6 +281,8 @@ class MainActivity : ComponentActivity() {
         profile.changed = null
         dexcomLog.changed = null
         dexcomReading.changed = null
+        mfp.changed = null
+        closeMfpSession()
         super.onDestroy()
     }
 
@@ -381,6 +412,72 @@ class MainActivity : ComponentActivity() {
         ).render()
     }
 
+    /** The session of the link, built on first use. Never built while the link is off. */
+    private fun mfpSession(): MfpWebSession {
+        check(mfp.enabled) { "mfp.link.off" }
+        return mfpSession ?: MfpWebSession(this, mfpAnswers).also { session ->
+            session.changed = { if (navigation.current == Destination.MOBILE_SETTINGS) { rememberScroll(); render() } }
+            mfpSession = session
+        }
+    }
+
+    private fun closeMfpSession() {
+        mfpSession?.destroy()
+        mfpSession = null
+    }
+
+    /**
+     * ADR 0032, second delivery: the MyFitnessPal link. Every connection starts from a button of this screen. A
+     * reading goes to a draft only when the user asks, meal by meal, and the draft is reviewed in Comidas like any
+     * other. Nothing is calculated, selected for Bolo or sent anywhere.
+     */
+    private fun renderMfp() {
+        MfpLinkScreen(this, findViewById(R.id.screen_content), mfp, mfpSession?.view,
+            mfpSession?.blockedHosts.orEmpty(), mfpSignedOut, java.time.ZoneId.systemDefault(),
+            toggle = { enabled ->
+                if (mfp.setEnabled(enabled) && !enabled) closeMfpSession()
+                mfpSignedOut = false
+                rememberScroll()
+                render()
+            },
+            open = {
+                mfpSignedOut = false
+                val date = MfpDate.parse(mfp.dateText.trim())
+                // Without a readable day MyFitnessPal shows its own current diary; reading still demands a valid day.
+                mfpSession().open(if (date != null) MfpHosts.diaryUrl(date) else MfpHosts.DIARY_PAGE)
+                rememberScroll()
+                render()
+            },
+            read = {
+                mfpSignedOut = false
+                val session = mfpSession()
+                mfp.read(MfpDiaryReader { session.read(it) })
+            },
+            signOut = {
+                android.app.AlertDialog.Builder(this).setMessage(MfpLinkText.SIGN_OUT_QUESTION)
+                    .setNegativeButton(MfpLinkText.CANCEL, null)
+                    .setPositiveButton(MfpLinkText.CONFIRM) { _, _ ->
+                        mfp.leave()
+                        mfpSession().signOut {
+                            mfpSignedOut = true
+                            if (navigation.current == Destination.MOBILE_SETTINGS) { rememberScroll(); render() }
+                        }
+                    }.show()
+            },
+            import = { meal: MfpMeal, readAt: Long ->
+                if (mfp.importing.add(meal.id)) {
+                    meals.importDraft({ history, save -> ImportMfpMeal(history, save).import(meal, readAt) }) { outcome ->
+                        mfp.importing.remove(meal.id)
+                        mfp.imports[meal.id] = outcome
+                        if (navigation.current == Destination.MOBILE_SETTINGS) { rememberScroll(); render() }
+                    }
+                    rememberScroll()
+                    render()
+                }
+            },
+        ).render()
+    }
+
     private fun renderSelection() {
         MealSelectionScreen(this, findViewById(R.id.screen_content), meals) { record ->
             val edit = {
@@ -405,6 +502,12 @@ class MainActivity : ComponentActivity() {
             if (Build.VERSION.SDK_INT >= 28) isAccessibilityHeading = true
         }
         findViewById<Button>(R.id.back_button).visibility = if (canGoBack) View.VISIBLE else View.GONE
+        if (destination != Destination.MOBILE_SETTINGS && (mfpSession != null || mfp.result != null || mfp.reading)) {
+            // ADR 0032: leaving the screen ends the session view and forgets what was read; the cookies stay.
+            closeMfpSession()
+            mfp.leave()
+            mfpSignedOut = false
+        }
         if (destination != blockingDetailsDestination) {
             blockingDetailsOpen = false
             dexcomLogOpen = false
@@ -470,6 +573,18 @@ class MainActivity : ComponentActivity() {
         internal fun doseLedger(context: Context): ClosableDoseLedger =
             doseLedgerFactory?.invoke(context) ?: if (DoseStorageGuard.active) UnavailableDoseLedger
             else SqliteDoseLedger(context)
+
+        /** Process-local test seams of the MyFitnessPal link (ADR 0032); production uses the stored switch and the network. */
+        var mfpSwitchFactory: ((Context) -> MfpLinkSwitch)? = null
+        var mfpAnswers: ((String) -> android.webkit.WebResourceResponse?)? = null
+
+        /**
+         * The switch the activity uses. During instrumentation a missing synthetic switch gives one that is off and
+         * forgets, so no test reads or changes the switch of the installed app.
+         */
+        internal fun mfpSwitch(context: Context): MfpLinkSwitch =
+            mfpSwitchFactory?.invoke(context) ?: if (MfpLinkGuard.active) VolatileMfpLinkSwitch()
+            else StoredMfpLinkSwitch(context)
 
         /** Wall clock of the presentation and the test calculation; injectable for deterministic tests. */
         var clock: () -> Long = { System.currentTimeMillis() }

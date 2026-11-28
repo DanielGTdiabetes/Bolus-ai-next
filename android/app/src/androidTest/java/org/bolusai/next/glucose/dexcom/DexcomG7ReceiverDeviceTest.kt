@@ -92,7 +92,12 @@ class DexcomG7ReceiverDeviceTest {
         assertEquals(DexcomApprovedPermissionSet.PERMISSION, receiver.permission)
         assertEquals(listOf(DexcomApprovedPermissionSet.PERMISSION),
             info.requestedPermissions.orEmpty().filter { it.startsWith("com.dexcom.") })
-        assertTrue(info.requestedPermissions.orEmpty().none { it == "android.permission.INTERNET" })
+        // ADR 0032: INTERNET exists for the MyFitnessPal link alone; no other Android permission is declared.
+        // Android 17 adds ACCESS_LOCAL_NETWORK by itself to an app with INTERNET that targets an earlier release; the
+        // manifest does not declare it (verify.ps1 checks the manifest) and the link reaches MyFitnessPal's hosts only.
+        assertEquals(listOf("android.permission.INTERNET", "android.permission.QUERY_ALL_PACKAGES"),
+            info.requestedPermissions.orEmpty().filter { it.startsWith("android.permission.") }
+                .filter { it != "android.permission.ACCESS_LOCAL_NETWORK" }.sorted())
         assertTrue("android.permission.QUERY_ALL_PACKAGES" in info.requestedPermissions.orEmpty())
         val observed = Intent(DexcomReceiverConfiguration.ACTION).setPackage(context.packageName)
         assertTrue(context.packageManager.queryBroadcastReceivers(observed, PackageManager.ResolveInfoFlags.of(0)).isEmpty())

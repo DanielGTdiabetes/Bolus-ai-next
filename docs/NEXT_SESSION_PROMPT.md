@@ -109,13 +109,32 @@ configurada es desconocido, nunca `0`; un total es desconocido si lo es algún
 alimento. Una coma que no sea separador de miles deja el valor desconocido, y
 la dirección final debe llevar `date=` con el día pedido. 28 pruebas con datos
 sintéticos. Detalle en «Primera entrega implementada» del ADR 0032.
-SIGUIENTE PASO, con el Pixel y el propietario: segunda entrega del plan
-(permiso `INTERNET` limitado a MyFitnessPal, que hoy `verify.ps1` prohíbe;
-`WebView` para iniciar sesión y leer el diario; extractor que entregue el texto
-de las celdas como lo lee la librería; interruptor apagado por defecto;
-importación al borrador de comida) y la prueba controlada de la segunda sesión.
-Antes de dar por bueno el analizador hace falta una página real saneada: falta
-confirmar el texto de las cabeceras y el separador de miles de la versión `/es/`.
+
+ENTREGA 2026-11-28 — ENLACE ANDROID DE MYFITNESSPAL (ADR 0032, SEGUNDA ENTREGA)
+Menú → Ajustes del móvil, bloque MyFitnessPal. Interruptor apagado por defecto
+(`MfpLinkSwitch`). `MfpWebSession` es la única clase que abre conexiones: un
+`WebView` con la sesión del usuario, cada petición comprobada con `MfpHosts`
+(página en `www.myfitnesspal.com`, recursos en `myfitnesspal.com` y subdominios,
+solo HTTPS; lo demás se bloquea y se lista). `MfpExtraction` lee la tabla con un
+guion fijo de solo lectura. `ImportMfpMeal` crea o revisa el borrador
+`mfp:<fecha>:<comida>`; la línea `mfp-revision=` de las notas dice qué revisión
+está importada; desconocido queda sin dato. Sin tabla ni base nuevas.
+`verify.ps1` admite solo `INTERNET` y `QUERY_ALL_PACKAGES`, y limita red,
+direcciones y consumidores del módulo. Probado en JVM y en el Pixel con una
+página sintética: `verify.ps1 -DeviceTests`, `OK (198 tests)`, con
+`MfpWebSessionDeviceTest` y `MfpLinkDeviceTest`
+(docs/validation/mfp-link-device-2026-11-28.md). Nada se ha probado contra
+MyFitnessPal. Android 17 añade solo `ACCESS_LOCAL_NETWORK` a la app; Next no lo
+declara.
+SIGUIENTE PASO, con el Pixel y el propietario (ADR 0032, «Pendiente con el
+Pixel y el propietario»): inicio de sesión real y
+lectura de un día, anotando los hosts bloqueados; página real saneada como
+fixture (cabeceras y separador de miles de `/es/`); y prueba controlada de que
+Hermes sigue leyendo tras la segunda sesión. Las pruebas que lancen
+`MainActivity` reciben un interruptor apagado que no se guarda; para encender
+el enlace inyectan `MainActivity.mfpSwitchFactory` y `MainActivity.mfpAnswers`.
+Sin decidir: equivalente del disparo automático al cerrar MyFitnessPal y del
+aviso remoto de revisión de Legacy.
 
 ESCRITURA EN DEXCOM — AVISO DEL PROPIETARIO 2026-11-28
 Legacy escribe en el historial de la app Dexcom todos los bolos y la insulina

@@ -1,9 +1,11 @@
 # ADR 0032: enlace MyFitnessPal por sesión en el propio móvil
 
-- Estado: **aceptado; primera entrega implementada** (módulo común
-  `shared/mfp-import`, sin red ni sesión). La segunda entrega (red, `WebView`,
-  importación al borrador y pruebas en el Pixel) sigue pendiente y necesita al
-  propietario
+- Estado: **aceptado; primera y segunda entrega implementadas** (módulo común
+  `shared/mfp-import` y enlace Android con `WebView`, interruptor e importación
+  al borrador). Las pruebas de dispositivo pasan en el Pixel con una página
+  sintética. **Sin probar todavía con una sesión real**: faltan el inicio de
+  sesión del propietario, la página real saneada y la prueba controlada de la
+  segunda sesión
 - Fecha: 2026-11-28
 - Fase y criterio de aceptación: fase 8 (enlace MyFitnessPal con independencia
   del cálculo local)
@@ -281,6 +283,111 @@ Pruebas: 28 en `commonTest` con datos sintéticos (interpretación, cada motivo
 de desconocido, cada fallo, host, fechas, texto canónico, identidad y
 revisión, estabilidad a la segunda y a la tercera, inestable, comidas añadidas
 o quitadas, fallo sin reutilizar lecturas y reimportación idéntica).
+
+## Segunda entrega implementada (2026-11-28)
+
+Enlace Android completo, de interruptor a borrador. Probado en JVM y en el
+Pixel con una página sintética servida por la propia prueba, sin red y sin
+sesión ([validación](../validation/mfp-link-device-2026-11-28.md)). **Nada se
+ha probado contra MyFitnessPal.** Legacy no se volvió a leer ni se tocó.
+
+- **Dónde está.** Menú → Ajustes del móvil (`native/settings`), bloque
+  MyFitnessPal. No hay destino nuevo.
+- **Interruptor** (`MfpLinkSwitch`): apagado por defecto, guardado en las
+  preferencias privadas de la app. Apagado, no se crea ningún `WebView` ni se
+  abre conexión. Encenderlo tampoco conecta: la sesión se crea con «Abrir
+  MyFitnessPal» o «Leer el diario».
+- **Red** (`MfpHosts`, `MfpWebSession`): el manifiesto pide `INTERNET` y fija
+  `usesCleartextTraffic="false"`. La única clase que abre conexiones es
+  `MfpWebSession`. Cada petición del `WebView` pasa por
+  `shouldInterceptRequest`: la página mostrada debe ser HTTPS en
+  `www.myfitnesspal.com`; lo que la página carga, HTTPS en `myfitnesspal.com` o
+  un subdominio suyo (o `data:`, `blob:`, `about:`). Lo demás recibe un 403
+  vacío sin salir del móvil y su host se lista en pantalla. Sin interfaz de
+  JavaScript hacia la app, sin acceso a ficheros, sin ventanas nuevas, sin
+  cookies de terceros, sin contenido mixto.
+- **Sesión.** El usuario inicia sesión en la página de MyFitnessPal dentro de
+  ese `WebView`. Next no lee, escribe, copia ni registra cookies ni
+  contraseñas: quedan en el almacén del `WebView` de la app, excluido de las
+  copias. «Cerrar la sesión» borra cookies, almacenamiento web, caché e
+  historial tras confirmar. La sesión visual se destruye al salir de la
+  pantalla, al apagar el enlace y con la actividad; las cookies permanecen.
+- **Lectura** (`MfpExtraction`): se carga
+  `https://www.myfitnesspal.com/food/diary?date=AAAA-MM-DD` y un guion fijo lee
+  la tabla como describe este ADR (texto anterior a cualquier hijo en cabeceras
+  y enlaces, `span.macro-value` en celdas con hijos). El guion solo lee: no
+  hace peticiones ni toca cookies o almacenamiento. Devuelve líneas con cada
+  texto codificado; el decodificador es estricto y una respuesta rara no es una
+  página (`mfp.read.transport_failed`). El estado HTTP solo se conoce si el
+  `WebView` informa un error; si no, queda sin dato. Carga con límite de 30 s
+  (constante técnica). La lectura estable es la del módulo común: dos cargas
+  con 4 s de pausa, tres como máximo, en un hilo de trabajo.
+- **Solo a petición.** Cada lectura empieza con el botón. El día es un texto
+  `AAAA-MM-DD` que empieza en el día actual del móvil y nunca se corrige solo.
+  La lectura vive en memoria y se olvida al salir de la pantalla o al apagar.
+- **Importación al borrador** (`ImportMfpMeal`): comida a comida, con su botón.
+  El borrador usa como identidad la de MyFitnessPal (`mfp:<fecha>:<comida>`),
+  así que reimportar llega siempre al mismo borrador y un reintento tras una
+  interrupción no crea otro. Hidratos, grasa, proteína y fibra pasan como total
+  en gramos; un valor desconocido queda **sin dato**, nunca `0`. Las notas
+  llevan origen, la línea `mfp-revision=<sha256>`, `mfp-read-at=<instante UTC>`,
+  qué falta y por qué, y los alimentos. La revisión ya importada es la de la
+  revisión guardada más reciente que lleve esa línea: la misma revisión no
+  escribe nada y conserva lo que el usuario haya editado; una distinta crea una
+  revisión nueva del mismo borrador sin borrar las anteriores. El esquema de
+  comidas no cambia (`meal-drafts.db` sigue en v3) y no hay base nueva.
+  Importar no selecciona la comida para Bolo ni calcula nada.
+- **Estados visibles** (`MfpLinkText`): cada fallo tiene su texto, su código y
+  la acción del usuario; ninguno se muestra como «sin conexión» salvo el de
+  transporte, y todos dicen que no se usa una lectura anterior.
+- **Nada hacia Legacy.** El código de la app no nombra ninguna dirección salvo
+  las de `MfpHosts`; `verify.ps1` lo comprueba junto con el resto de límites.
+- **Instrumentación.** `MfpLinkGuard` impide en las pruebas crear una sesión
+  que llegue a la red, cerrar la sesión real o leer el interruptor guardado.
+
+Decisiones tomadas al implementar:
+
+1. **Procedencia en las notas, no en una tabla nueva.** Evita migrar
+   `meal-drafts.db` y una segunda base que habría que mantener coherente. El
+   coste: si el usuario borra la línea `mfp-revision=` de todas las revisiones,
+   la siguiente lectura crea una revisión nueva. No se pierde nada.
+2. **Sin comparación previa.** La pantalla no dice si una comida es nueva hasta
+   pulsar «Importar»; el resultado lo indica.
+3. **Recursos de terceros bloqueados.** Es posible que la página de inicio de
+   sesión necesite otros dominios (por ejemplo, la comprobación de Cloudflare).
+   No se ha supuesto cuáles: la pantalla lista lo bloqueado y la lista de
+   `MfpHosts` solo se ampliará con lo observado en el Pixel y a propósito.
+4. **Agente de usuario del `WebView` sin cambios.** No se disfraza de otro
+   navegador.
+5. **`ACCESS_LOCAL_NETWORK` implícito.** Observado en el Pixel (Android 17):
+   el sistema añade ese permiso a una app con `INTERNET` que apunta a una
+   versión anterior. Next no lo declara y `verify.ps1` comprueba el manifiesto.
+   El filtro de `MfpHosts` sigue siendo el límite: ninguna dirección de la red
+   local es de MyFitnessPal, así que todas se bloquean.
+
+No cubierto por esta entrega y pendiente de decisión o de trabajo posterior: el
+disparo automático al cerrar MyFitnessPal que hace Legacy (aquí la lectura es
+solo a petición, por la condición de no interferir) y el aviso remoto de
+revisión que Legacy da por Telegram.
+
+Pruebas JVM (`android/app/src/test/.../mfp`): importación (nueva, idéntica,
+revisión, edición del usuario conservada, vuelta a un contenido anterior,
+desconocido frente a cero, fallos de almacenamiento), hosts (suplantaciones de
+autoridad, puertos, subdominios falsos, esquemas), extracción (respuestas mal
+formadas, UTF-8 inválido, guion sin escritura) y textos. Pruebas de dispositivo
+escritas (`MfpWebSessionDeviceTest`, `MfpLinkDeviceTest`) con una página
+sintética servida por la propia prueba, sin red.
+
+### Pendiente con el Pixel y el propietario
+
+1. Hecho: `scripts/verify.ps1 -DeviceTests`, `OK (198 tests)`. El `WebView`
+   informa el estado HTTP de una página rechazada (403).
+2. Inicio de sesión real del propietario y lectura de un día. Anotar qué hosts
+   aparecen bloqueados y si el inicio de sesión funciona con ellos.
+3. Página real saneada como fixture: texto exacto de las cabeceras y separador
+   de miles de la versión `/es/`.
+4. Prueba controlada de la segunda sesión: comprobar que Hermes sigue leyendo
+   después de iniciar sesión en Next.
 
 ## Alternativas descartadas
 
