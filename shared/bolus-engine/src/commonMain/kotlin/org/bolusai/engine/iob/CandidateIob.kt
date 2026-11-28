@@ -3,6 +3,7 @@ package org.bolusai.engine.iob
 import org.bolusai.engine.EngineIdentity
 import org.bolusai.engine.candidate.EngineSha256
 import org.bolusai.engine.candidate.Input
+import org.bolusai.engine.candidate.IobValue
 import kotlin.math.ceil
 import kotlin.math.max
 
@@ -63,6 +64,15 @@ public data class IobResult(
 ) {
     public val usableForTreatment: Boolean get() = false
     public val ruleValidation: String get() = CandidateIobRules.VALIDATION
+
+    /**
+     * This result as the IOB input of the bolus calculation (ADR 0028). A computed IOB keeps its exact value and this
+     * calculation's input fingerprint as provenance; a blocked one stays unavailable with its first cause, never zero.
+     */
+    public fun asCandidateInput(): Input<IobValue> = when (val o = outcome) {
+        is IobOutcome.Computed -> Input.Provided(IobValue.calculated(o.units, inputFingerprintSha256))
+        is IobOutcome.Blocked -> Input.Unavailable(o.causes.first())
+    }
 }
 
 /** Stable warning codes of the IOB calculation. They never carry values. */

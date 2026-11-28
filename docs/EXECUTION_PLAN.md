@@ -817,6 +817,19 @@ verificada sin relleno; A4 queda no comprobada (no había perfil real v3) por de
 Evidencia y límites en la
 [validación](validation/profile-insulin-action-2026-10-12.md).
 
+### Entrega de historial local de dosis e IOB calculado en Bolo — 2026-11-28
+
+[ADR 0028](adr/0028-local-dose-ledger-and-calculated-iob.md): por decisión del
+propietario el historial de dosis es local y lo alimenta Bolo. Módulo común
+`shared/insulin-history` (eventos append-only con clave de idempotencia: inicio
+del registro, dosis y anulación), `insulin-doses.db` v1 y elección en Bolo entre
+IOB a mano e IOB calculado por `CandidateIob` con la acción de la insulina del
+perfil. El IOB conserva su procedencia en la huella del bolo. Registro sin
+empezar, ilegible o que no cubre toda la acción bloquea; nunca es `0 U`. Las
+entradas son anotaciones locales sin autoridad de tratamiento y sin
+sincronización. Fase 6, puntos 4 y 5, y fase 7 en modo de prueba. Pendiente la
+prueba en el Pixel.
+
 ### Secuencia de capacidades
 
 La secuencia inicial siguiente queda como referencia de dependencias, no como
@@ -853,12 +866,11 @@ unitarias, incluidos los límites del perfil de PR #58.
    de evidencia preliminar, pero sigue sin aprobación del informe; no repetir
    la decisión I-3 ni las pruebas de recepción ya registradas sin cambios que
    lo justifiquen.
-2. Sin depender del teléfono: el IOB candidato está en el motor (ADR 0026) y
-   DIA, curva y pico en el perfil (ADR 0027). Sigue el historial local de
-   insulina, en otra entrega y con decisión del propietario sobre su origen
-   porque Next no registra tratamientos reales, y después el IOB calculado en el
-   cálculo de prueba de Bolo en lugar del manual. Luego, fibra/Warsaw (LC-008). El techo de IOB (`max_iob_u`) y el intervalo mínimo entre bolos
-   dependen del IOB calculado.
+2. Sin depender del teléfono: el IOB candidato (ADR 0026), DIA, curva y pico en
+   el perfil (ADR 0027) y el historial local de dosis con IOB calculado en Bolo
+   (ADR 0028) están hechos. Sigue fibra/Warsaw (LC-008), y después el techo de
+   IOB (`max_iob_u`), el intervalo mínimo entre bolos y el bolo extendido o
+   dual, que dependen del IOB calculado.
 3. Mantener la matriz de `docs/audit/legacy-functional-inventory.md` en cada
    entrega, incluidos MyFitnessPal y los casos de uso del bot.
 

@@ -53,6 +53,19 @@ hasta el IOB candidato y el total de prueba. Ver ADR 0026, «Prueba con historia
 sintético». Bolo conserva el IOB manual. Antes de conectarlo al historial real,
 queda elegir su origen y llevar al cálculo la procedencia y huella del IOB.
 
+ENTREGA 2026-11-28 — HISTORIAL LOCAL DE DOSIS E IOB CALCULADO EN BOLO (ADR 0028)
+Decisión del propietario: el historial de dosis es local y lo alimenta Bolo,
+como en `bolus_ai`; Next debe funcionar entero en el móvil. `shared/insulin-history`
+(inicio del registro, dosis y anulación, append-only e idempotente),
+`insulin-doses.db` v1 y elección en Bolo entre IOB a mano e IOB calculado. El IOB
+calculado lleva su huella a la del bolo. Registro sin empezar, ilegible o sin
+cubrir toda la acción de la insulina bloquea; nunca es 0. Entradas sin autoridad
+de tratamiento y sin sincronización. `main` de Legacy era `e48c4ab` ese día; las
+reglas siguen fijadas en `bcac891` y la diferencia no está auditada.
+Las pruebas que quieran un registro en dispositivo inyectan
+`MainActivity.doseLedgerFactory`; sin ella el registro es no disponible.
+Pendiente: `SqliteDoseLedgerDeviceTest` y recorrido manual en el Pixel.
+
 SIGUIENTE
 - Teléfono: cálculo con perfil real confirmado (P6) y actualización sobre un
   perfil v2 real existente (P7 de la validación de límites). B1 tiene evidencia
@@ -61,10 +74,9 @@ SIGUIENTE
   pruebas ya ejecutadas sin cambios que lo justifiquen. En esta sesión Codex
   hizo las pruebas del Pixel mientras Claude avanzaba desde la nube, sin
   modificar la implementación de perfil o motor de Claude.
-- Sin teléfono: productor del historial local de insulina, en entrega separada
-  tras decidir el origen de las dosis reales. Después, conectar `CandidateIob`
-  a Bolo con procedencia explícita. Luego fibra/Warsaw (LC-008). Resolver y
-  registrar el SHA remoto de Legacy antes de una nueva auditoría.
+- Sin teléfono: fibra/Warsaw (LC-008); después techo de IOB, intervalo mínimo
+  entre bolos y bolo extendido o dual. Comparar Legacy `bcac891..e48c4ab` antes
+  de capturar vectores nuevos.
 No repetir las decisiones ya aprobadas.
 
 CONTINUACIÓN ACTIVA — 2026-10-12

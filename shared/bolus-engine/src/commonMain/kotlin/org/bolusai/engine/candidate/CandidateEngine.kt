@@ -128,7 +128,9 @@ public object CandidateEngine {
             if (!glucose.value.measurementTimeVerified) warnings += Warnings.MEASUREMENT_TIME_UNVERIFIED
             if (glucose.value.origin == GlucoseOrigin.DEXCOM_PERMISSION_SET) warnings += Warnings.DEXCOM_NOT_ATTRIBUTED
         }
-        if (request.iob is Input.Provided) warnings += Warnings.MANUAL_IOB
+        (request.iob as? Input.Provided)?.let {
+            warnings += if (it.value.origin == IobValue.CALCULATED) Warnings.CALCULATED_IOB else Warnings.MANUAL_IOB
+        }
         val roundStep = limit { it.roundStep }
         val maxBolus = limit { it.maxBolus }
         val maxCorrection = limit { it.maxCorrection }
@@ -204,7 +206,7 @@ public object CandidateEngine {
             if (causes.isNotEmpty()) return@run StepOutcome.Blocked(causes)
             val mealU = (meal as StepOutcome.Computed).units
             val corrU = (limited as StepOutcome.Computed).units
-            val iobU = (iob as Input.Provided).value.units.value
+            val iobU = (iob as Input.Provided).value.unitsValue
             val positive = max(corrU, 0.0)
             val lowAdjustment = min(corrU, 0.0)
             val afterIob = max(positive - iobU, 0.0)
@@ -286,6 +288,9 @@ public object Warnings {
     public const val MEASUREMENT_TIME_UNVERIFIED: String = "glucose.measurement_time_unverified"
     public const val DEXCOM_NOT_ATTRIBUTED: String = "glucose.sender_not_attributed_to_dexcom"
     public const val MANUAL_IOB: String = "iob.manual_entry_unverified"
+
+    /** IOB computed by the candidate IOB rules from the local dose history (ADR 0028); validation pending. */
+    public const val CALCULATED_IOB: String = "iob.calculated_candidate_unverified"
     public const val MAX_BOLUS_LIMITED: String = "max_bolus.limited"
     public const val BELOW_HYPO_STOP: String = "glucose.below_legacy_hypo_stop"
 }
@@ -324,6 +329,6 @@ public object CandidateCodec {
             "${it.value.text}:${it.unit.code}:${it.origin.code}:${it.recordedAtEpochMs}:verified=${it.measurementTimeVerified}" +
                 ":source=${it.sourceReference}"
         }
-        input("iob", request.iob) { "${it.units.text}:${it.origin}" }
+        input("iob", request.iob) { "${it.reference}:${it.origin}" }
     }
 }
