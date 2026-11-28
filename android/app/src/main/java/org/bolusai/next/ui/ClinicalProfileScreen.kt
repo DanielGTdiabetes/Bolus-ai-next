@@ -320,6 +320,8 @@ internal class ClinicalProfileScreen(
         heading(context.getString(R.string.profile_action_title), "profile:review:action")
         label(curveText(body), "profile:review:action:curve")
         ProfileLimit.of(ProfileFieldGroup.INSULIN_ACTION).forEach { label(limitText(body, it), "profile:review:limit:${it.code}") }
+        heading(context.getString(R.string.profile_nutrition_title), "profile:review:nutrition")
+        ProfileLimit.of(ProfileFieldGroup.NUTRITION_RULES).forEach { label(limitText(body, it), "profile:review:limit:${it.code}") }
         body.schedules.forEach { schedule ->
             val parameter = schedule.parameter
             heading(parameter.unitLabel(body.glucoseUnit)?.let {
@@ -358,6 +360,11 @@ internal class ClinicalProfileScreen(
         ProfileLimit.MAX_CORRECTION -> R.string.profile_limit_max_correction
         ProfileLimit.INSULIN_DIA -> R.string.profile_action_dia
         ProfileLimit.INSULIN_PEAK -> R.string.profile_action_peak
+        ProfileLimit.FIBER_FACTOR -> R.string.profile_nutrition_fiber_factor
+        ProfileLimit.FIBER_THRESHOLD -> R.string.profile_nutrition_fiber_threshold
+        ProfileLimit.WARSAW_FACTOR_SIMPLE -> R.string.profile_nutrition_warsaw_simple
+        ProfileLimit.WARSAW_FACTOR_DUAL -> R.string.profile_nutrition_warsaw_dual
+        ProfileLimit.WARSAW_TRIGGER -> R.string.profile_nutrition_warsaw_trigger
     })
 
     /** A version without the field has it "unknown", never "not configured" and never a value from another version. */
@@ -370,6 +377,7 @@ internal class ClinicalProfileScreen(
     private fun notInSchema(limit: ProfileLimit): Int = when (limit.group) {
         ProfileFieldGroup.CALCULATION_LIMITS -> R.string.profile_limit_not_in_schema
         ProfileFieldGroup.INSULIN_ACTION -> R.string.profile_action_not_in_schema
+        ProfileFieldGroup.NUTRITION_RULES -> R.string.profile_nutrition_not_in_schema
     }
 
     private fun curveName(curve: InsulinCurveCode): String = context.getString(when (curve) {
@@ -432,6 +440,7 @@ internal class ClinicalProfileScreen(
         ProfileLimit.of(ProfileFieldGroup.CALCULATION_LIMITS).forEach { label(limitText(body, it), "$prefix:limit:${it.code}", 14f) }
         label(curveText(body), "$prefix:action:curve", 14f)
         ProfileLimit.of(ProfileFieldGroup.INSULIN_ACTION).forEach { label(limitText(body, it), "$prefix:limit:${it.code}", 14f) }
+        ProfileLimit.of(ProfileFieldGroup.NUTRITION_RULES).forEach { label(limitText(body, it), "$prefix:limit:${it.code}", 14f) }
         label(context.getString(R.string.profile_writer, version.writer), "$prefix:writer", 13f)
         label(context.getString(R.string.profile_fingerprint, version.contentSha256.take(16)), "$prefix:sha", 13f)
     }
@@ -498,6 +507,7 @@ internal class ClinicalProfileScreen(
         editor.content.schedules.forEach { schedule -> schedule(editor, schedule, ::refresh) }
         limits(editor, ::refresh)
         insulinAction(editor, ::refresh)
+        nutritionRules(editor, ::refresh)
 
         save.apply {
             text = context.getString(R.string.profile_save, editor.nextVersion)
@@ -725,6 +735,22 @@ internal class ClinicalProfileScreen(
         }
     }
 
+    /**
+     * Fibre and Warsaw settings of content schema 4 (ADR 0029), with validation pending and no default. A factor of 0
+     * switches its rule off; empty stays not configured and blocks a meal that would need the rule.
+     */
+    private fun nutritionRules(editor: ProfileEditor, refresh: () -> Unit) {
+        heading(context.getString(R.string.profile_nutrition_title), "profile:nutrition")
+        notice(context.getString(R.string.profile_nutrition_explanation), "profile:nutrition:explanation")
+        if (editor.start.limit(ProfileLimit.FIBER_FACTOR) == null) {
+            notice(context.getString(R.string.profile_nutrition_not_in_schema_notice), "profile:nutrition:not_in_schema")
+        }
+        ProfileLimit.of(ProfileFieldGroup.NUTRITION_RULES).forEach { limit ->
+            field(ProfileEditorField.Limit(limit), context.getString(R.string.profile_param_with_unit, limitName(limit),
+                limit.unitLabel), true, refresh)
+        }
+    }
+
     private fun scheduleLines(schedule: ParameterSchedule, unit: Setting<GlucoseUnit>): String {
         val label = schedule.parameter.unitLabel(unit)
         return schedule.segments.joinToString("\n") {
@@ -800,6 +826,7 @@ internal class ClinicalProfileScreen(
                 null -> context.getString(when (field.limit.group) {
                     ProfileFieldGroup.CALCULATION_LIMITS -> R.string.profile_preview_unknown
                     ProfileFieldGroup.INSULIN_ACTION -> R.string.profile_action_preview_unknown
+                    ProfileFieldGroup.NUTRITION_RULES -> R.string.profile_nutrition_preview_unknown
                 })
             }
         }

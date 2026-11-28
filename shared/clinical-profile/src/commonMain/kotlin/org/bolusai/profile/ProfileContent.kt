@@ -44,7 +44,7 @@ enum class ProfileParameter(val code: String, val glucoseDependent: Boolean) {
 }
 
 /** What a profile-wide field is for. The UI groups them; storage, codec and confirmation treat them alike. */
-enum class ProfileFieldGroup { CALCULATION_LIMITS, INSULIN_ACTION }
+enum class ProfileFieldGroup { CALCULATION_LIMITS, INSULIN_ACTION, NUTRITION_RULES }
 
 /**
  * Profile-wide numeric fields, one value per version, never per time segment and never dependent on the glucose unit.
@@ -55,6 +55,11 @@ enum class ProfileFieldGroup { CALCULATION_LIMITS, INSULIN_ACTION }
  * - Content schema 3 (ADR 0027): the insulin action of Legacy `IOBConfig` (`dia_hours`, `peak_minutes`). Legacy
  *   defaults (4 h, 75 min) are never used. The peak is whole minutes, as Legacy stores it ([wholeNumber]); that is a
  *   representation rule, not a clinical range. The curve is not numeric and lives in [ProfileContent.insulinCurve].
+ * - Content schema 4 (ADR 0029): the fibre and Warsaw settings of Legacy `CalculatorConfig` (`fiber_factor`,
+ *   `fiber_threshold_g`) and `WarsawConfig` (`safety_factor`, `safety_factor_dual`, `trigger_threshold_kcal`). Legacy
+ *   defaults (0.5, 5 g, 0.1, 0.2, 300 kcal) and ranges are never used. Legacy also has two switches
+ *   (`subtract_fiber`, `warsaw.enabled`); here a factor of `0` is the switch off, which gives the same result. The
+ *   trigger is whole kcal, as the Legacy `int`.
  */
 enum class ProfileLimit(val code: String, val unitLabel: String, val group: ProfileFieldGroup, val wholeNumber: Boolean) {
     ROUND_STEP("round_step", "U", ProfileFieldGroup.CALCULATION_LIMITS, false),
@@ -62,6 +67,11 @@ enum class ProfileLimit(val code: String, val unitLabel: String, val group: Prof
     MAX_CORRECTION("max_correction", "U", ProfileFieldGroup.CALCULATION_LIMITS, false),
     INSULIN_DIA("insulin_dia", "h", ProfileFieldGroup.INSULIN_ACTION, false),
     INSULIN_PEAK("insulin_peak", "min", ProfileFieldGroup.INSULIN_ACTION, true),
+    FIBER_FACTOR("fiber_factor", "×", ProfileFieldGroup.NUTRITION_RULES, false),
+    FIBER_THRESHOLD("fiber_threshold", "g", ProfileFieldGroup.NUTRITION_RULES, false),
+    WARSAW_FACTOR_SIMPLE("warsaw_factor_simple", "×", ProfileFieldGroup.NUTRITION_RULES, false),
+    WARSAW_FACTOR_DUAL("warsaw_factor_dual", "×", ProfileFieldGroup.NUTRITION_RULES, false),
+    WARSAW_TRIGGER("warsaw_trigger", "kcal", ProfileFieldGroup.NUTRITION_RULES, true),
     ;
 
     /** Representation check only: a [wholeNumber] field rejects a fractional value. */
@@ -95,16 +105,17 @@ enum class InsulinCurveCode(val code: String, val usesPeak: Boolean) {
 
 /**
  * Content schema catalogs. A new parameter or field is a new content schema, never a change to an earlier one:
- * schema 1 has no limits and schemas 1 and 2 have no insulin action, so those versions keep them unknown forever and
- * are never filled in.
+ * schema 1 has no limits, schemas 1 and 2 have no insulin action and schemas 1 to 3 have no nutrition rules, so those
+ * versions keep them unknown forever and are never filled in.
  */
 object ProfileCatalog {
-    const val CURRENT_SCHEMA = 3
+    const val CURRENT_SCHEMA = 4
     const val MINUTES_PER_DAY = 1440
     private val schema1 = listOf(ProfileParameter.CARB_RATIO, ProfileParameter.INSULIN_SENSITIVITY,
         ProfileParameter.GLUCOSE_TARGET)
     private val limits2 = listOf(ProfileLimit.ROUND_STEP, ProfileLimit.MAX_BOLUS, ProfileLimit.MAX_CORRECTION)
     private val limits3 = limits2 + listOf(ProfileLimit.INSULIN_DIA, ProfileLimit.INSULIN_PEAK)
+    private val limits4 = limits3 + ProfileLimit.of(ProfileFieldGroup.NUTRITION_RULES)
 
     fun parameters(schemaVersion: Int): List<ProfileParameter>? = if (schemaVersion in 1..CURRENT_SCHEMA) schema1 else null
 
@@ -112,6 +123,7 @@ object ProfileCatalog {
         1 -> emptyList()
         2 -> limits2
         3 -> limits3
+        4 -> limits4
         else -> null
     }
 

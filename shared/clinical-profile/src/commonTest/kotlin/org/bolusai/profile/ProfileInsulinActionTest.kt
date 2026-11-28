@@ -44,7 +44,7 @@ class ProfileInsulinActionTest {
 
     @Test fun newProfilesStartWithTheActionExplicitlyNotConfigured() {
         val empty = ProfileContent.empty()
-        assertEquals(3, empty.schemaVersion)
+        assertEquals(ProfileCatalog.CURRENT_SCHEMA, empty.schemaVersion)
         assertEquals(Setting.NotConfigured, empty.insulinCurve)
         assertEquals(ProfileValue.NotConfigured, empty.limit(ProfileLimit.INSULIN_DIA))
         assertEquals(ProfileValue.NotConfigured, empty.limit(ProfileLimit.INSULIN_PEAK))

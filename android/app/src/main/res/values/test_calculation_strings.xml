@@ -7,6 +7,9 @@
     <string name="test_calc_carbs_manual">Introducir a mano</string>
     <string name="test_calc_carbs_meal">Usar la comida seleccionada</string>
     <string name="test_calc_carbs">Hidratos (g)</string>
+    <string name="test_calc_fiber">Fibra (g). Vacío = desconocida, nunca 0</string>
+    <string name="test_calc_fat">Grasa (g). Vacío = desconocida, nunca 0</string>
+    <string name="test_calc_protein">Proteína (g). Vacío = desconocida, nunca 0</string>
     <string name="test_calc_glucose_source">Glucosa</string>
     <string name="test_calc_glucose_manual">Introducir a mano (mg/dL)</string>
     <string name="test_calc_glucose_dexcom">Usar la última lectura Dexcom mostrada</string>
@@ -20,7 +23,8 @@
     <string name="test_calc_step_computed">%1$s: %2$s U</string>
     <string name="test_calc_step_blocked">%1$s: bloqueado (%2$s)</string>
     <string name="test_calc_fact">   %1$s = %2$s</string>
-    <string name="test_calc_step_meal">A) Comida</string>
+    <string name="test_calc_step_meal">A) Comida (hidratos netos de fibra + Warsaw simple)</string>
+    <string name="test_calc_step_extended">A2) Warsaw extendido (se suma al total)</string>
     <string name="test_calc_step_correction">B) Corrección</string>
     <string name="test_calc_step_correction_limit">B2) Límite de corrección</string>
     <string name="test_calc_step_iob">C) IOB sobre corrección positiva</string>

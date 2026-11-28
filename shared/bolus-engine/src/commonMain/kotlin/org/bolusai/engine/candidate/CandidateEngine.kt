@@ -10,7 +10,7 @@ import kotlin.math.round
  * every result is a test result.
  */
 public object CandidateRuleSet {
-    public const val ID: String = "legacy-backend-core-candidate-v1"
+    public const val ID: String = "legacy-backend-core-candidate-v2"
     public const val LEGACY_REPOSITORY: String = "DanielGTdiabetes/bolus_ai"
     public const val LEGACY_SHA: String = "bcac891d85e6fb3e84398c118061e6aeae3f73f1"
     public const val LEGACY_SOURCE: String = "backend/app/services/bolus_engine.py::_calculate_core"
@@ -23,20 +23,34 @@ public object CandidateRuleSet {
     public const val LEGACY_INVALID_CARB_RATIO_AT_OR_BELOW: Double = 0.1
     public const val LEGACY_INVALID_SENSITIVITY_AT_OR_BELOW_MG_DL: Double = 5.0
 
-    /** Legacy features outside this candidate set. They are not applied and the result says so. */
+    /** Warsaw literals observed in Legacy (LC-008): kcal per gram, kcal and carbohydrate grams per FPU. */
+    public const val LEGACY_KCAL_PER_G_FAT: Double = 9.0
+    public const val LEGACY_KCAL_PER_G_PROTEIN: Double = 4.0
+    public const val LEGACY_KCAL_PER_FPU: Double = 100.0
+    public const val LEGACY_CARBS_G_PER_FPU: Double = 10.0
+
+    /** Legacy applies Warsaw only when fat and protein exceed 50 kcal (`if total_kcal > 50`). */
+    public const val LEGACY_WARSAW_ABOVE_KCAL: Double = 50.0
+
+    /**
+     * Legacy features outside this candidate set. They are not applied and the result says so. `dual_bolus` is the
+     * delivery split: the extended Warsaw component is computed and rounded apart, as Legacy does, and then added to
+     * the total exactly as Legacy does with dual delivery disabled.
+     */
     public val NOT_APPLIED: List<String> = listOf(
-        "autosens", "fiber_deduction", "warsaw_fat_protein", "exercise_reduction", "techne_rounding",
+        "autosens", "exercise_reduction", "techne_rounding",
         "dual_bolus", "max_iob_ceiling", "stacking_warning", "glucose_staleness",
     )
 }
 
 /** Steps of the candidate rule set, in the order of Legacy `_calculate_core`. */
 public enum class CandidateStep(public val code: String, public val legacyReference: String) {
-    MEAL("meal", "meal_u = eff_carbs / cr"),
+    MEAL("meal", "meal_u = eff_carbs / cr (+ warsaw_ins in simple mode); eff_carbs = max(0, carbs_g - fiber_g * fiber_factor)"),
+    EXTENDED("extended", "warsaw_later_u = fpu_count * 10 * warsaw_factor_dual / cr when total_kcal >= warsaw_trigger"),
     CORRECTION("correction", "corr_u = (bg_mgdl - target_mgdl) / isf"),
     CORRECTION_LIMIT("correction_limit", "if corr_u > max_correction_u: corr_u = max_correction_u"),
     IOB("iob", "upfront_net = max(0, meal_u + min(corr_u, 0) + max(max(corr_u, 0) - iob_u, 0))"),
-    ROUNDING("rounding", "_round_step: round(value / step) * step"),
+    ROUNDING("rounding", "final_total = _round_step(final_upfront) + _round_step(final_later)"),
     MAX_BOLUS("max_bolus", "if final_total > max_bolus_u: final_total = max_bolus_u"),
     HYPO_STOP("hypo_stop", "if bg_mgdl < 70: final_total = 0"),
 }
@@ -134,16 +148,89 @@ public object CandidateEngine {
         val roundStep = limit { it.roundStep }
         val maxBolus = limit { it.maxBolus }
         val maxCorrection = limit { it.maxCorrection }
+        val fiberFactor = limit { it.nutritionRules.fiberFactor }
+        val fiberThreshold = limit { it.nutritionRules.fiberThresholdG }
+        val warsawSimple = limit { it.nutritionRules.warsawFactorSimple }
+        val warsawDual = limit { it.nutritionRules.warsawFactorDual }
+        val warsawTrigger = limit { it.nutritionRules.warsawTriggerKcal }
 
         val steps = mutableListOf<StepResult>()
 
-        // A) Meal. Zero grams needs no ratio, as in Legacy (`if eff_carbs > 0`).
+        // A) Meal: fibre deduction, carbohydrates and Warsaw (ADR 0029). Zero grams needs no ratio, as in Legacy.
+        // The extended Warsaw component is kept apart until rounding, as Legacy keeps `warsaw_later_u`.
+        var extendedU = 0.0
         val meal: StepOutcome = run {
+            val causes = mutableListOf<String>()
+            val facts = mutableListOf<Fact>()
+            fun <T> read(input: Input<T>): T? = when (input) {
+                is Input.Unavailable -> { causes += input.cause; null }
+                is Input.Provided -> input.value
+            }
+            fun isZero(input: Input<Quantity>) = input is Input.Provided && input.value.value == 0.0
             val carbs = when (val c = request.carbs) {
                 is Input.Unavailable -> return@run blocked(c.cause)
                 is Input.Provided -> c.value.grams.value
             }
-            if (carbs == 0.0) return@run StepOutcome.Computed(0.0, listOf(Fact("carbs_g", 0.0)))
+            facts += Fact("carbs_g", carbs)
+
+            // Fibre. A factor of 0 is the Legacy switch off: the fibre amount is then not read.
+            var effectiveCarbs = carbs
+            if (carbs > 0.0 && !isZero(fiberFactor)) {
+                val fiber = read(request.nutrition.fiber)?.value
+                if (fiber != null) {
+                    facts += Fact("fiber_g", fiber)
+                    if (fiber >= carbs) {
+                        // Legacy high-fibre rule: nothing is deducted.
+                        facts += Fact("fiber_at_or_above_carbs", 1.0)
+                    } else if (fiber > 0.0) {
+                        val factor = read(fiberFactor)?.value
+                        val threshold = read(fiberThreshold)?.value
+                        if (factor != null && threshold != null && fiber > threshold) {
+                            val deduction = fiber * factor
+                            effectiveCarbs = max(0.0, carbs - deduction)
+                            facts += Fact("fiber_deduction_g", deduction)
+                        }
+                    }
+                }
+            }
+            facts += Fact("effective_carbs_g", effectiveCarbs)
+
+            // Warsaw. Both factors at 0 are the Legacy switch off: fat and protein are then not read.
+            var warsawSimpleCarbs: Double? = null
+            var warsawExtendedCarbs: Double? = null
+            if (!(isZero(warsawSimple) && isZero(warsawDual))) {
+                val fat = read(request.nutrition.fat)?.value
+                val protein = read(request.nutrition.protein)?.value
+                if (fat != null && protein != null && (fat > 0.0 || protein > 0.0)) {
+                    val kcalFat = fat * CandidateRuleSet.LEGACY_KCAL_PER_G_FAT
+                    val kcalProtein = protein * CandidateRuleSet.LEGACY_KCAL_PER_G_PROTEIN
+                    val kcal = kcalFat + kcalProtein
+                    facts += Fact("warsaw_kcal", kcal)
+                    if (kcal > CandidateRuleSet.LEGACY_WARSAW_ABOVE_KCAL) {
+                        val fpu = kcal / CandidateRuleSet.LEGACY_KCAL_PER_FPU
+                        facts += Fact("warsaw_fpu", fpu)
+                        val dual = when (request.warsawStrategy) {
+                            WarsawStrategy.NORMAL -> false
+                            WarsawStrategy.AUTO -> read(warsawTrigger)?.value?.let { kcal >= it }
+                        }
+                        when (dual) {
+                            true -> read(warsawDual)?.value?.let {
+                                warsawExtendedCarbs = fpu * CandidateRuleSet.LEGACY_CARBS_G_PER_FPU * it
+                                facts += Fact("warsaw_factor_dual", it)
+                            }
+                            false -> read(warsawSimple)?.value?.let {
+                                warsawSimpleCarbs = fpu * CandidateRuleSet.LEGACY_CARBS_G_PER_FPU * it
+                                facts += Fact("warsaw_factor_simple", it)
+                            }
+                            null -> Unit
+                        }
+                    }
+                }
+            }
+            if (causes.isNotEmpty()) return@run StepOutcome.Blocked(causes.distinct())
+
+            val needsRatio = effectiveCarbs > 0.0 || warsawSimpleCarbs != null || warsawExtendedCarbs != null
+            if (!needsRatio) return@run StepOutcome.Computed(0.0, facts)
             val cr = when (carbRatio) {
                 is Input.Unavailable -> return@run blocked(carbRatio.cause)
                 is Input.Provided -> carbRatio.value.value
@@ -151,9 +238,19 @@ public object CandidateEngine {
             if (cr <= CandidateRuleSet.LEGACY_INVALID_CARB_RATIO_AT_OR_BELOW) {
                 return@run blocked("profile.carb_ratio.invalid_for_candidate")
             }
-            StepOutcome.Computed(carbs / cr, listOf(Fact("carbs_g", carbs), Fact("carb_ratio_g_per_u", cr)))
+            facts += Fact("carb_ratio_g_per_u", cr)
+            var mealU = if (effectiveCarbs > 0.0) effectiveCarbs / cr else 0.0
+            warsawSimpleCarbs?.let {
+                val units = it / cr
+                mealU += units
+                facts += Fact("warsaw_simple_u", units)
+            }
+            warsawExtendedCarbs?.let { extendedU = it / cr }
+            StepOutcome.Computed(mealU, facts)
         }
         steps += StepResult(CandidateStep.MEAL, meal)
+        val extended: StepOutcome = after(meal, CandidateStep.MEAL) { StepOutcome.Computed(extendedU, emptyList()) }
+        steps += StepResult(CandidateStep.EXTENDED, extended)
 
         // B) Correction. Traced only in mg/dL; nothing is converted.
         val glucoseMgDl: Input<Double> = when (glucose) {
@@ -217,14 +314,20 @@ public object CandidateEngine {
         }
         steps += StepResult(CandidateStep.IOB, upfront)
 
-        // 6) Rounding. Kotlin round() is half-even, like Python round() in Legacy.
+        // 6) Rounding. Kotlin round() is half-even, like Python round() in Legacy. Upfront and extended parts are
+        // rounded apart and then added, as Legacy does before any delivery split.
         val rounded: StepOutcome = after(upfront, CandidateStep.IOB) { value ->
+            val later = (extended as StepOutcome.Computed).units
             val step = when (val s = roundStep) {
                 is Input.Unavailable -> return@after blocked(s.cause)
                 is Input.Provided -> s.value.value
             }
             if (step <= 0.0) return@after blocked("round_step.not_positive")
-            StepOutcome.Computed(round(value / step) * step, listOf(Fact("unrounded_u", value), Fact("round_step_u", step)))
+            val roundedUpfront = round(value / step) * step
+            val roundedLater = round(later / step) * step
+            StepOutcome.Computed(roundedUpfront + roundedLater, listOf(Fact("unrounded_u", value),
+                Fact("round_step_u", step), Fact("rounded_upfront_u", roundedUpfront),
+                Fact("unrounded_extended_u", later), Fact("rounded_extended_u", roundedLater)))
         }
         steps += StepResult(CandidateStep.ROUNDING, rounded)
 
@@ -308,7 +411,7 @@ public object CandidateCodec {
         fun segments(key: String, list: List<SegmentValue>) = list.forEach { segment ->
             input("$key.${segment.startMinute}-${segment.endMinute}", segment.value) { it.text }
         }
-        line("codec", "bolus-ai-next/candidate-request/v2")
+        line("codec", "bolus-ai-next/candidate-request/v3")
         line("engine", EngineIdentity.VERSION)
         line("rule_set", CandidateRuleSet.ID)
         line("calculation_at_ms", request.calculationAtEpochMs.toString())
@@ -330,5 +433,16 @@ public object CandidateCodec {
                 ":source=${it.sourceReference}"
         }
         input("iob", request.iob) { "${it.reference}:${it.origin}" }
+        (request.profile as? Input.Provided)?.value?.nutritionRules?.let { rules ->
+            input("profile.fiber_factor", rules.fiberFactor) { it.text }
+            input("profile.fiber_threshold", rules.fiberThresholdG) { it.text }
+            input("profile.warsaw_factor_simple", rules.warsawFactorSimple) { it.text }
+            input("profile.warsaw_factor_dual", rules.warsawFactorDual) { it.text }
+            input("profile.warsaw_trigger", rules.warsawTriggerKcal) { it.text }
+        }
+        input("meal.fiber", request.nutrition.fiber) { it.text }
+        input("meal.fat", request.nutrition.fat) { it.text }
+        input("meal.protein", request.nutrition.protein) { it.text }
+        line("warsaw_strategy", request.warsawStrategy.code)
     }
 }

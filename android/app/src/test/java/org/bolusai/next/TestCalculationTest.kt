@@ -89,8 +89,8 @@ class TestCalculationTest {
         return ProfileGateState.of(record, TimeZoneRules { true })
     }
 
-    private val form = TestCalculationForm(carbs = "60", glucoseMgDl = "190", glucoseEnteredAtEpochMs = at - 60_000,
-        iobUnits = "0")
+    private val form = TestCalculationForm(carbs = "60", fiber = "0", fat = "0", protein = "0", glucoseMgDl = "190",
+        glucoseEnteredAtEpochMs = at - 60_000, iobUnits = "0")
 
     private fun reading(value: Int = 190) = LatestReadingPresentation.Reading(value, at - 120_000, 120_000,
         ApprovedPermissionSet("adr0023-i2b-2026-10-12", "c".repeat(64)), "ab12cd34", "SYNTHETIC_TREND")
@@ -237,13 +237,21 @@ class TestCalculationTest {
     }
 
     @Test fun limitsAreReadOnlyHereAndShowTheirOrigin() {
+        fun firstLines(text: String) = text.lines().take(4).joinToString("\n")
+        val confirmed = TestCalculationText.limits(TestCalculation.profile(state()))
         assertEquals("Perfil v1 confirmado\nPaso de redondeo: 0,1 U\nBolo máximo: 15 U\nCorrección máxima: 5 U",
-            TestCalculationText.limits(TestCalculation.profile(state())))
+            firstLines(confirmed))
+        // ADR 0029: a version without nutrition rules shows them as unknown, never as off.
+        assertEquals(listOf("Fibra: factor de descuento: desconocido (profile.fiber_factor.not_in_schema)",
+            "Fibra: umbral: desconocido (profile.fiber_threshold.not_in_schema)",
+            "Warsaw: factor simple: desconocido (profile.warsaw_factor_simple.not_in_schema)",
+            "Warsaw: factor dual: desconocido (profile.warsaw_factor_dual.not_in_schema)",
+            "Warsaw: umbral: desconocido (profile.warsaw_trigger.not_in_schema)"), confirmed.lines().drop(4))
         assertEquals("Perfil v1 sin confirmar (profile.unconfirmed)\n" +
             "Paso de redondeo: desconocido (profile.round_step.not_in_schema)\n" +
             "Bolo máximo: desconocido (profile.max_bolus.not_in_schema)\n" +
             "Corrección máxima: desconocido (profile.max_correction.not_in_schema)",
-            TestCalculationText.limits(TestCalculation.profile(state(confirmed = false, content = content(schema = 1)))))
+            firstLines(TestCalculationText.limits(TestCalculation.profile(state(confirmed = false, content = content(schema = 1))))))
         assertEquals("Límites del perfil no disponibles (profile.missing)",
             TestCalculationText.limits(Input.Unavailable("profile.missing")))
     }
@@ -278,6 +286,30 @@ class TestCalculationTest {
         assertEquals(Input.Unavailable("meal.selection.missing"), TestCalculation.mealCarbs(MealSelection.Missing))
         val request = TestCalculation.request(at, state(), current, null, form.copy(carbsChoice = CarbsChoice.MEAL_SELECTION))
         assertEquals("45", (request.carbs as Input.Provided).value.grams.text)
+    }
+
+    @Test fun mealNutrientsComeFromTheSameRevisionAndAMissingOneIsNeverZero() {
+        fun full(fiber: DraftField) = MealRecord("meal-1", 2, MealKind.DRAFT, MealContent(carbs = DraftField.Entered("60"),
+            fat = DraftField.Entered("20"), protein = DraftField.Entered("30"), fiber = fiber,
+            basis = NutritionBasis.TOTAL_GRAMS), null)
+        val complete = MealSelection.Reviewed(full(DraftField.Entered("12")), full(DraftField.Entered("12")))
+        val nutrition = TestCalculation.mealNutrition(complete)
+        assertEquals(listOf("12", "20", "30"), listOf(nutrition.fiber, nutrition.fat, nutrition.protein)
+            .map { (it as Input.Provided).value.text })
+        val missing = MealSelection.Reviewed(full(DraftField.Missing), full(DraftField.Missing))
+        assertEquals(Input.Unavailable("meal.fiber.missing"), TestCalculation.mealNutrition(missing).fiber)
+        assertEquals(Input.Unavailable("meal.fat.invalid"), TestCalculation.mealNutrition(MealSelection.Reviewed(
+            full(DraftField.Entered("1")).let { it.copy(content = it.content.copy(fat = DraftField.Entered("mucha"))) },
+            full(DraftField.Entered("1")).let { it.copy(content = it.content.copy(fat = DraftField.Entered("mucha"))) })).fat)
+        assertEquals(Input.Unavailable("meal.selection.missing"), TestCalculation.mealNutrition(MealSelection.Missing).protein)
+        assertEquals(Input.Unavailable("meal.selection.obsolete"), TestCalculation.mealNutrition(
+            MealSelection.Reviewed(record(1, DraftField.Entered("45")), record(2, DraftField.Entered("50")))).fiber)
+        val mealForm = form.copy(carbsChoice = CarbsChoice.MEAL_SELECTION)
+        assertEquals(nutrition, TestCalculation.request(at, state(), complete, null, mealForm).nutrition)
+        // The typed nutrients of the manual form are not used with a meal selection.
+        assertEquals(nutrition, TestCalculation.request(at, state(), complete, null, mealForm.copy(fiber = "99")).nutrition)
+        assertEquals(nutrition, TestCalculation.dependencies(state(), complete, null, mealForm).mealNutrition)
+        assertNull(TestCalculation.dependencies(state(), complete, null, form).mealNutrition)
     }
 
     @Test fun manualGlucoseKeepsItsEntryInstantNotTheCalculationTime() {

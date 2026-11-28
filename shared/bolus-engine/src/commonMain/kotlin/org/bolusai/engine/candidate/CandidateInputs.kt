@@ -80,6 +80,52 @@ public enum class CarbsOrigin(public val code: String) {
 public data class CarbsValue(public val grams: Quantity, public val origin: CarbsOrigin)
 
 /**
+ * Fibre, fat and protein of the meal, in grams (ADR 0029). Each is explicit: an unknown amount is unavailable and is
+ * never taken as zero. `0` is a declared fact: the meal has none.
+ */
+public data class MealNutrition(
+    public val fiber: Input<Quantity>,
+    public val fat: Input<Quantity>,
+    public val protein: Input<Quantity>,
+) {
+    public companion object {
+        /** Nothing declared: the rules that would read each amount block. */
+        public val UNKNOWN: MealNutrition = MealNutrition(Input.Unavailable("meal.fiber.missing"),
+            Input.Unavailable("meal.fat.missing"), Input.Unavailable("meal.protein.missing"))
+    }
+}
+
+/** Legacy `BolusRequestV2.strategy`: `auto` lets the Warsaw trigger select the dual factor, `normal` never does. */
+public enum class WarsawStrategy(public val code: String) {
+    AUTO("auto"),
+    NORMAL("normal"),
+}
+
+/**
+ * Fibre and Warsaw settings of the profile version used (content schema 4, ADR 0029). Legacy has two switches
+ * (`calculator.subtract_fiber`, `warsaw.enabled`); Next has none: a factor of `0` gives exactly the Legacy result
+ * with the switch off, so switching a rule off is declaring its factor as `0`. Nothing is defaulted: Legacy
+ * defaults (0.5, 5 g, 0.1, 0.2, 300 kcal) are never used.
+ */
+public data class NutritionRules(
+    public val fiberFactor: Input<Quantity>,
+    public val fiberThresholdG: Input<Quantity>,
+    public val warsawFactorSimple: Input<Quantity>,
+    public val warsawFactorDual: Input<Quantity>,
+    public val warsawTriggerKcal: Input<Quantity>,
+) {
+    public companion object {
+        /** A profile version whose schema has no nutrition rules: unknown, never filled in. */
+        public val NOT_IN_SCHEMA: NutritionRules = NutritionRules(
+            Input.Unavailable("profile.fiber_factor.not_in_schema"),
+            Input.Unavailable("profile.fiber_threshold.not_in_schema"),
+            Input.Unavailable("profile.warsaw_factor_simple.not_in_schema"),
+            Input.Unavailable("profile.warsaw_factor_dual.not_in_schema"),
+            Input.Unavailable("profile.warsaw_trigger.not_in_schema"))
+    }
+}
+
+/**
  * IOB as provided, with its provenance. A manual value is typed by the user (semantics pending, Legacy LC-011). A
  * calculated value comes from the candidate IOB over a dose history (ADR 0026, ADR 0028): it keeps the exact double
  * the IOB rules produced, without rounding, and [reference] is the input fingerprint of that IOB calculation, which
@@ -140,6 +186,7 @@ public data class ProfileSnapshot(
     public val roundStep: Input<Quantity>,
     public val maxBolus: Input<Quantity>,
     public val maxCorrection: Input<Quantity>,
+    public val nutritionRules: NutritionRules = NutritionRules.NOT_IN_SCHEMA,
 ) {
     init {
         require(version > 0) { "engine.profile.invalid_version" }
@@ -163,6 +210,8 @@ public data class CandidateRequest(
     public val carbs: Input<CarbsValue>,
     public val glucose: Input<GlucoseValue>,
     public val iob: Input<IobValue>,
+    public val nutrition: MealNutrition = MealNutrition.UNKNOWN,
+    public val warsawStrategy: WarsawStrategy = WarsawStrategy.AUTO,
 ) {
     init {
         val minute = (localMinuteOfDay as? Input.Provided)?.value

@@ -249,7 +249,10 @@ pendiente ([ADR 0027](docs/adr/0027-profile-insulin-action.md)). El productor es
 el registro local de dosis de Bolo (`shared/insulin-history`, `insulin-doses.db`):
 anotaciones locales append-only, sin sincronización ni autoridad de tratamiento.
 Bolo permite elegir entre IOB a mano e IOB calculado de ese registro
-([ADR 0028](docs/adr/0028-local-dose-ledger-and-calculated-iob.md)).
+([ADR 0028](docs/adr/0028-local-dose-ledger-and-calculated-iob.md)). El cálculo
+de prueba aplica además el descuento de fibra y Warsaw (grasa y proteína) de
+Legacy, con paridad exacta en 23 vectores y reglas declaradas en el perfil sin
+valores por defecto ([ADR 0029](docs/adr/0029-fiber-and-warsaw-candidate-rules.md)).
 
 ## Documentación para ejecutar el proyecto
 

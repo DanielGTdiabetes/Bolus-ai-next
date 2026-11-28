@@ -88,6 +88,8 @@ class TestCalculationDeviceTest {
             model.gate is ProfileGateState.Evaluated
         }
         enter(scenario, "carbs", "60")
+        // ADR 0029: a manual meal declares its fibre, fat and protein; blank would be unknown and block the meal.
+        listOf("fiber", "fat", "protein").forEach { enter(scenario, it, "0") }
         enter(scenario, "glucose", "190")
     }
 
