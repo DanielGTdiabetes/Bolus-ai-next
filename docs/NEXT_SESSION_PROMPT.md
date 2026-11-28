@@ -94,10 +94,28 @@ propuesto. Condición del propietario: no puede crear conflicto con `bolus_ai`
 interruptor apagado por defecto). El adaptador del mini PC ya está auditado
 (sección «Adaptador del mini PC» del ADR): usa la librería pública
 `myfitnesspal` 2.1.2 y lee la página `https://www.myfitnesspal.com/food/diary?date=`
-con la sesión; no hay interfaz privada. SIGUIENTE PASO: implementar la primera
-entrega del «Plan de implementación» del ADR 0032 (módulo `shared/mfp-import`,
-sin teléfono). El EVO-X2 es accesible por SSH con el alias `evo-x2` y clave;
-solo lectura, sin abrir su `.env`.
+con la sesión; no hay interfaz privada. El EVO-X2 es accesible por SSH con el
+alias `evo-x2` y clave; solo lectura, sin abrir su `.env`.
+
+ENTREGA 2026-11-28 — MÓDULO `shared/mfp-import` (ADR 0032, PRIMERA ENTREGA)
+Paquete `org.bolusai.mfp`, común, sin dependencias, sin red y sin sesión; nada
+lo usa todavía y `verify.ps1` lo exige. `MfpDiaryPage` es el texto de la página
+sin interpretar; `MfpDiaryInterpreter` da comidas con totales exactos en
+milésimas o fallos `mfp.page.*`; `ReadStableMfpDiary` lee con los puertos
+`MfpDiaryReader` y `MfpPause` hasta dos cargas iguales (máximo tres, pausa de
+4 s observada en Legacy) y devuelve las comidas estables y las que cambiaron.
+El SHA-256 llega por el puerto `MfpSha256`. Ilegible, negativo o columna no
+configurada es desconocido, nunca `0`; un total es desconocido si lo es algún
+alimento. Una coma que no sea separador de miles deja el valor desconocido, y
+la dirección final debe llevar `date=` con el día pedido. 28 pruebas con datos
+sintéticos. Detalle en «Primera entrega implementada» del ADR 0032.
+SIGUIENTE PASO, con el Pixel y el propietario: segunda entrega del plan
+(permiso `INTERNET` limitado a MyFitnessPal, que hoy `verify.ps1` prohíbe;
+`WebView` para iniciar sesión y leer el diario; extractor que entregue el texto
+de las celdas como lo lee la librería; interruptor apagado por defecto;
+importación al borrador de comida) y la prueba controlada de la segunda sesión.
+Antes de dar por bueno el analizador hace falta una página real saneada: falta
+confirmar el texto de las cabeceras y el separador de miles de la versión `/es/`.
 
 ESCRITURA EN DEXCOM — AVISO DEL PROPIETARIO 2026-11-28
 Legacy escribe en el historial de la app Dexcom todos los bolos y la insulina
@@ -137,7 +155,7 @@ SIGUIENTE
   en Dexcom y Nightscout quedan para cuando Next tenga escritura, que nacerá
   con interruptor apagado por defecto.
 - Después: techo de IOB, intervalo mínimo entre bolos y entrega dual o
-  extendida; luego MyFitnessPal por sesión en el móvil.
+  extendida; luego la segunda entrega de MyFitnessPal (ADR 0032).
 No repetir las decisiones ya aprobadas.
 
 CONTINUACIÓN ACTIVA — 2026-10-12

@@ -230,3 +230,13 @@ lo traduce a un `DoseHistory` explícito con su cobertura y `CandidateIob`
 decide si basta. Las entradas son anotaciones locales sin autoridad de
 tratamiento; nada se sincroniza. Véase el
 [ADR 0028](adr/0028-local-dose-ledger-and-calculated-iob.md).
+
+## Importación de MyFitnessPal (ADR 0032)
+
+`shared/mfp-import` es un módulo común sin dependencias que interpreta el texto
+de la página del diario de MyFitnessPal: comidas con totales exactos o valores
+desconocidos, fallos con código estable, identidad, revisión y lectura estable.
+No abre conexiones ni guarda sesión; la carga de la página, la pausa y el
+SHA-256 son puertos que pondrá la plataforma. Nada lo usa todavía: el adaptador
+Android con `WebView` es la segunda entrega del
+[ADR 0032](adr/0032-myfitnesspal-session-on-device.md).

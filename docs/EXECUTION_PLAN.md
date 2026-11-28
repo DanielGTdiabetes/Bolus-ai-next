@@ -852,8 +852,19 @@ auditar en solo lectura `scripts/hermes/mfp_sync_trigger.py`,
 Las cookies nunca entran en logs, fixtures ni en el repositorio. El host BMAX
 ya no existe; lo sustituye el EVO-X2, y cualquier mención al BMAX es histórica.
 Auditoría, condición de no interferir con `bolus_ai` y diseño propuesto en el
-[ADR 0032](adr/0032-myfitnesspal-session-on-device.md). Falta el código del
-adaptador, que está en el mini PC y no en el repositorio de Legacy.
+[ADR 0032](adr/0032-myfitnesspal-session-on-device.md). El adaptador del mini
+PC quedó auditado en ese ADR.
+
+Primera entrega hecha el 2026-11-28: módulo común `shared/mfp-import`, sin red
+ni sesión. Interpreta el texto de la página del diario, da fallos con código
+estable, identidad `mfp:<fecha>:<comida>`, revisión SHA-256 y lectura estable
+(dos cargas iguales, máximo tres). Un valor ilegible, negativo o de una columna
+no configurada es desconocido, nunca `0`, y el total de una comida es
+desconocido si lo es algún alimento. Cubre de la fase 8 la parte de dominio de
+los puntos 2 y 4 (identidad, huella, comida nueva, revisión y reimportación).
+Falta la segunda entrega, con el Pixel y el propietario: permiso de red
+limitado a MyFitnessPal, inicio de sesión en `WebView`, importación al borrador
+revisable y pruebas en dispositivo. Hasta entonces la fase 8 no está cubierta.
 
 ### Entrega de modo sombra por repetición — 2026-11-28
 

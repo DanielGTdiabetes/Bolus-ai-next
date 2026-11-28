@@ -284,6 +284,29 @@ try {
     if ($doseNetwork.Count -gt 0) {
         throw "The dose ledger must not send or synchronise anything (ADR 0028): $($doseNetwork.Path -join ', ')"
     }
+    # ADR 0032, first delivery: the MyFitnessPal import module only interprets the text it is handed. It depends on no
+    # other module and on no platform API, opens no connection and holds no session. Nothing uses it yet: connecting
+    # it to Android is the second delivery and has to change this rule on purpose.
+    $mfpRoot = Join-Path $repositoryRoot "shared\mfp-import"
+    $mfpReferences = @(Get-ChildItem -LiteralPath $mfpRoot -Recurse -File |
+        Where-Object { $_.FullName -notmatch '\\build\\' } |
+        Select-String -Pattern 'org\.bolusai\.(engine|profile|profileunavailability|meals|dexcomg7|insulin|next)|^import (android|androidx|java|javax|platform)\.|project\(' -List)
+    if ($mfpReferences.Count -gt 0) {
+        throw "The MyFitnessPal import module must stay self-contained (ADR 0032): $($mfpReferences.Path -join ', ')"
+    }
+    $mfpNetwork = @(Get-ChildItem -LiteralPath (Join-Path $mfpRoot "src\commonMain") -Recurse -File |
+        Select-String -Pattern 'java\.net\.|HttpURLConnection|okhttp|ktor|Socket|WebView|CookieManager|ContentResolver|sendBroadcast' -List)
+    if ($mfpNetwork.Count -gt 0) {
+        throw "The MyFitnessPal import module must not open connections or hold a session (ADR 0032): $($mfpNetwork.Path -join ', ')"
+    }
+    $mfpConsumers = @(Get-ChildItem -LiteralPath (Join-Path $repositoryRoot "android"), (Join-Path $repositoryRoot "shared"),
+            (Join-Path $repositoryRoot "tools") -Recurse -File |
+        Where-Object { -not $_.FullName.StartsWith($mfpRoot + "\") -and $_.FullName -notmatch '[\\/]build[\\/]' -and
+            $_.Extension -in @(".kt", ".kts", ".java") } |
+        Select-String -Pattern 'mfp-import|org\.bolusai\.mfp' -List)
+    if ($mfpConsumers.Count -gt 0) {
+        throw "Nothing may use the MyFitnessPal import module before the second delivery (ADR 0032): $($mfpConsumers.Path -join ', ')"
+    }
     # ADR 0030: the shadow replay is offline and read-only. Its engine package, tool and extractor never open a
     # connection, send a broadcast or touch a database, and no export of real Legacy rows is ever committed.
     $shadowSources = @(Get-ChildItem -LiteralPath (Join-Path $repositoryRoot "shared\bolus-engine\src\commonMain\kotlin\org\bolusai\engine\shadow"),
