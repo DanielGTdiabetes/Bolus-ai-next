@@ -31,7 +31,10 @@ versión de tratamiento y no debe distribuirse como tal.
 
 ## Límites actuales
 
-- No declara el permiso `INTERNET` ni permisos Dexcom.
+- Declara `INTERNET` solo para el enlace con MyFitnessPal, apagado por defecto
+  y limitado por código a los hosts de MyFitnessPal
+  ([ADR 0032](../docs/adr/0032-myfitnesspal-session-on-device.md)). El cálculo
+  local no usa la red.
 - No interpreta broadcasts, notificaciones ni datos de otros proveedores.
 - No contiene lecturas de ejemplo ni valores clínicos sustitutivos.
 - Incluye un verificador puro y todavía no conectado para futura identidad del

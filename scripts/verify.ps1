@@ -39,13 +39,26 @@ try {
     if (-not (Test-Path -LiteralPath $mergedManifest)) {
         throw "Android verification did not produce the merged manifest"
     }
-    if (Select-String -LiteralPath $mergedManifest -SimpleMatch "android.permission.INTERNET" -Quiet) {
-        throw "The Android foundation must not request Internet permission"
-    }
     $releaseManifest = Join-Path $repositoryRoot "android\app\build\intermediates\merged_manifest\release\processReleaseMainManifest\AndroidManifest.xml"
     if (-not (Test-Path -LiteralPath $releaseManifest) -or
-        (Select-String -LiteralPath $releaseManifest -Pattern 'senderfixture|android.permission.INTERNET' -Quiet)) {
-        throw "Release manifest must stay isolated from fixtures and network permissions"
+        (Select-String -LiteralPath $releaseManifest -Pattern 'senderfixture' -Quiet)) {
+        throw "Release manifest must stay isolated from fixtures"
+    }
+    # ADR 0032, second delivery: the Internet permission exists for the MyFitnessPal link alone. The app requests no
+    # other Android permission than that one and QUERY_ALL_PACKAGES (ADR 0023), allows no cleartext traffic and
+    # declares no network security configuration that could widen it.
+    foreach ($manifest in @($mergedManifest, $releaseManifest)) {
+        [xml]$permissionXml = Get-Content -Raw -LiteralPath $manifest
+        $permissionNs = "http://schemas.android.com/apk/res/android"
+        $androidPermissions = @($permissionXml.SelectNodes("/manifest/uses-permission") |
+            ForEach-Object { $_.GetAttribute("name", $permissionNs) } |
+            Where-Object { $_.StartsWith("android.permission.") } | Sort-Object)
+        $permissionApplication = $permissionXml.SelectSingleNode("/manifest/application")
+        if (($androidPermissions -join ",") -cne "android.permission.INTERNET,android.permission.QUERY_ALL_PACKAGES" -or
+                $permissionApplication.GetAttribute("usesCleartextTraffic", $permissionNs) -cne "false" -or
+                $permissionApplication.HasAttribute("networkSecurityConfig", $permissionNs)) {
+            throw "The app may request only INTERNET (MyFitnessPal link, ADR 0032) and QUERY_ALL_PACKAGES, without cleartext traffic: $manifest"
+        }
     }
     # ADR 0022 R1 and ADR 0023: the only receiver is the Dexcom one, declared disabled and exported, guarded by the
     # producer's permission (ADR 0023, part I, point 1), with a single intent filter holding only the observed action.
@@ -284,9 +297,8 @@ try {
     if ($doseNetwork.Count -gt 0) {
         throw "The dose ledger must not send or synchronise anything (ADR 0028): $($doseNetwork.Path -join ', ')"
     }
-    # ADR 0032, first delivery: the MyFitnessPal import module only interprets the text it is handed. It depends on no
-    # other module and on no platform API, opens no connection and holds no session. Nothing uses it yet: connecting
-    # it to Android is the second delivery and has to change this rule on purpose.
+    # ADR 0032: the MyFitnessPal import module only interprets the text it is handed. It depends on no other module
+    # and on no platform API, opens no connection and holds no session.
     $mfpRoot = Join-Path $repositoryRoot "shared\mfp-import"
     $mfpReferences = @(Get-ChildItem -LiteralPath $mfpRoot -Recurse -File |
         Where-Object { $_.FullName -notmatch '\\build\\' } |
@@ -299,13 +311,78 @@ try {
     if ($mfpNetwork.Count -gt 0) {
         throw "The MyFitnessPal import module must not open connections or hold a session (ADR 0032): $($mfpNetwork.Path -join ', ')"
     }
+    # ADR 0032, second delivery: only the link (its session, extraction, hosts, switch, import into drafts, screen,
+    # the activity that wires them and their tests) uses the module. The engine, the test calculation, the profile, the
+    # dose ledger and Dexcom never see MyFitnessPal data: it reaches a calculation only as a draft the user reviewed.
+    $allowedMfpConsumers = @(
+        "android\app\build.gradle.kts",
+        "android\app\src\main\java\org\bolusai\next\MainActivity.kt",
+        "android\app\src\main\java\org\bolusai\next\application\ImportMfpMeal.kt",
+        "android\app\src\main\java\org\bolusai\next\mfp\MfpHosts.kt",
+        "android\app\src\main\java\org\bolusai\next\mfp\MfpExtraction.kt",
+        "android\app\src\main\java\org\bolusai\next\mfp\MfpWebSession.kt",
+        "android\app\src\main\java\org\bolusai\next\ui\MfpLinkModel.kt",
+        "android\app\src\main\java\org\bolusai\next\ui\MfpLinkScreen.kt",
+        "android\app\src\test\java\org\bolusai\next\mfp\MfpTestData.kt",
+        "android\app\src\test\java\org\bolusai\next\mfp\ImportMfpMealTest.kt",
+        "android\app\src\test\java\org\bolusai\next\mfp\MfpHostsTest.kt",
+        "android\app\src\test\java\org\bolusai\next\mfp\MfpExtractionTest.kt",
+        "android\app\src\test\java\org\bolusai\next\mfp\MfpLinkTextTest.kt",
+        "android\app\src\androidTest\java\org\bolusai\next\mfp\MfpWebSessionDeviceTest.kt"
+    ) | ForEach-Object { Join-Path $repositoryRoot $_ }
     $mfpConsumers = @(Get-ChildItem -LiteralPath (Join-Path $repositoryRoot "android"), (Join-Path $repositoryRoot "shared"),
             (Join-Path $repositoryRoot "tools") -Recurse -File |
         Where-Object { -not $_.FullName.StartsWith($mfpRoot + "\") -and $_.FullName -notmatch '[\\/]build[\\/]' -and
-            $_.Extension -in @(".kt", ".kts", ".java") } |
+            $_.Extension -in @(".kt", ".kts", ".java") -and $allowedMfpConsumers -notcontains $_.FullName } |
         Select-String -Pattern 'mfp-import|org\.bolusai\.mfp' -List)
     if ($mfpConsumers.Count -gt 0) {
-        throw "Nothing may use the MyFitnessPal import module before the second delivery (ADR 0032): $($mfpConsumers.Path -join ', ')"
+        throw "Only the MyFitnessPal link files may use the import module (ADR 0032): $($mfpConsumers.Path -join ', ')"
+    }
+    # The session class is the only production code that can open a connection, and the hosts file is the only one that
+    # names an address. No page can call into the app, and nothing points at Legacy, the NAS, Render or the mini PC.
+    $appMain = Join-Path $repositoryRoot "android\app\src\main\java"
+    $mfpSessionSource = Join-Path $appMain "org\bolusai\next\mfp\MfpWebSession.kt"
+    $mfpHostsSource = Join-Path $appMain "org\bolusai\next\mfp\MfpHosts.kt"
+    $networkUsers = @(Get-ChildItem -LiteralPath $appMain -Recurse -File |
+        Where-Object { $_.FullName -ne $mfpSessionSource } |
+        Select-String -Pattern 'java\.net\.|HttpURLConnection|okhttp|ktor|Socket\b|WebView|CookieManager|WebStorage|loadUrl|evaluateJavascript|DownloadManager' -List)
+    if ($networkUsers.Count -gt 0) {
+        throw "Only the MyFitnessPal session may open connections (ADR 0032): $($networkUsers.Path -join ', ')"
+    }
+    $addressUsers = @(Get-ChildItem -LiteralPath $appMain -Recurse -File |
+        Where-Object { $_.FullName -ne $mfpHostsSource } |
+        Select-String -Pattern 'https?://|wss?://' -List)
+    if ($addressUsers.Count -gt 0) {
+        throw "Only the MyFitnessPal hosts file may name a network address (ADR 0032): $($addressUsers.Path -join ', ')"
+    }
+    $mfpHostsText = Get-Content -Raw -LiteralPath $mfpHostsSource
+    $namedHosts = @([regex]::Matches($mfpHostsText, '(?i)\b[a-z0-9.-]+\.(com|net|org|io|app|dev|es)\b') | ForEach-Object { $_.Value.ToLowerInvariant() } | Sort-Object -Unique)
+    if (($namedHosts -join ",") -cne "challenges.cloudflare.com,myfitnesspal.com,www.myfitnesspal.com") {
+        throw "The MyFitnessPal link may only name MyFitnessPal's own hosts and the Cloudflare challenge its sign-in embeds (ADR 0032): $($namedHosts -join ', ')"
+    }
+    $mfpForbidden = @(Get-ChildItem -LiteralPath $appMain -Recurse -File |
+        Select-String -Pattern 'addJavascriptInterface|api/integrations|sync-now|onrender\.com|\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b' -List)
+    if ($mfpForbidden.Count -gt 0) {
+        throw "The app must not expose a JavaScript interface nor name Legacy, NAS, Render or private addresses (ADR 0032): $($mfpForbidden.Path -join ', ')"
+    }
+    $mfpSessionText = Get-Content -Raw -LiteralPath $mfpSessionSource
+    if ($mfpSessionText -notmatch 'check\(!MfpLinkGuard\.active \|\| answers != null\)' -or
+            $mfpSessionText -notmatch 'MfpHosts\.mainFrameAllowed\(url\) else MfpHosts\.resourceAllowed\(url\)' -or
+            $mfpSessionText -match 'postUrl|setCookie|getCookie') {
+        throw "The MyFitnessPal session must check every request, never post, never read or write a cookie itself and stay closed to instrumentation (ADR 0032)"
+    }
+    # The link is born off, and instrumentation never reaches the stored switch, the real session or the network.
+    if (-not (Select-String -LiteralPath (Join-Path $appMain "org\bolusai\next\mfp\MfpLinkSwitch.kt") -SimpleMatch -Quiet `
+            -Pattern 'preferences.getBoolean(KEY, false)')) {
+        throw "The MyFitnessPal link must be off by default (ADR 0032)"
+    }
+    if (-not (Select-String -LiteralPath (Join-Path $repositoryRoot "android\app\src\androidTest\java\org\bolusai\next\ProfileIsolationTestRunner.kt") -SimpleMatch -Quiet `
+            -Pattern 'MfpLinkGuard.activateForInstrumentation()')) {
+        throw "The instrumentation runner must activate the MyFitnessPal barrier (ADR 0032)"
+    }
+    # A MyFitnessPal meal reaches a calculation only as a reviewed draft: the import writes drafts and nothing else.
+    if (Select-String -LiteralPath (Join-Path $appMain "org\bolusai\next\application\ImportMfpMeal.kt") -Pattern 'org\.bolusai\.(engine|insulin|profile)|\.select\(|TestCalculation' -Quiet) {
+        throw "The MyFitnessPal import must only write meal drafts (ADR 0032)"
     }
     # ADR 0030: the shadow replay is offline and read-only. Its engine package, tool and extractor never open a
     # connection, send a broadcast or touch a database, and no export of real Legacy rows is ever committed.
@@ -615,7 +692,7 @@ jobs:
             if ($LASTEXITCODE -ne 0) { throw "Could not wake the display for UI instrumentation" }
             # Direct instrumentation avoids collecting unrelated device logcat or clinical data.
             $instrumentation = @(adb shell am instrument -w -r `
-                -e class org.bolusai.next.glucose.dexcom.AndroidDexcomSenderEvidenceTest,org.bolusai.next.NavigationDeviceTest,org.bolusai.next.MealDraftDeviceTest,org.bolusai.next.MealHistoryDeviceTest,org.bolusai.next.MealRestoreDeviceTest,org.bolusai.next.meals.SqliteMealRepositoryDeviceTest,org.bolusai.next.DarkThemeDeviceTest,org.bolusai.next.TestCalculationDeviceTest,org.bolusai.next.profile.SqliteClinicalProfileRepositoryDeviceTest,org.bolusai.next.profile.ClinicalProfileConfirmationDeviceTest,org.bolusai.next.profile.ClinicalProfileLimitsDeviceTest,org.bolusai.next.profile.ClinicalProfileInsulinActionDeviceTest,org.bolusai.next.ClinicalProfileDeviceTest,org.bolusai.next.ClinicalProfileConfirmationUiDeviceTest,org.bolusai.next.ClinicalProfileUnavailabilityDeviceTest,org.bolusai.next.BolusProfileDetailsDeviceTest,org.bolusai.next.ProfileStorageGuardDeviceTest,org.bolusai.next.glucose.dexcom.DexcomBundleExtrasDeviceTest,org.bolusai.next.glucose.dexcom.storage.SqliteDexcomObservationStoreDeviceTest,org.bolusai.next.DexcomLogDiagnosticsDeviceTest,org.bolusai.next.glucose.dexcom.storage.DexcomLogIsolationDeviceTest,org.bolusai.next.glucose.dexcom.DexcomG7ReceiverDeviceTest,org.bolusai.next.doses.SqliteDoseLedgerDeviceTest `
+                -e class org.bolusai.next.glucose.dexcom.AndroidDexcomSenderEvidenceTest,org.bolusai.next.NavigationDeviceTest,org.bolusai.next.MealDraftDeviceTest,org.bolusai.next.MealHistoryDeviceTest,org.bolusai.next.MealRestoreDeviceTest,org.bolusai.next.meals.SqliteMealRepositoryDeviceTest,org.bolusai.next.DarkThemeDeviceTest,org.bolusai.next.TestCalculationDeviceTest,org.bolusai.next.profile.SqliteClinicalProfileRepositoryDeviceTest,org.bolusai.next.profile.ClinicalProfileConfirmationDeviceTest,org.bolusai.next.profile.ClinicalProfileLimitsDeviceTest,org.bolusai.next.profile.ClinicalProfileInsulinActionDeviceTest,org.bolusai.next.ClinicalProfileDeviceTest,org.bolusai.next.ClinicalProfileConfirmationUiDeviceTest,org.bolusai.next.ClinicalProfileUnavailabilityDeviceTest,org.bolusai.next.BolusProfileDetailsDeviceTest,org.bolusai.next.ProfileStorageGuardDeviceTest,org.bolusai.next.glucose.dexcom.DexcomBundleExtrasDeviceTest,org.bolusai.next.glucose.dexcom.storage.SqliteDexcomObservationStoreDeviceTest,org.bolusai.next.DexcomLogDiagnosticsDeviceTest,org.bolusai.next.glucose.dexcom.storage.DexcomLogIsolationDeviceTest,org.bolusai.next.glucose.dexcom.DexcomG7ReceiverDeviceTest,org.bolusai.next.doses.SqliteDoseLedgerDeviceTest,org.bolusai.next.mfp.MfpWebSessionDeviceTest,org.bolusai.next.MfpLinkDeviceTest `
                 "$testPackage/$isolationRunner")
             $instrumentationExit = $LASTEXITCODE
             $instrumentation | Write-Output

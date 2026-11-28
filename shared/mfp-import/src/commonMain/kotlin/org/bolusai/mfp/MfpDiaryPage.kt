@@ -21,6 +21,12 @@ data class MfpDiaryPage(
     val meals: List<MfpMealRows>,
     /** HTTP status of the page when the platform knows it; `null` when it does not. Never assumed to be 200. */
     val httpStatus: Int? = null,
+    /**
+     * The day the page itself declares: the `value` attribute of every `input#date_selector`, as written. Observed on
+     * the real page on 2026-11-28 (ADR 0032): MyFitnessPal drops `date=` from the address when the day is today, and
+     * this hidden field still states it. Empty when the page has no such field.
+     */
+    val declaredDates: List<String> = emptyList(),
 )
 
 /**

@@ -38,6 +38,7 @@ internal class ScreenRenderer(
     private val renderSelection: (() -> Unit)? = null,
     private val renderProfile: (() -> Unit)? = null,
     private val renderTestCalculation: (() -> Unit)? = null,
+    private val renderMfp: (() -> Unit)? = null,
 ) {
     private fun dp(value: Int) = (value * context.resources.displayMetrics.density).toInt()
     private fun color(id: Int) = context.getColor(id)
@@ -216,7 +217,8 @@ internal class ScreenRenderer(
             }
             Destination.MOBILE_SETTINGS -> {
                 info(R.string.dexcom, R.string.external_detail)
-                info(R.string.mfp, R.string.meals_detail)
+                // ADR 0032: the link screen is composed elsewhere; the renderer knows nothing of the session.
+                renderMfp?.invoke() ?: info(R.string.mfp, R.string.meals_detail)
                 link(Destination.MEALS)
                 link(Destination.DIAGNOSTICS)
                 link(Destination.SETTINGS)

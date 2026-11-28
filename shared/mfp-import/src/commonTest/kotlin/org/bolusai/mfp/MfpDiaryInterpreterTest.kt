@@ -125,12 +125,31 @@ class MfpDiaryInterpreterTest {
             page(rows, finalUrl = "$DIARY_URL&date=2026-01-14") to MfpFailure.DATE_NOT_CONFIRMED,
             page(rows, finalUrl = "https://www.myfitnesspal.com/food/diary#?date=2026-01-15") to
                 MfpFailure.DATE_NOT_CONFIRMED,
+            // The address states the day and the page declares another, or the reverse: never resolved by choosing.
+            page(rows, declaredDates = listOf("2026-01-14")) to MfpFailure.DATE_NOT_CONFIRMED,
+            page(rows, finalUrl = "https://www.myfitnesspal.com/food/diary?date=2026-01-14",
+                declaredDates = listOf("2026-01-15")) to MfpFailure.DATE_NOT_CONFIRMED,
+            page(rows, finalUrl = "https://www.myfitnesspal.com/food/diary",
+                declaredDates = listOf("2026-01-15", "2026-01-14")) to MfpFailure.DATE_NOT_CONFIRMED,
+            page(rows, finalUrl = "https://www.myfitnesspal.com/food/diary", declaredDates = listOf("")) to
+                MfpFailure.DATE_NOT_CONFIRMED,
+            page(rows, finalUrl = "https://www.myfitnesspal.com/food/diary", declaredDates = listOf("15/01/2026")) to
+                MfpFailure.DATE_NOT_CONFIRMED,
             page(mealRows("", OATS)) to MfpFailure.AMBIGUOUS_MEALS,
             page(MfpMealRows(emptyList(), listOf(OATS))) to MfpFailure.AMBIGUOUS_MEALS,
             page(mealRows("Lunch", OATS), mealRows(" lunch ", MILK)) to MfpFailure.AMBIGUOUS_MEALS,
         )
         cases.forEach { (page, expected) -> assertEquals(expected, failure(page), page.toString()) }
         assertEquals(MfpFailure.entries.size, MfpFailure.entries.map { it.code }.toSet().size)
+    }
+
+    /** Observed on the real page: for today MyFitnessPal drops `date=` from the address and the page states the day. */
+    @Test fun thePageItselfMayStateTheDayWhenTheAddressDoesNot() {
+        val rows = mealRows("Breakfast", OATS)
+        val today = page(rows, finalUrl = "https://www.myfitnesspal.com/food/diary", declaredDates = listOf("2026-01-15"))
+        assertEquals(listOf("mfp:2026-01-15:breakfast"), diary(today).meals.map { it.id.text })
+        assertEquals(diary(page(rows)).meals.single().revision, diary(today).meals.single().revision)
+        assertEquals(1, diary(page(rows, declaredDates = listOf("2026-01-15"))).meals.size)
     }
 
     @Test fun onlyTheMyFitnessPalHostOverHttpsIsRead() {

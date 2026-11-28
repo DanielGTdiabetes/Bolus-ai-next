@@ -29,7 +29,10 @@ enum class MfpFailure(val code: String) {
     /** The diary is protected with a key. */
     DIARY_LOCKED("mfp.page.diary_locked"),
 
-    /** The final address does not state the requested day, so the page cannot be attributed to it. */
+    /**
+     * Neither the final address nor the page states the requested day, or one of them states another day, so the page
+     * cannot be attributed to it.
+     */
     DATE_NOT_CONFIRMED("mfp.page.date_not_confirmed"),
 
     /** No meal header: the sign-in page or anything else that is not the diary. */
@@ -88,8 +91,13 @@ data class MfpMeal(
 )
 
 sealed interface MfpDiaryReading {
-    /** Meals that have at least one food, in page order. */
-    data class Diary(val date: MfpDate, val meals: List<MfpMeal>) : MfpDiaryReading
+    /**
+     * [meals] are the meals that have at least one food, in page order. [columns] are the column names of the first
+     * header as this module reads them (lowercase, `carbs` as `carbohydrates`), so the user can see which nutrients
+     * the diary shows at all: a nutrient whose column is not there is unknown, never `0`.
+     */
+    data class Diary(val date: MfpDate, val meals: List<MfpMeal>, val columns: List<String> = emptyList()) :
+        MfpDiaryReading
 
     data class Failed(val failure: MfpFailure) : MfpDiaryReading
 }
@@ -115,7 +123,7 @@ class MfpDiaryInterpreter(private val sha256: MfpSha256) {
         val meals = page.meals.mapIndexedNotNull { index, rows ->
             if (rows.foods.isEmpty()) null else meal(date, names[index], columns, rows.foods)
         }
-        return MfpDiaryReading.Diary(date, meals)
+        return MfpDiaryReading.Diary(date, meals, columns)
     }
 
     /** Distinguishes a new meal, a new revision of a known meal and an identical re-import. */
@@ -140,7 +148,7 @@ class MfpDiaryInterpreter(private val sha256: MfpSha256) {
             page.lockedDiaryMarker -> MfpFailure.DIARY_LOCKED
             status != null && status !in 200..299 -> MfpFailure.UNEXPECTED_PAGE
             page.meals.isEmpty() -> MfpFailure.UNEXPECTED_PAGE
-            !dateConfirmed(date, page.finalUrl) -> MfpFailure.DATE_NOT_CONFIRMED
+            !dateConfirmed(date, page) -> MfpFailure.DATE_NOT_CONFIRMED
             else -> null
         }
     }
@@ -196,11 +204,16 @@ class MfpDiaryInterpreter(private val sha256: MfpSha256) {
             return authority.lowercase() == HOST
         }
 
-        /** The query must state `date=` and every such parameter must be the requested day. */
-        private fun dateConfirmed(date: MfpDate, url: String): Boolean {
-            val query = url.substringBefore('#').substringAfter('?', "")
-            val dates = query.split('&').filter { it.startsWith("date=") }.map { it.removePrefix("date=") }
-            return dates.isNotEmpty() && dates.all { it == date.text }
+        /**
+         * The day is stated by every `date=` parameter of the address and by every date the page declares. At least
+         * one of them must state it and none may state another day: a page without any statement is never taken to be
+         * "today", and a disagreement is never resolved by choosing one side.
+         */
+        private fun dateConfirmed(date: MfpDate, page: MfpDiaryPage): Boolean {
+            val query = page.finalUrl.substringBefore('#').substringAfter('?', "")
+            val stated = query.split('&').filter { it.startsWith("date=") }.map { it.removePrefix("date=") } +
+                page.declaredDates
+            return stated.isNotEmpty() && stated.all { it == date.text }
         }
 
         /**

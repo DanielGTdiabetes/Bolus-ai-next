@@ -101,7 +101,12 @@ class AndroidDexcomSenderEvidenceTest {
         )
         // ADR 0022: the only receiver is the Dexcom one, declared disabled; DexcomG7ReceiverDeviceTest covers it.
         assertEquals(listOf(DexcomG7Receiver::class.java.name to false), info.receivers.orEmpty().map { it.name to it.enabled })
-        assertTrue(info.requestedPermissions.orEmpty().none { it == "android.permission.INTERNET" })
+        // ADR 0032: INTERNET exists for the MyFitnessPal link alone; no other Android permission is declared.
+        // Android 17 adds ACCESS_LOCAL_NETWORK by itself to an app with INTERNET that targets an earlier release; the
+        // manifest does not declare it (verify.ps1 checks the manifest) and the link reaches MyFitnessPal's hosts only.
+        assertEquals(listOf("android.permission.INTERNET", "android.permission.QUERY_ALL_PACKAGES"),
+            info.requestedPermissions.orEmpty().filter { it.startsWith("android.permission.") }
+                .filter { it != "android.permission.ACCESS_LOCAL_NETWORK" }.sorted())
         assertEquals(listOf(DexcomApprovedPermissionSet.PERMISSION),
             info.requestedPermissions.orEmpty().filter { it.startsWith("com.dexcom.") })
         assertTrue("android.permission.QUERY_ALL_PACKAGES" in info.requestedPermissions.orEmpty())

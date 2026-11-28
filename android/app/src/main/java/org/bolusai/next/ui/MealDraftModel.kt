@@ -214,6 +214,25 @@ internal class MealDraftModel(
         }
     }
 
+    /**
+     * Runs an import into the drafts on this model's storage worker (ADR 0032) and reports on the main thread. The
+     * draft list is read again afterwards. The editor and the Bolo selection are not touched: an imported revision
+     * makes a selected older one obsolete, as any other save does.
+     */
+    fun <T> importDraft(task: (history: (String) -> MealHistory, save: (MealRecord) -> MealSave) -> T,
+                        done: (T) -> Unit) {
+        if (disposed.get()) return
+        worker.execute {
+            val result = task({ id -> historyReader?.read(id, MealKind.DRAFT) ?: MealHistory.Failed(MealFailure.READ_FAILED) },
+                useCases::save)
+            main.post {
+                if (disposed.get()) return@post
+                lists.remove(MealKind.DRAFT)
+                done(result)
+            }
+        }
+    }
+
     fun retry(kind: MealKind) { lists.remove(kind); load(kind); changed?.invoke() }
     fun new(kind: MealKind) = open(useCases.new(kind), null, null)
     fun edit(record: MealRecord) = open(record, record, null)
