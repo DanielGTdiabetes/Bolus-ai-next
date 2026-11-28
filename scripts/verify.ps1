@@ -46,7 +46,7 @@ try {
     }
     # ADR 0032, second delivery: the Internet permission exists for the MyFitnessPal link alone. The app requests no
     # other Android permission than that one and QUERY_ALL_PACKAGES (ADR 0023), allows no cleartext traffic and
-    # declares no network security configuration that could widen it.
+    # declares exactly the network security configuration checked below, which narrows the trust and never widens it.
     foreach ($manifest in @($mergedManifest, $releaseManifest)) {
         [xml]$permissionXml = Get-Content -Raw -LiteralPath $manifest
         $permissionNs = "http://schemas.android.com/apk/res/android"
@@ -56,9 +56,53 @@ try {
         $permissionApplication = $permissionXml.SelectSingleNode("/manifest/application")
         if (($androidPermissions -join ",") -cne "android.permission.INTERNET,android.permission.QUERY_ALL_PACKAGES" -or
                 $permissionApplication.GetAttribute("usesCleartextTraffic", $permissionNs) -cne "false" -or
-                $permissionApplication.HasAttribute("networkSecurityConfig", $permissionNs)) {
-            throw "The app may request only INTERNET (MyFitnessPal link, ADR 0032) and QUERY_ALL_PACKAGES, without cleartext traffic: $manifest"
+                $permissionApplication.GetAttribute("networkSecurityConfig", $permissionNs) -cne "@xml/network_security_config") {
+            throw "The app may request only INTERNET (MyFitnessPal link, ADR 0032) and QUERY_ALL_PACKAGES, without cleartext traffic and with the network security configuration of the link: $manifest"
         }
+    }
+    # ADR 0032, "Limite de red impuesto por el sistema": the request filter of the session runs in a web view callback
+    # that does not see every connection. The system therefore trusts no certificate for this app except for the hosts
+    # MfpHosts.resourceAllowed lets a page load. The configuration is exactly: a base that trusts nothing, one domain
+    # configuration with those hosts and the system authorities, no cleartext, no user authorities, no debug override,
+    # no pin and no variant that replaces it. The hosts are read from MfpHosts.kt, so both change together or not at all.
+    $linkHostsText = Get-Content -Raw -LiteralPath (Join-Path $repositoryRoot "android\app\src\main\java\org\bolusai\next\mfp\MfpHosts.kt")
+    $linkDomain = [regex]::Match($linkHostsText, '(?m)^\s+const val DOMAIN = "([a-z0-9.-]+)"\r?$').Groups[1].Value
+    $linkChallengeHost = [regex]::Match($linkHostsText, '(?m)^\s+const val CHALLENGE_HOST = "([a-z0-9.-]+)"\r?$').Groups[1].Value
+    if (-not $linkDomain -or -not $linkChallengeHost -or
+            -not $linkHostsText.Contains('return host == DOMAIN || host.endsWith(".$DOMAIN") || host == CHALLENGE_HOST')) {
+        throw "MfpHosts.kt must allow exactly DOMAIN, its subdomains and CHALLENGE_HOST (ADR 0032)"
+    }
+    $securityConfigFiles = @(Get-ChildItem -LiteralPath (Join-Path $repositoryRoot "android") -Recurse -File -Filter "network_security_config.xml" |
+        Where-Object { $_.FullName -notmatch '[\\/]build[\\/]' })
+    $securityConfigSource = Join-Path $repositoryRoot "android\app\src\main\res\xml\network_security_config.xml"
+    if ($securityConfigFiles.Count -ne 1 -or $securityConfigFiles[0].FullName -ne $securityConfigSource) {
+        throw "Only android\app\src\main\res\xml\network_security_config.xml may exist: a variant could replace the limit (ADR 0032)"
+    }
+    [xml]$securityConfig = Get-Content -Raw -LiteralPath $securityConfigSource
+    $securityShape = @($securityConfig.SelectNodes("//*") | ForEach-Object {
+            $attributes = @($_.Attributes | Sort-Object Name | ForEach-Object { "$($_.Name)=$($_.Value)" }) -join " "
+            $path = @($_.SelectNodes("ancestor-or-self::*") | ForEach-Object { $_.LocalName }) -join "/"
+            $text = if ($_.SelectNodes("*").Count -eq 0) { $_.InnerText.Trim() } else { "" }
+            "$path [$attributes] $text".Trim()
+        }) -join "`n"
+    $expectedSecurityShape = @(
+        "network-security-config []",
+        "network-security-config/base-config [cleartextTrafficPermitted=false]",
+        "network-security-config/base-config/trust-anchors []",
+        "network-security-config/domain-config [cleartextTrafficPermitted=false]",
+        "network-security-config/domain-config/domain [includeSubdomains=true] $linkDomain",
+        "network-security-config/domain-config/domain [includeSubdomains=false] $linkChallengeHost",
+        "network-security-config/domain-config/trust-anchors []",
+        "network-security-config/domain-config/trust-anchors/certificates [src=system]"
+    ) -join "`n"
+    if ($securityShape -cne $expectedSecurityShape) {
+        throw "The network security configuration must trust nothing by default and the system authorities only for the hosts of MfpHosts.kt (ADR 0032). Found:`n$securityShape"
+    }
+    # Overriding a certificate error would undo that limit: production code never handles one.
+    $certificateOverrides = @(Get-ChildItem -LiteralPath (Join-Path $repositoryRoot "android\app\src\main") -Recurse -File -Include *.kt, *.java |
+        Select-String -Pattern 'onReceivedSslError|SslErrorHandler|TrustManager|HostnameVerifier|SSLContext' -List)
+    if ($certificateOverrides.Count -gt 0) {
+        throw "Production code must not handle certificate errors nor build its own trust (ADR 0032): $($certificateOverrides.Path -join ', ')"
     }
     # ADR 0022 R1 and ADR 0023: the only receiver is the Dexcom one, declared disabled and exported, guarded by the
     # producer's permission (ADR 0023, part I, point 1), with a single intent filter holding only the observed action.
@@ -692,7 +736,7 @@ jobs:
             if ($LASTEXITCODE -ne 0) { throw "Could not wake the display for UI instrumentation" }
             # Direct instrumentation avoids collecting unrelated device logcat or clinical data.
             $instrumentation = @(adb shell am instrument -w -r `
-                -e class org.bolusai.next.glucose.dexcom.AndroidDexcomSenderEvidenceTest,org.bolusai.next.NavigationDeviceTest,org.bolusai.next.MealDraftDeviceTest,org.bolusai.next.MealHistoryDeviceTest,org.bolusai.next.MealRestoreDeviceTest,org.bolusai.next.meals.SqliteMealRepositoryDeviceTest,org.bolusai.next.DarkThemeDeviceTest,org.bolusai.next.TestCalculationDeviceTest,org.bolusai.next.profile.SqliteClinicalProfileRepositoryDeviceTest,org.bolusai.next.profile.ClinicalProfileConfirmationDeviceTest,org.bolusai.next.profile.ClinicalProfileLimitsDeviceTest,org.bolusai.next.profile.ClinicalProfileInsulinActionDeviceTest,org.bolusai.next.ClinicalProfileDeviceTest,org.bolusai.next.ClinicalProfileConfirmationUiDeviceTest,org.bolusai.next.ClinicalProfileUnavailabilityDeviceTest,org.bolusai.next.BolusProfileDetailsDeviceTest,org.bolusai.next.ProfileStorageGuardDeviceTest,org.bolusai.next.glucose.dexcom.DexcomBundleExtrasDeviceTest,org.bolusai.next.glucose.dexcom.storage.SqliteDexcomObservationStoreDeviceTest,org.bolusai.next.DexcomLogDiagnosticsDeviceTest,org.bolusai.next.glucose.dexcom.storage.DexcomLogIsolationDeviceTest,org.bolusai.next.glucose.dexcom.DexcomG7ReceiverDeviceTest,org.bolusai.next.doses.SqliteDoseLedgerDeviceTest,org.bolusai.next.mfp.MfpWebSessionDeviceTest,org.bolusai.next.MfpLinkDeviceTest `
+                -e class org.bolusai.next.glucose.dexcom.AndroidDexcomSenderEvidenceTest,org.bolusai.next.NavigationDeviceTest,org.bolusai.next.MealDraftDeviceTest,org.bolusai.next.MealHistoryDeviceTest,org.bolusai.next.MealRestoreDeviceTest,org.bolusai.next.meals.SqliteMealRepositoryDeviceTest,org.bolusai.next.DarkThemeDeviceTest,org.bolusai.next.TestCalculationDeviceTest,org.bolusai.next.profile.SqliteClinicalProfileRepositoryDeviceTest,org.bolusai.next.profile.ClinicalProfileConfirmationDeviceTest,org.bolusai.next.profile.ClinicalProfileLimitsDeviceTest,org.bolusai.next.profile.ClinicalProfileInsulinActionDeviceTest,org.bolusai.next.ClinicalProfileDeviceTest,org.bolusai.next.ClinicalProfileConfirmationUiDeviceTest,org.bolusai.next.ClinicalProfileUnavailabilityDeviceTest,org.bolusai.next.BolusProfileDetailsDeviceTest,org.bolusai.next.ProfileStorageGuardDeviceTest,org.bolusai.next.glucose.dexcom.DexcomBundleExtrasDeviceTest,org.bolusai.next.glucose.dexcom.storage.SqliteDexcomObservationStoreDeviceTest,org.bolusai.next.DexcomLogDiagnosticsDeviceTest,org.bolusai.next.glucose.dexcom.storage.DexcomLogIsolationDeviceTest,org.bolusai.next.glucose.dexcom.DexcomG7ReceiverDeviceTest,org.bolusai.next.doses.SqliteDoseLedgerDeviceTest,org.bolusai.next.mfp.MfpWebSessionDeviceTest,org.bolusai.next.mfp.MfpNetworkBoundaryDeviceTest,org.bolusai.next.MfpLinkDeviceTest `
                 "$testPackage/$isolationRunner")
             $instrumentationExit = $LASTEXITCODE
             $instrumentation | Write-Output

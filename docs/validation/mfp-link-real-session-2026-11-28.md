@@ -80,6 +80,7 @@ propietario, menos urgente ahora que la columna existe.
 - La página se sirvió en inglés; el separador de miles de la versión `/es/`
   sigue sin comprobar.
 - No se comprobó qué ocurre cuando un recurso permitido redirige a otro
-  dominio (ADR 0032, «Riesgo abierto: redirecciones de recursos»).
+  dominio. Comprobado y resuelto después: ADR 0032, «Límite de red impuesto
+  por el sistema», y `mfp-network-boundary-2026-11-28.md`.
 - No se probó cerrar la sesión desde Next ni una lectura con la app de
   MyFitnessPal editando a la vez.

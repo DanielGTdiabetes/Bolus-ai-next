@@ -4,8 +4,9 @@
   `shared/mfp-import` y enlace Android con `WebView`, interruptor e importación
   al borrador). Probado en el Pixel con una página sintética y, el 2026-11-28,
   con la sesión real del propietario: inicio de sesión, lectura de dos días,
-  importación de una comida y comprobación de que Hermes sigue leyendo. Falta
-  la página real saneada como fixture
+  importación de una comida y comprobación de que Hermes sigue leyendo. El
+  límite de red lo impone además el sistema («Límite de red impuesto por el
+  sistema»). Falta la página real saneada como fixture
 - Fecha: 2026-11-28
 - Fase y criterio de aceptación: fase 8 (enlace MyFitnessPal con independencia
   del cálculo local)
@@ -305,7 +306,9 @@ ha probado contra MyFitnessPal.** Legacy no se volvió a leer ni se tocó.
   un subdominio suyo (o `data:`, `blob:`, `about:`). Lo demás recibe un 403
   vacío sin salir del móvil y su host se lista en pantalla. Sin interfaz de
   JavaScript hacia la app, sin acceso a ficheros, sin ventanas nuevas, sin
-  cookies de terceros, sin contenido mixto.
+  cookies de terceros, sin contenido mixto. Ese filtro no ve el destino de la
+  redirección de un recurso; desde «Límite de red impuesto por el sistema» los
+  mismos hosts los impone también Android.
 - **Sesión.** El usuario inicia sesión en la página de MyFitnessPal dentro de
   ese `WebView`. Next no lee, escribe, copia ni registra cookies ni
   contraseñas: quedan en el almacén del `WebView` de la app, excluido de las
@@ -451,24 +454,110 @@ ninguno de los nutrientes que Next lee es un fallo propio,
 `mfp.page.columns_not_recognized`, y de esa página no se importa nada. No se
 ha añadido ninguna traducción porque no se ha observado ese caso.
 
-**Riesgo abierto: redirecciones de recursos.** El filtro de `MfpHosts` se
-aplica en `shouldInterceptRequest`, que recibe la dirección que pide la
-página. No está comprobado que Android vuelva a llamarlo con el destino cuando
-un recurso permitido responde con una redirección a otro dominio; si no lo
-hace, ese destino saldría sin pasar por el filtro. La página mostrada sí está
-cubierta (`shouldOverrideUrlLoading` y la comprobación del host final al
-leer). No afecta al cálculo ni a lo que se importa, pero sí al límite de red
-declarado, que hasta cerrarlo debe leerse como «las peticiones que la página
-hace directamente». Candidata a solución: una configuración de seguridad de
-red de Android que solo confíe en certificados para los dominios permitidos,
-de modo que el límite lo imponga el sistema y no solo el `WebView`. Necesita
-prueba con la sesión real antes de darla por buena.
+**Redirecciones de recursos.** Al terminar la validación quedó abierto si el
+filtro de `MfpHosts`, que se aplica en `shouldInterceptRequest`, ve el destino
+cuando un recurso permitido redirige a otro dominio. Está resuelto en «Límite
+de red impuesto por el sistema».
 
 **Segunda sesión.** Tras el inicio de sesión en Next, el disparador de Hermes
 se activó al cerrar la app de MyFitnessPal y leyó el diario con su propia
 sesión: cookies presentes, respuesta 200, mismas comidas, `no_changes`, sin
 fallos. No hay evidencia a más de unos minutos; una invalidación posterior se
 vería como fallos de sesión en Hermes.
+
+## Límite de red impuesto por el sistema (2026-11-28)
+
+Cierra el riesgo de las redirecciones de recursos
+([validación](../validation/mfp-network-boundary-2026-11-28.md)).
+
+**Qué hace el `WebView` con una redirección.** La documentación de Android no
+lo dice, así que se comprobó en el Pixel, sin red, con un servidor HTTPS en la
+interfaz local del propio teléfono que responde con un 302 real hacia otro
+nombre de host (`MfpNetworkBoundaryDeviceTest`; un `WebResourceResponse`
+sintético no admite estados 3xx):
+
+- **Recurso de una página: el destino no pasa por el filtro.** El `WebView`
+  sigue la redirección y pide el destino sin volver a llamar a
+  `shouldInterceptRequest`. El riesgo era real: con solo el filtro de
+  `MfpHosts`, un recurso de MyFitnessPal o de Cloudflare que redirigiera a
+  otro dominio habría salido hacia él.
+- **Página mostrada: el destino sí se ofrece**, a `shouldOverrideUrlLoading`,
+  antes de pedirlo, y si se rechaza no se pide. Esa parte ya estaba cubierta.
+
+Coincide con el código de Chromium de esa versión del `WebView`
+(`158.0.8127.46`, `android_webview/browser/network_service/aw_proxying_url_loader_factory.cc`):
+tras una redirección `InterceptedRequest::ShouldNotInterceptRequest` devuelve
+`true` y la petición continúa sin consultar a la app. Tampoco es ese callback
+el camino de todas las conexiones: Android da a los service workers otro
+cliente (`ServiceWorkerClient`), que Next no instala, y no está comprobado que
+los web sockets pasen por él.
+
+**El límite que no depende del callback.** La app declara una configuración de
+seguridad de red (`res/xml/network_security_config.xml`,
+`android:networkSecurityConfig`):
+
+- por defecto no se confía en **ninguna** autoridad de certificación;
+- solo `myfitnesspal.com` con sus subdominios y `challenges.cloudflare.com`
+  (sin subdominios) confían en las autoridades del sistema: los mismos hosts
+  que admite `MfpHosts.resourceAllowed`;
+- sin tráfico en claro, sin autoridades añadidas por el usuario, sin
+  excepciones de depuración y sin anclajes propios.
+
+Con cualquier otro host la negociación TLS falla al validar el certificado,
+antes de enviar una petición: no salen la dirección, las cabeceras ni las
+cookies, llegue la conexión por donde llegue (redirección, web socket, service
+worker o cualquier vía futura). Next no trata los errores de certificado: el
+cliente conserva el comportamiento por defecto, que cancela la carga.
+
+El `WebView` respeta esta configuración: Chromium valida los certificados con
+el gestor de confianza por defecto de la app (`X509Util`: `TrustManagerFactory`
+por defecto y `checkServerTrusted` con el nombre del host), que es el que
+instala la configuración de seguridad de red. Comprobado en el Pixel:
+
+- sin red (`MfpNetworkBoundaryDeviceTest`): para Next la plataforma informa de
+  cero autoridades aceptadas por defecto, de ningún tráfico en claro y de una
+  confianza distinta solo para los hosts del enlace;
+- con red (`MfpNetworkBoundaryProbe`, sonda que no forma parte de
+  `verify.ps1`, solo se ejecuta a petición y no contacta con MyFitnessPal):
+  un `WebView` sin ningún filtro rechaza como no fiable `example.org`, que
+  tiene un certificado público válido; lo rechaza también cuando llega como
+  destino de la redirección de un recurso, sin que el filtro lo haya visto,
+  que es exactamente el caso del riesgo; y sigue cargando
+  `challenges.cloudflare.com`.
+
+**Lo que este límite no impide, dicho con precisión.**
+
+- Para rechazar un certificado hay que recibirlo: hacia el destino ajeno de
+  una redirección salen la consulta DNS, la conexión TCP y el saludo TLS, que
+  lleva el nombre del host. No sale ninguna petición HTTP: ni dirección, ni
+  cabeceras, ni cookies, ni dato alguno de la sesión.
+- El límite es por nombre de host: no distingue rutas dentro de
+  `myfitnesspal.com` ni de `challenges.cloudflare.com`, y una redirección entre
+  esos hosts se sigue.
+- El propio teléfono queda fuera. Android da a `localhost` y a las direcciones
+  de bucle local una configuración suya, que permite tráfico en claro
+  (observado en el Pixel: `isCleartextTrafficPermitted("localhost")` es
+  verdadero con esta configuración), y una app no puede sustituirla para todas
+  esas direcciones. El filtro rechaza esas peticiones cuando las ve, pero el
+  destino de una redirección de un recurso hacia un puerto del propio teléfono
+  no pasaría por él. Esa conexión no sale del teléfono. Se deja anotado, sin
+  más medida.
+
+Con la sesión real: el propietario confirmó el 2026-11-28, con la versión
+nueva instalada en el Pixel, que el inicio de sesión y la lectura del diario
+siguen funcionando, y autorizó la integración. No consta qué pasos de la lista
+de la nota de validación siguió.
+
+**Qué lo mantiene.** `MfpNetworkSecurityConfigTest` (JVM) lee el recurso y
+exige que un host sea de confianza exactamente cuando `MfpHosts` lo admite.
+`scripts/verify.ps1` exige el atributo en los manifiestos, la forma exacta de
+la configuración con los hosts leídos de `MfpHosts.kt`, que no exista otra
+copia en ninguna variante y que el código de producción no trate errores de
+certificado ni construya su propia confianza. Añadir un host exige cambiar
+`MfpHosts.kt` y el recurso a la vez.
+
+**iOS.** El equivalente sería App Transport Security más un filtro de
+contenido de `WKWebView`. Sin verificar.
 
 ## Alternativas descartadas
 

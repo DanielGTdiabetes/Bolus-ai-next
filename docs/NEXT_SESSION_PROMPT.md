@@ -140,13 +140,24 @@ la regla para la fibra ausente sigue siendo decisión del propietario. La
 página llega en inglés a Next y a Hermes aunque la web del propietario esté en
 español; Next solo reconoce columnas en inglés y una cabecera sin ninguna
 columna conocida da `mfp.page.columns_not_recognized` (no se importa nada).
-RIESGO ABIERTO (ADR 0032, «Riesgo abierto: redirecciones de recursos»): no
-está comprobado que el filtro de `MfpHosts` vea el destino cuando un recurso
-permitido redirige a otro dominio. Candidata: configuración de seguridad de
-red que solo confíe en certificados de los dominios permitidos (hoy
-`verify.ps1` prohíbe `networkSecurityConfig`; habría que cambiarlo a
-propósito) y prueba con la sesión real. Vigilar unos días que `bolus_ai` sigue
-importando.
+LÍMITE DE RED IMPUESTO POR EL SISTEMA (ADR 0032, sección del mismo nombre;
+docs/validation/mfp-network-boundary-2026-11-28.md). Comprobado en el Pixel
+(WebView 158.0.8127.46): el `WebView` sigue la redirección de un recurso sin
+volver a llamar a `shouldInterceptRequest`, así que el filtro de `MfpHosts` no
+ve ese destino (el riesgo era real); la redirección de la página mostrada sí
+pasa por `shouldOverrideUrlLoading`. Por eso la app declara
+`res/xml/network_security_config.xml`: por defecto no confía en ninguna
+autoridad de certificación y solo `myfitnesspal.com` con subdominios y
+`challenges.cloudflare.com` confían en las del sistema, sin tráfico en claro.
+Hacia otro host no sale ninguna petición HTTP (sí DNS, TCP y el saludo TLS con
+el nombre del host). `localhost` queda fuera: Android le da su propia
+configuración. `verify.ps1` exige el atributo, la forma exacta del recurso con
+los hosts leídos de `MfpHosts.kt`, que no haya otra copia y que producción no
+trate errores de certificado; `MfpNetworkSecurityConfigTest` (JVM) exige la
+equivalencia con `MfpHosts`. Añadir un host exige cambiar los dos a la vez.
+`MfpNetworkBoundaryDeviceTest` está en la lista de `verify.ps1`;
+`MfpNetworkBoundaryProbe` usa Internet, no está en la lista y solo corre con
+`-e mfpNetworkProbe true`. Vigilar unos días que `bolus_ai` sigue importando.
 PASOS ANTERIORES, ya hechos salvo la página saneada (ADR 0032, «Pendiente con el
 Pixel y el propietario»): inicio de sesión real y
 lectura de un día, anotando los hosts bloqueados; página real saneada como
