@@ -106,12 +106,15 @@ SIGUIENTE
   pruebas ya ejecutadas sin cambios que lo justifiquen. En esta sesión Codex
   hizo las pruebas del Pixel mientras Claude avanzaba desde la nube, sin
   modificar la implementación de perfil o motor de Claude.
-- Primero, por petición del propietario del 2026-11-28: modo sombra (fase 9).
-  Las dos apps en paralelo; Next lee en solo lectura los cálculos de Legacy,
-  los repite con su motor y muestra la comparación por componente y lo que
-  cada una escribió o habría escrito en Dexcom y Nightscout. La escritura de
-  Next nace con interruptor apagado por defecto. Auditar antes qué guarda
-  Legacy de cada cálculo y por dónde leerlo sin efectos.
+- Modo sombra (fase 9, ADR 0030): la herramienta de repetición está hecha y
+  probada con datos sintéticos. Falta ejecutarla con datos reales: el
+  propietario decide cómo dar acceso de solo lectura a `treatments` y a los
+  ajustes de Legacy. Triar cada `MISMATCH` y añadir su prueba. Los datos
+  reales y el detalle no entran en el repositorio; solo el resumen de
+  recuentos. Legacy también está instalada en el Pixel y puede consultarse en
+  solo lectura. La sombra en vivo en el móvil y la comparación de lo escrito
+  en Dexcom y Nightscout quedan para cuando Next tenga escritura, que nacerá
+  con interruptor apagado por defecto.
 - Después: techo de IOB, intervalo mínimo entre bolos y entrega dual o
   extendida; luego MyFitnessPal por sesión en el móvil.
 No repetir las decisiones ya aprobadas.

@@ -19,6 +19,7 @@ try {
         androidJvmTest `
         allMetadataJar `
         :android:app:testDebugUnitTest `
+        :tools:shadow-replay:test `
         :android:app:lintDebug `
         :android:app:assembleDebug `
         :android:app:assembleDebugAndroidTest `
@@ -282,6 +283,36 @@ try {
         Select-String -Pattern 'java\.net\.|HttpURLConnection|okhttp|Socket|ContentResolver|sendBroadcast' -List)
     if ($doseNetwork.Count -gt 0) {
         throw "The dose ledger must not send or synchronise anything (ADR 0028): $($doseNetwork.Path -join ', ')"
+    }
+    # ADR 0030: the shadow replay is offline and read-only. Its engine package, tool and extractor never open a
+    # connection, send a broadcast or touch a database, and no export of real Legacy rows is ever committed.
+    $shadowSources = @(Get-ChildItem -LiteralPath (Join-Path $repositoryRoot "shared\bolus-engine\src\commonMain\kotlin\org\bolusai\engine\shadow"),
+            (Join-Path $repositoryRoot "tools\shadow-replay\src\main"), (Join-Path $repositoryRoot "scripts\shadow") -Recurse -File |
+        Where-Object { $_.Extension -in @(".kt", ".py") } |
+        Select-String -Pattern 'java\.net\.|HttpURLConnection|okhttp|Socket|sendBroadcast|java\.sql|^\s*(import|from)\s+(socket|urllib|http|requests|psycopg|sqlalchemy|asyncpg|subprocess)\b' -List)
+    if ($shadowSources.Count -gt 0) {
+        throw "The shadow replay must stay offline and read-only (ADR 0030): $($shadowSources.Path -join ', ')"
+    }
+    $shadowExports = @(git -C $repositoryRoot ls-files -- "*.jsonl" "*shadow*.txt" |
+        Where-Object { $_ -notmatch '^scripts/shadow/fixtures/synthetic-' })
+    if ($shadowExports.Count -gt 0) {
+        throw "Only synthetic shadow fixtures may be committed (ADR 0030): $($shadowExports -join ', ')"
+    }
+    $shadowFixtures = Join-Path $repositoryRoot "scripts\shadow\fixtures"
+    $shadowActual = & python -I (Join-Path $repositoryRoot "scripts\shadow\extract_legacy_calculations.py") `
+        --rows (Join-Path $shadowFixtures "synthetic-rows.jsonl") --settings (Join-Path $shadowFixtures "synthetic-settings.json") `
+        --legacy-sha e48c4ab896751091f323379b17c6211aff793487 --config-hash synthetic-hash-1 --quiet
+    if ($LASTEXITCODE -ne 0) {
+        throw "The shadow extractor failed on its synthetic fixture (ADR 0030)"
+    }
+    $shadowExpected = (Get-Content -Raw -Encoding UTF8 -LiteralPath (Join-Path $shadowFixtures "synthetic-expected.txt")) -replace "`r`n", "`n"
+    if ((($shadowActual -join "`n") + "`n") -cne $shadowExpected) {
+        throw "The shadow extractor output differs from scripts/shadow/fixtures/synthetic-expected.txt (ADR 0030)"
+    }
+    foreach ($private in @("notes", "synthetic free text", "synthetic-user", "2000-01-01", "created_at", "entered_by")) {
+        if ($shadowExpected.Contains($private)) {
+            throw "The minimised shadow export must not carry '$private' (ADR 0030)"
+        }
     }
     # ADR 0024: test results stay in memory. The test calculation never persists, confirms or synchronises anything.
     foreach ($testCalculation in @("android\app\src\main\java\org\bolusai\next\application\TestCalculation.kt",

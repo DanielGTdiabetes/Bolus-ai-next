@@ -6,3 +6,5 @@ gradlew text eol=lf
 *.kt text eol=lf
 *.yml text eol=lf
 *.md text eol=lf
+# ADR 0030: the shadow fixtures are compared with the extractor output.
+scripts/shadow/fixtures/* text eol=lf

@@ -254,6 +254,10 @@ de prueba aplica además el descuento de fibra y Warsaw (grasa y proteína) de
 Legacy, con paridad exacta en 23 vectores y reglas declaradas en el perfil sin
 valores por defecto ([ADR 0029](docs/adr/0029-fiber-and-warsaw-candidate-rules.md)).
 
+El modo sombra repite fuera de línea los cálculos que Legacy guardó y los
+compara por componente con el motor de Next, sin red ni escritura
+([ADR 0030](docs/adr/0030-shadow-replay-of-legacy-calculations.md)).
+
 ## Documentación para ejecutar el proyecto
 
 - [`docs/NEXT_SESSION_PROMPT.md`](docs/NEXT_SESSION_PROMPT.md): estado real y siguiente incremento propuesto.
