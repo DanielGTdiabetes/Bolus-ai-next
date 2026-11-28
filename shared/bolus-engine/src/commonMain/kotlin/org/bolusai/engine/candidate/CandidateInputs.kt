@@ -147,6 +147,7 @@ public class IobValue private constructor(
     public companion object {
         public const val MANUAL_ENTRY: String = "manual_entry"
         public const val CALCULATED: String = "calculated_from_dose_history"
+        public const val REPLAYED: String = "legacy_trace_replay"
         private val SHA256 = Regex("[0-9a-f]{64}")
 
         /** [units] must be a finite, non-negative result of the candidate IOB identified by its input fingerprint. */
@@ -154,6 +155,16 @@ public class IobValue private constructor(
             require(units.isFinite() && units >= 0.0) { "engine.iob_value.invalid_units" }
             require(SHA256.matches(iobInputFingerprintSha256)) { "engine.iob_value.invalid_fingerprint" }
             return IobValue(units, CALCULATED, iobInputFingerprintSha256)
+        }
+
+        /**
+         * The IOB a stored Legacy calculation used, for the shadow replay only (ADR 0030). [reference] identifies
+         * the replayed record. It is never an input of a calculation shown to the user.
+         */
+        public fun replayed(units: Double, reference: String): IobValue {
+            require(units.isFinite() && units >= 0.0) { "engine.iob_value.invalid_units" }
+            require(reference.isNotBlank() && '\n' !in reference) { "engine.iob_value.invalid_reference" }
+            return IobValue(units, REPLAYED, "$reference:$units")
         }
     }
 }

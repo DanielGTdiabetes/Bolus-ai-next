@@ -143,7 +143,11 @@ public object CandidateEngine {
             if (glucose.value.origin == GlucoseOrigin.DEXCOM_PERMISSION_SET) warnings += Warnings.DEXCOM_NOT_ATTRIBUTED
         }
         (request.iob as? Input.Provided)?.let {
-            warnings += if (it.value.origin == IobValue.CALCULATED) Warnings.CALCULATED_IOB else Warnings.MANUAL_IOB
+            warnings += when (it.value.origin) {
+                IobValue.CALCULATED -> Warnings.CALCULATED_IOB
+                IobValue.REPLAYED -> Warnings.REPLAYED_IOB
+                else -> Warnings.MANUAL_IOB
+            }
         }
         val roundStep = limit { it.roundStep }
         val maxBolus = limit { it.maxBolus }
@@ -394,6 +398,8 @@ public object Warnings {
 
     /** IOB computed by the candidate IOB rules from the local dose history (ADR 0028); validation pending. */
     public const val CALCULATED_IOB: String = "iob.calculated_candidate_unverified"
+    /** IOB copied from a stored Legacy calculation for the shadow replay (ADR 0030). */
+    public const val REPLAYED_IOB: String = "iob.replayed_from_legacy_trace"
     public const val MAX_BOLUS_LIMITED: String = "max_bolus.limited"
     public const val BELOW_HYPO_STOP: String = "glucose.below_legacy_hypo_stop"
 }

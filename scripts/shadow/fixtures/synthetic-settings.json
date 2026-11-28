@@ -1,0 +1,13 @@
+{
+  "calculator": {
+    "subtract_fiber": true,
+    "fiber_factor": 0.5,
+    "fiber_threshold_g": 5.0
+  },
+  "warsaw": {
+    "enabled": true,
+    "trigger_threshold_kcal": 300,
+    "safety_factor": 0.1,
+    "safety_factor_dual": 0.2
+  }
+}

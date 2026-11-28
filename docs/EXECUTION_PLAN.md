@@ -852,6 +852,17 @@ auditar en solo lectura `scripts/hermes/mfp_sync_trigger.py`,
 Las cookies nunca entran en logs, fixtures ni en el repositorio. El host BMAX
 ya no existe; lo sustituye el EVO-X2, y cualquier mención al BMAX es histórica.
 
+### Entrega de modo sombra por repetición — 2026-11-28
+
+[ADR 0030](adr/0030-shadow-replay-of-legacy-calculations.md): Legacy guarda un
+rastro de cada cálculo en `treatments.calculation_trace`, pero ninguna lectura
+lo devuelve. La herramienta fuera de línea repite esos cálculos en el motor
+único y los clasifica (coincide, coincide con matices, difiere, no comparable).
+Extractor que minimiza los datos, paquete `engine.shadow` y módulo
+`tools/shadow-replay`. Sin red y sin escritura. Fase 9, puntos 1 a 5. Falta
+ejecutarla con datos reales, que requieren acceso de solo lectura concedido
+por el propietario, y la comparación de lo escrito en Dexcom y Nightscout.
+
 ### Secuencia de capacidades
 
 La secuencia inicial siguiente queda como referencia de dependencias, no como
