@@ -16,6 +16,14 @@ import org.bolusai.engine.candidate.IobValue
 import org.bolusai.engine.candidate.ProfileSnapshot
 import org.bolusai.engine.candidate.Quantity
 import org.bolusai.engine.candidate.SegmentValue
+import org.bolusai.engine.iob.CandidateIob
+import org.bolusai.engine.iob.DoseHistory
+import org.bolusai.engine.iob.InsulinAction
+import org.bolusai.engine.iob.InsulinCurve
+import org.bolusai.engine.iob.InsulinDose
+import org.bolusai.engine.iob.IobRequest
+import org.bolusai.engine.iob.IobResult
+import org.bolusai.insulin.LedgerRead
 import org.bolusai.meals.DraftField
 import org.bolusai.meals.MealSelection
 import org.bolusai.meals.NutritionBasis
@@ -45,7 +53,12 @@ internal data class TestCalculationDependencies(
     val meal: Input<CarbsValue>?,
     /** Null when the form does not take glucose from Dexcom. */
     val dexcom: Input<GlucoseValue>?,
+    /** Null when the form takes the IOB typed by hand. Otherwise the ledger as read: a new dose discards the result. */
+    val doses: LedgerRead? = null,
 )
+
+/** Where the test calculation takes the IOB from. Nothing is chosen automatically. */
+internal enum class IobChoice { MANUAL, DOSE_HISTORY }
 
 /** Where the test calculation takes glucose from. Nothing is chosen automatically. */
 internal enum class GlucoseChoice { MANUAL, DEXCOM }
@@ -61,6 +74,7 @@ internal data class TestCalculationForm(
     val glucoseMgDl: String = "",
     /** When the manual glucose text was last edited; part of the input, never replaced by the calculation time. */
     val glucoseEnteredAtEpochMs: Long? = null,
+    val iobChoice: IobChoice = IobChoice.MANUAL,
     val iobUnits: String = "",
 )
 
@@ -68,7 +82,8 @@ internal data class TestCalculationForm(
  * Builds the explicit engine request of a test calculation (ADR 0024) from the local profile, the meal selection, the
  * latest Dexcom presentation and the form. Rounding step and both maximums come from the profile version used
  * (ADR 0025); they are never typed per calculation. It only translates: every absent or invalid input becomes
- * [Input.Unavailable] with a stable cause, and the engine blocks what depends on it. Nothing here calculates.
+ * [Input.Unavailable] with a stable cause, and the engine blocks what depends on it. Nothing here calculates: the
+ * bolus and, since ADR 0028, the IOB from the local dose ledger are computed by the single engine.
  */
 internal object TestCalculation {
     fun request(
@@ -77,6 +92,7 @@ internal object TestCalculation {
         meal: MealSelection?,
         dexcom: LatestReadingPresentation?,
         form: TestCalculationForm,
+        doses: LedgerRead? = null,
     ): CandidateRequest = CandidateRequest(
         calculationAtEpochMs = atEpochMs,
         localMinuteOfDay = localMinute(profile, atEpochMs),
@@ -89,8 +105,63 @@ internal object TestCalculation {
             GlucoseChoice.MANUAL -> manualGlucose(form)
             GlucoseChoice.DEXCOM -> dexcomGlucose(dexcom)
         },
-        iob = quantity(form.iobUnits, "iob.manual", absent = "iob.unknown").map { IobValue(it) },
+        iob = when (form.iobChoice) {
+            IobChoice.MANUAL -> quantity(form.iobUnits, "iob.manual", absent = "iob.unknown").map { IobValue(it) }
+            IobChoice.DOSE_HISTORY -> iob(atEpochMs, profile, doses).asCandidateInput()
+        },
     )
+
+    /**
+     * ADR 0028: the candidate IOB at [atEpochMs] from the insulin action of the profile version and the local dose
+     * ledger. Deterministic: the same instant, profile and ledger give the same result and fingerprint, so the screen
+     * can show the breakdown the request used. Anything absent blocks; it never becomes `0 U`.
+     */
+    fun iob(atEpochMs: Long, profile: ProfileGateState?, doses: LedgerRead?): IobResult =
+        CandidateIob.calculate(IobRequest(atEpochMs, insulinAction(profile), doseHistory(atEpochMs, doses)))
+
+    /** DIA, curve and peak of the latest profile version (ADR 0027), copied without defaults. */
+    fun insulinAction(state: ProfileGateState?): Input<InsulinAction> = when (state) {
+        null, ProfileGateState.ReadPending -> Input.Unavailable("profile.read.pending")
+        is ProfileGateState.Unreadable -> Input.Unavailable("profile.unreadable")
+        is ProfileGateState.Missing -> Input.Unavailable("profile.missing")
+        is ProfileGateState.Evaluated -> run {
+            val latest = state.latest
+            val curve = when (val declared = latest.content.insulinCurve) {
+                null -> return@run Input.Unavailable("profile.insulin_curve.not_in_schema")
+                Setting.NotConfigured -> return@run Input.Unavailable("profile.insulin_curve.not_configured")
+                is Setting.Declared -> InsulinCurve.fromCode(declared.value.code)
+                    ?: return@run Input.Unavailable("profile.insulin_curve.unrecognized")
+            }
+            val dia = when (val value = limit(latest.content, ProfileLimit.INSULIN_DIA)) {
+                is Input.Unavailable -> return@run value
+                is Input.Provided -> value.value
+            }
+            val peak: Input<Int> = when (val value = limit(latest.content, ProfileLimit.INSULIN_PEAK)) {
+                is Input.Unavailable -> value
+                is Input.Provided -> value.value.text.toIntOrNull()?.let { Input.Provided(it) }
+                    ?: Input.Unavailable("profile.insulin_peak.invalid")
+            }
+            Input.Provided(InsulinAction(latest.version, latest.contentSha256,
+                state.confirmation is VersionConfirmation.Active, curve, dia, peak))
+        }
+    }
+
+    /**
+     * The local ledger as the history the engine checks. It vouches from the instant the user started it until now and
+     * records ordinary boluses only, so the declared maximum extended duration is 0. A ledger that is unread, failed or
+     * not started is unavailable, never an empty history.
+     */
+    fun doseHistory(atEpochMs: Long, doses: LedgerRead?): Input<DoseHistory> = when (doses) {
+        null -> Input.Unavailable("iob.history.read_pending")
+        is LedgerRead.Failed -> Input.Unavailable("iob.history.unreadable")
+        is LedgerRead.Available -> when (val since = doses.state.trackingSinceEpochMs) {
+            null -> Input.Unavailable("iob.history.tracking_not_started")
+            else -> Input.Provided(DoseHistory(DOSE_LEDGER_SOURCE, since, atEpochMs, maxExtendedMinutes = 0,
+                doses = doses.state.doses.map { InsulinDose(it.eventId, it.atEpochMs, Quantity(it.unitsText), 0) }))
+        }
+    }
+
+    const val DOSE_LEDGER_SOURCE = "next_local_dose_ledger_v1"
 
     fun calculate(request: CandidateRequest): CandidateResult = CandidateEngine.calculate(request)
 
@@ -103,10 +174,12 @@ internal object TestCalculation {
         meal: MealSelection?,
         dexcom: LatestReadingPresentation?,
         form: TestCalculationForm,
+        doses: LedgerRead? = null,
     ) = TestCalculationDependencies(
         profile(profile),
         if (form.carbsChoice == CarbsChoice.MEAL_SELECTION) mealCarbs(meal) else null,
         if (form.glucoseChoice == GlucoseChoice.DEXCOM) dexcomGlucose(dexcom) else null,
+        if (form.iobChoice == IobChoice.DOSE_HISTORY) doses ?: LedgerRead.Failed("iob.history.read_pending") else null,
     )
 
     private fun manualGlucose(form: TestCalculationForm): Input<GlucoseValue> =

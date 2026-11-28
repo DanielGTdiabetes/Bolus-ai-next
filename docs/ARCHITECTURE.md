@@ -218,3 +218,15 @@ Fases previstas:
 5. congelación posterior de NAS/Render cuando Next haya demostrado estabilidad.
 
 Durante la convivencia solo un sistema tendrá autoridad para registrar un tratamiento real en cada fase para evitar duplicados.
+
+## Registro local de dosis (ADR 0028)
+
+`shared/insulin-history` es un módulo común sin dependencias: eventos
+append-only (inicio del registro, dosis, anulación) con clave de idempotencia y
+reglas de alta compartidas por todos los almacenes. El adaptador Android
+(`doses/SqliteDoseLedger`, `insulin-doses.db` v1) los guarda con triggers que
+impiden modificar o borrar. El motor no conoce el registro: `TestCalculation`
+lo traduce a un `DoseHistory` explícito con su cobertura y `CandidateIob`
+decide si basta. Las entradas son anotaciones locales sin autoridad de
+tratamiento; nada se sincroniza. Véase el
+[ADR 0028](adr/0028-local-dose-ledger-and-calculated-iob.md).

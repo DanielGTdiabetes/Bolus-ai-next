@@ -79,9 +79,37 @@ public enum class CarbsOrigin(public val code: String) {
 
 public data class CarbsValue(public val grams: Quantity, public val origin: CarbsOrigin)
 
-/** Only manual IOB exists: Next has no insulin history. Its semantics are pending approval (Legacy LC-011). */
-public data class IobValue(public val units: Quantity) {
-    public val origin: String get() = "manual_entry"
+/**
+ * IOB as provided, with its provenance. A manual value is typed by the user (semantics pending, Legacy LC-011). A
+ * calculated value comes from the candidate IOB over a dose history (ADR 0026, ADR 0028): it keeps the exact double
+ * the IOB rules produced, without rounding, and [reference] is the input fingerprint of that IOB calculation, which
+ * determines the value. [reference] and [origin] enter the fingerprint of the bolus calculation.
+ */
+public class IobValue private constructor(
+    public val unitsValue: Double,
+    public val origin: String,
+    public val reference: String,
+) {
+    /** Manual entry: the canonical text is the reference, as before ADR 0028. */
+    public constructor(units: Quantity) : this(units.value, MANUAL_ENTRY, units.text)
+
+    override fun equals(other: Any?): Boolean =
+        other is IobValue && other.unitsValue == unitsValue && other.origin == origin && other.reference == reference
+    override fun hashCode(): Int = 31 * (31 * unitsValue.hashCode() + origin.hashCode()) + reference.hashCode()
+    override fun toString(): String = "IobValue($unitsValue, $origin, $reference)"
+
+    public companion object {
+        public const val MANUAL_ENTRY: String = "manual_entry"
+        public const val CALCULATED: String = "calculated_from_dose_history"
+        private val SHA256 = Regex("[0-9a-f]{64}")
+
+        /** [units] must be a finite, non-negative result of the candidate IOB identified by its input fingerprint. */
+        public fun calculated(units: Double, iobInputFingerprintSha256: String): IobValue {
+            require(units.isFinite() && units >= 0.0) { "engine.iob_value.invalid_units" }
+            require(SHA256.matches(iobInputFingerprintSha256)) { "engine.iob_value.invalid_fingerprint" }
+            return IobValue(units, CALCULATED, iobInputFingerprintSha256)
+        }
+    }
 }
 
 /** Local wall-clock interval [startMinute, endMinute) of one profile parameter. [value] absent means not configured. */

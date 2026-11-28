@@ -10,6 +10,7 @@ import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.lifecycle.ViewModel
+import org.bolusai.engine.candidate.CandidateRequest
 import org.bolusai.engine.candidate.CandidateResult
 import org.bolusai.engine.candidate.CandidateStep
 import org.bolusai.engine.candidate.Input
@@ -17,6 +18,9 @@ import org.bolusai.engine.candidate.ProfileSnapshot
 import org.bolusai.engine.candidate.Quantity
 import org.bolusai.engine.candidate.StepOutcome
 import org.bolusai.engine.candidate.Warnings
+import org.bolusai.engine.iob.IobOutcome
+import org.bolusai.engine.iob.IobResult
+import org.bolusai.next.application.IobChoice
 import org.bolusai.next.R
 import org.bolusai.next.application.CarbsChoice
 import org.bolusai.next.application.GlucoseChoice
@@ -39,6 +43,12 @@ internal class TestCalculationModel : ViewModel() {
         private set
     var calculatedAtEpochMs: Long? = null
         private set
+    /** The exact request [result] was computed from, kept to build the audit record of a noted dose (ADR 0028). */
+    var request: CandidateRequest? = null
+        private set
+    /** The candidate IOB the result used, when the form takes the IOB from the dose history (ADR 0028). */
+    var iob: IobResult? = null
+        private set
     var invalidated = false
         private set
     private var dependencies: TestCalculationDependencies? = null
@@ -48,11 +58,25 @@ internal class TestCalculationModel : ViewModel() {
         form = next
         if (result != null) invalidated = true
         result = null
+        request = null
+        iob = null
         calculatedAtEpochMs = null
     }
 
-    fun store(result: CandidateResult, atEpochMs: Long, dependencies: TestCalculationDependencies) {
+    /** Drops the result after it was noted as an administered dose, so it cannot be noted twice. */
+    fun discard() {
+        result = null
+        request = null
+        iob = null
+        calculatedAtEpochMs = null
+        dependencies = null
+    }
+
+    fun store(result: CandidateResult, atEpochMs: Long, dependencies: TestCalculationDependencies, iob: IobResult? = null,
+              request: CandidateRequest? = null) {
         this.result = result
+        this.request = request
+        this.iob = iob
         this.dependencies = dependencies
         calculatedAtEpochMs = atEpochMs
         invalidated = false
@@ -62,6 +86,8 @@ internal class TestCalculationModel : ViewModel() {
     fun invalidateIfChanged(current: TestCalculationDependencies) {
         if (result == null || current == dependencies) return
         result = null
+        request = null
+        iob = null
         calculatedAtEpochMs = null
         dependencies = null
         invalidated = true
@@ -87,6 +113,7 @@ internal object TestCalculationText {
         Warnings.MEASUREMENT_TIME_UNVERIFIED to "Hora de medida de la glucosa no verificada",
         Warnings.DEXCOM_NOT_ATTRIBUTED to "Glucosa recibida del conjunto aprobado, no atribuida a Dexcom",
         Warnings.MANUAL_IOB to "IOB introducido a mano, sin verificar",
+        Warnings.CALCULATED_IOB to "IOB calculado del historial local con reglas candidatas, sin verificar",
         Warnings.MAX_BOLUS_LIMITED to "Total limitado por el bolo máximo del perfil",
         Warnings.BELOW_HYPO_STOP to "Glucosa por debajo de la parada de Legacy (70 mg/dL)",
     )
@@ -120,6 +147,20 @@ internal object TestCalculationText {
         }
     }
 
+    /**
+     * Breakdown of the candidate IOB the result used: total, every dose with insulin left and its provenance, or the
+     * causes that block it. A blocked IOB is never shown as zero.
+     */
+    fun iob(result: IobResult): List<String> = when (val outcome = result.outcome) {
+        is IobOutcome.Blocked -> listOf("IOB del historial: bloqueado (${outcome.causes.joinToString(", ")})")
+        is IobOutcome.Computed -> listOf("IOB del historial: ${units(outcome.units)} U · ${outcome.contributions.size} dosis " +
+            "en el registro · acción efectiva ${units(outcome.effectiveActionMinutes)} min") +
+            outcome.contributions.filter { it.remainingUnits > 0.0 }.map {
+                "   ${units(it.units)} U hace ${units(it.elapsedMinutes)} min → quedan ${units(it.remainingUnits)} U"
+            }
+    } + ("IOB: reglas ${result.ruleSetId} · Legacy ${result.legacySha.take(12)} · validación ${result.ruleValidation} · " +
+        "huella ${result.inputFingerprintSha256}")
+
     fun outcome(outcome: StepOutcome): String = when (outcome) {
         is StepOutcome.Computed -> units(outcome.units)
         is StepOutcome.Blocked -> outcome.causes.joinToString(", ")
@@ -151,6 +192,16 @@ internal class TestCalculationScreen(
         setTextIsSelectable(true)
         layoutParams = LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(6) }
         parent.addView(this)
+    }
+
+    private fun choice(label: String, tag: String, selected: Boolean, run: () -> Unit) = Button(context).apply {
+        text = label
+        this.tag = tag
+        isAllCaps = false
+        isSelected = selected
+        setTypeface(typeface, if (selected) Typeface.BOLD else Typeface.NORMAL)
+        setOnClickListener { run() }
+        content.addView(this, LinearLayout.LayoutParams(-1, -2))
     }
 
     private fun choice(label: Int, tag: String, selected: Boolean, enabled: Boolean, run: () -> Unit) = Button(context).apply {
@@ -218,7 +269,19 @@ internal class TestCalculationScreen(
                 model.form.copy(glucoseMgDl = it, glucoseEnteredAtEpochMs = now())
             }
         }
-        field(R.string.test_calc_iob, "test_calc:iob", form.iobUnits, result) { model.form.copy(iobUnits = it) }
+        label(content, "IOB", bold = true)
+        choice("Introducir a mano", "test_calc:iob:manual", form.iobChoice == IobChoice.MANUAL) {
+            model.update(model.form.copy(iobChoice = IobChoice.MANUAL)); changed()
+        }
+        choice("Calcular del historial de dosis local", "test_calc:iob:history", form.iobChoice == IobChoice.DOSE_HISTORY) {
+            model.update(model.form.copy(iobChoice = IobChoice.DOSE_HISTORY)); changed()
+        }
+        if (form.iobChoice == IobChoice.MANUAL) {
+            field(R.string.test_calc_iob, "test_calc:iob", form.iobUnits, result) { model.form.copy(iobUnits = it) }
+        } else {
+            label(content, "Al calcular se usa el IOB candidato del historial de dosis de este móvil. Si el registro " +
+                "no cubre toda la acción de la insulina, el IOB se bloquea: nunca se toma como 0.", "test_calc:iob:history_note", 13f)
+        }
         label(content, context.getString(R.string.test_calc_limits), bold = true)
         label(content, TestCalculationText.limits(profile), "test_calc:limits", 13f)
         Button(context).apply {
@@ -250,6 +313,9 @@ internal class TestCalculationScreen(
                     size = 13f, ink = R.color.secondary_text)
             }
         }
+        model.iob?.let { iob -> TestCalculationText.iob(iob).forEachIndexed { index, line ->
+            label(parent, line, if (index == 0) "test_calc:iob_detail" else null, 13f, ink = R.color.secondary_text)
+        } }
         label(parent, context.getString(R.string.test_calc_warnings), bold = true)
         result.warnings.forEach { label(parent, "• " + TestCalculationText.warning(it), "test_calc:warning:$it", 13f) }
         label(parent, context.getString(R.string.test_calc_not_applied, result.notApplied.joinToString(", ")), size = 13f,

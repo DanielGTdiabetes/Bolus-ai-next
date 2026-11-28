@@ -16,6 +16,7 @@ class ProfileIsolationTestRunner : AndroidJUnitRunner() {
     override fun onCreate(arguments: Bundle?) {
         ProfileStorageGuard.activateForInstrumentation()
         DexcomStorageGuard.activateForInstrumentation()
+        org.bolusai.next.doses.DoseStorageGuard.activateForInstrumentation()
         super.onCreate(arguments)
     }
 }

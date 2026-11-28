@@ -243,14 +243,45 @@ try {
     if ($engineCurves.Count -eq 0 -or (($engineCurves -join ",") -cne ($profileCurves -join ","))) {
         throw "Profile and engine insulin curves differ (ADR 0027): engine [$($engineCurves -join ', ')], profile [$($profileCurves -join ', ')]"
     }
-    # ADR 0026, section 5: only the JVM test with a synthetic history may call candidate IOB. Bolo keeps manual IOB.
-    $syntheticIobTest = Join-Path $repositoryRoot "android\app\src\test\java\org\bolusai\next\TestCalculationTest.kt"
+    # ADR 0026, section 5, and ADR 0028: on Android the candidate IOB is called only by the test calculation, which
+    # feeds it the local dose ledger, by its screen, which shows the breakdown, and by their JVM tests.
+    $iobAllowed = @("android\app\src\main\java\org\bolusai\next\application\TestCalculation.kt",
+        "android\app\src\main\java\org\bolusai\next\application\CalculationAudit.kt",
+        "android\app\src\main\java\org\bolusai\next\ui\TestCalculationScreen.kt",
+        "android\app\src\test\java\org\bolusai\next\TestCalculationTest.kt",
+        "android\app\src\test\java\org\bolusai\next\DoseHistoryCalculationTest.kt") |
+        ForEach-Object { Join-Path $repositoryRoot $_ }
     $iobConsumers = @(Get-ChildItem -LiteralPath (Join-Path $repositoryRoot "android") -Recurse -File |
-        Where-Object { $_.FullName -ne $syntheticIobTest -and $_.FullName -notmatch '[\\/]build[\\/]' -and
+        Where-Object { $_.FullName -notin $iobAllowed -and $_.FullName -notmatch '[\\/]build[\\/]' -and
             $_.Extension -in @(".kt", ".kts", ".java") } |
         Select-String -Pattern 'org\.bolusai\.engine\.iob|CandidateIob' -List)
     if ($iobConsumers.Count -gt 0) {
-        throw "The candidate IOB has no approved producer yet (ADR 0026): $($iobConsumers.Path -join ', ')"
+        throw "Only the test calculation may call the candidate IOB (ADR 0026, ADR 0028): $($iobConsumers.Path -join ', ')"
+    }
+    # ADR 0028: the dose ledger module is self-contained and the engine never depends on it; the Android test
+    # calculation translates the ledger into an explicit DoseHistory. Entries stay local notes without authority.
+    $ledgerReferences = @(Get-ChildItem -LiteralPath (Join-Path $repositoryRoot "shared\insulin-history") -Recurse -File |
+        Where-Object { $_.FullName -notmatch '\\build\\' } |
+        Select-String -Pattern 'org\.bolusai\.(engine|profile|meals|dexcomg7|next)|^import (android|java)\.' -List)
+    if ($ledgerReferences.Count -gt 0) {
+        throw "The dose ledger module must stay self-contained (ADR 0028): $($ledgerReferences.Path -join ', ')"
+    }
+    $engineLedger = @(Get-ChildItem -LiteralPath (Join-Path $repositoryRoot "shared\bolus-engine") -Recurse -File |
+        Where-Object { $_.FullName -notmatch '\\build\\' } |
+        Select-String -Pattern 'insulin-history|org\.bolusai\.insulin' -List)
+    if ($engineLedger.Count -gt 0) {
+        throw "The bolus engine must not depend on the dose ledger (ADR 0028): $($engineLedger.Path -join ', ')"
+    }
+    $ledgerSource = Get-Content -Raw -LiteralPath (Join-Path $repositoryRoot "android\app\src\main\java\org\bolusai\next\doses\SqliteDoseLedger.kt")
+    if ($ledgerSource -notmatch "status = 'local_note_not_treatment_authority'" -or
+        $ledgerSource -notmatch 'dose_events_immutable_update' -or $ledgerSource -notmatch 'dose_events_immutable_delete') {
+        throw "The dose ledger must stay append-only and without treatment authority (ADR 0028)"
+    }
+    $doseNetwork = @(Get-ChildItem -LiteralPath (Join-Path $repositoryRoot "android\app\src\main\java\org\bolusai\next\doses"),
+            (Join-Path $repositoryRoot "shared\insulin-history\src\commonMain") -Recurse -File |
+        Select-String -Pattern 'java\.net\.|HttpURLConnection|okhttp|Socket|ContentResolver|sendBroadcast' -List)
+    if ($doseNetwork.Count -gt 0) {
+        throw "The dose ledger must not send or synchronise anything (ADR 0028): $($doseNetwork.Path -join ', ')"
     }
     # ADR 0024: test results stay in memory. The test calculation never persists, confirms or synchronises anything.
     foreach ($testCalculation in @("android\app\src\main\java\org\bolusai\next\application\TestCalculation.kt",
@@ -530,7 +561,7 @@ jobs:
             if ($LASTEXITCODE -ne 0) { throw "Could not wake the display for UI instrumentation" }
             # Direct instrumentation avoids collecting unrelated device logcat or clinical data.
             $instrumentation = @(adb shell am instrument -w -r `
-                -e class org.bolusai.next.glucose.dexcom.AndroidDexcomSenderEvidenceTest,org.bolusai.next.NavigationDeviceTest,org.bolusai.next.MealDraftDeviceTest,org.bolusai.next.MealHistoryDeviceTest,org.bolusai.next.MealRestoreDeviceTest,org.bolusai.next.meals.SqliteMealRepositoryDeviceTest,org.bolusai.next.DarkThemeDeviceTest,org.bolusai.next.TestCalculationDeviceTest,org.bolusai.next.profile.SqliteClinicalProfileRepositoryDeviceTest,org.bolusai.next.profile.ClinicalProfileConfirmationDeviceTest,org.bolusai.next.profile.ClinicalProfileLimitsDeviceTest,org.bolusai.next.profile.ClinicalProfileInsulinActionDeviceTest,org.bolusai.next.ClinicalProfileDeviceTest,org.bolusai.next.ClinicalProfileConfirmationUiDeviceTest,org.bolusai.next.ClinicalProfileUnavailabilityDeviceTest,org.bolusai.next.BolusProfileDetailsDeviceTest,org.bolusai.next.ProfileStorageGuardDeviceTest,org.bolusai.next.glucose.dexcom.DexcomBundleExtrasDeviceTest,org.bolusai.next.glucose.dexcom.storage.SqliteDexcomObservationStoreDeviceTest,org.bolusai.next.DexcomLogDiagnosticsDeviceTest,org.bolusai.next.glucose.dexcom.storage.DexcomLogIsolationDeviceTest,org.bolusai.next.glucose.dexcom.DexcomG7ReceiverDeviceTest `
+                -e class org.bolusai.next.glucose.dexcom.AndroidDexcomSenderEvidenceTest,org.bolusai.next.NavigationDeviceTest,org.bolusai.next.MealDraftDeviceTest,org.bolusai.next.MealHistoryDeviceTest,org.bolusai.next.MealRestoreDeviceTest,org.bolusai.next.meals.SqliteMealRepositoryDeviceTest,org.bolusai.next.DarkThemeDeviceTest,org.bolusai.next.TestCalculationDeviceTest,org.bolusai.next.profile.SqliteClinicalProfileRepositoryDeviceTest,org.bolusai.next.profile.ClinicalProfileConfirmationDeviceTest,org.bolusai.next.profile.ClinicalProfileLimitsDeviceTest,org.bolusai.next.profile.ClinicalProfileInsulinActionDeviceTest,org.bolusai.next.ClinicalProfileDeviceTest,org.bolusai.next.ClinicalProfileConfirmationUiDeviceTest,org.bolusai.next.ClinicalProfileUnavailabilityDeviceTest,org.bolusai.next.BolusProfileDetailsDeviceTest,org.bolusai.next.ProfileStorageGuardDeviceTest,org.bolusai.next.glucose.dexcom.DexcomBundleExtrasDeviceTest,org.bolusai.next.glucose.dexcom.storage.SqliteDexcomObservationStoreDeviceTest,org.bolusai.next.DexcomLogDiagnosticsDeviceTest,org.bolusai.next.glucose.dexcom.storage.DexcomLogIsolationDeviceTest,org.bolusai.next.glucose.dexcom.DexcomG7ReceiverDeviceTest,org.bolusai.next.doses.SqliteDoseLedgerDeviceTest `
                 "$testPackage/$isolationRunner")
             $instrumentationExit = $LASTEXITCODE
             $instrumentation | Write-Output

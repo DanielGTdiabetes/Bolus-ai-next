@@ -57,6 +57,22 @@ import org.bolusai.profile.ClinicalProfiles
 import org.bolusai.profile.OperationIds
 import org.bolusai.profile.ProfileClock
 import org.bolusai.profile.TimeZoneRules
+import org.bolusai.engine.candidate.StepOutcome
+import org.bolusai.insulin.AppendOutcome
+import org.bolusai.insulin.DoseClock
+import org.bolusai.insulin.DoseHistoryLog
+import org.bolusai.insulin.DoseOrigin
+import org.bolusai.next.application.CalculationAudit
+import org.bolusai.next.application.IobChoice
+import org.bolusai.next.doses.ClosableDoseLedger
+import org.bolusai.next.doses.DoseStorageGuard
+import org.bolusai.next.doses.SqliteDoseLedger
+import org.bolusai.next.doses.UnavailableDoseLedger
+import org.bolusai.next.ui.DoseHistoryModel
+import org.bolusai.next.ui.DoseHistoryScreen
+import org.bolusai.next.ui.DoseHistoryText
+import org.bolusai.profile.DecimalInput
+import org.bolusai.profile.DecimalInputs
 import java.util.UUID
 
 class MainActivity : ComponentActivity() {
@@ -80,6 +96,7 @@ class MainActivity : ComponentActivity() {
     private var dexcomLogOpen = false
     private lateinit var dexcomReading: DexcomReadingModel
     private lateinit var testCalculation: TestCalculationModel
+    private lateinit var doseHistory: DoseHistoryModel
     private val overview = ReadOverview(ReadLocalGlucoseStatus(PendingDexcomSource))
     private val backCallback = object : OnBackPressedCallback(false) {
         override fun handleOnBackPressed() = goBack()
@@ -134,6 +151,13 @@ class MainActivity : ComponentActivity() {
         })[DexcomReadingModel::class.java]
         dexcomReading.changed = { if (showsDexcomReading(navigation.current)) { rememberScroll(); render() } }
         testCalculation = ViewModelProvider(this)[TestCalculationModel::class.java]
+        doseHistory = ViewModelProvider(this, object : ViewModelProvider.Factory {
+            @Suppress("UNCHECKED_CAST")
+            override fun <T : ViewModel> create(modelClass: Class<T>): T {
+                val ledger = doseLedger(applicationContext)
+                return DoseHistoryModel(ledger, DoseHistoryLog(ledger, DoseClock { clock() }, writer())) as T
+            }
+        })[DoseHistoryModel::class.java]
         renderer = ScreenRenderer(this, findViewById(R.id.screen_content), ::open,
             { settingsSection = it; profileDetailsOpen = false; render() }, ::renderMeals, ::renderSelection, ::renderProfile,
             ::renderTestCalculation)
@@ -281,22 +305,79 @@ class MainActivity : ComponentActivity() {
      * shown and used are those of the same profile version.
      */
     private fun renderTestCalculation() {
-        testCalculation.invalidateIfChanged(
-            TestCalculation.dependencies(profile.gate, meals.selection, dexcomReading.state, testCalculation.form))
+        if (doseHistory.state == null) doseHistory.load()
+        testCalculation.invalidateIfChanged(TestCalculation.dependencies(profile.gate, meals.selection,
+            dexcomReading.state, testCalculation.form, doseHistory.state))
         TestCalculationScreen(this, findViewById(R.id.screen_content), testCalculation,
             dexcomReading.state is LatestReadingPresentation.Reading, TestCalculation.profile(profile.gate),
             meals.selection is org.bolusai.meals.MealSelection.Reviewed,
             now = clock,
             calculate = {
                 val now = clock()
+                // ADR 0028: read the ledger at calculation time, so the IOB uses what is stored now.
+                doseHistory.load()
+                val doses = doseHistory.state
                 val request = TestCalculation.request(now, profile.gate, meals.selection, dexcomReading.state,
-                    testCalculation.form)
-                testCalculation.store(TestCalculation.calculate(request), now,
-                    TestCalculation.dependencies(profile.gate, meals.selection, dexcomReading.state, testCalculation.form))
+                    testCalculation.form, doses)
+                val iob = if (testCalculation.form.iobChoice == IobChoice.DOSE_HISTORY) {
+                    TestCalculation.iob(now, profile.gate, doses)
+                } else null
+                testCalculation.store(TestCalculation.calculate(request), now, TestCalculation.dependencies(
+                    profile.gate, meals.selection, dexcomReading.state, testCalculation.form, doses), iob, request)
                 rememberScroll()
                 render()
             },
             changed = { rememberScroll(); render() },
+        ).render()
+        renderDoseHistory()
+    }
+
+    /**
+     * ADR 0028: the local dose ledger under the test calculation. Every append is confirmed explicitly, uses one event
+     * id per intent and is stored durably before the screen repaints. Nothing is synchronised or sent anywhere.
+     */
+    private fun renderDoseHistory() {
+        val result = testCalculation.result
+        val request = testCalculation.request
+        // A total can be noted only with the request it came from, so its audit record is complete.
+        val total = (result?.total as? StepOutcome.Computed)?.units?.takeIf { request != null }
+            ?.let(DoseHistoryText::totalUnits)
+        fun confirmed(question: String, append: (String) -> AppendOutcome, after: () -> Unit = {}) {
+            val eventId = doseEventIds()
+            android.app.AlertDialog.Builder(this).setMessage(question)
+                .setNegativeButton(DoseHistoryText.CANCEL, null)
+                .setPositiveButton(DoseHistoryText.CONFIRM) { _, _ ->
+                    if (doseHistory.applied(append(eventId))) after()
+                    rememberScroll()
+                    render()
+                }.show()
+        }
+        val zone = java.time.ZoneId.systemDefault()
+        DoseHistoryScreen(this, findViewById(R.id.screen_content), doseHistory, zone, total,
+            start = { confirmed(DoseHistoryText.START_QUESTION, { doseHistory.log.startTracking(it) }) },
+            note = { typed ->
+                when (val parsed = DecimalInputs.parse(typed)) {
+                    is DecimalInput.Valid -> confirmed(DoseHistoryText.noteQuestion(parsed.value.text),
+                        { doseHistory.log.noteDose(it, parsed.value.text, DoseOrigin.USER_NOTE, null) }) {
+                        doseHistory.typedUnits = ""
+                    }
+                    else -> {
+                        doseHistory.applied(AppendOutcome.Rejected("dose_ledger.units_missing_or_invalid"))
+                        rememberScroll()
+                        render()
+                    }
+                }
+            },
+            registerTotal = { units ->
+                val audit = CalculationAudit.record(checkNotNull(request), checkNotNull(result), testCalculation.iob)
+                confirmed(DoseHistoryText.noteQuestion(units),
+                    { doseHistory.log.noteDose(it, units, DoseOrigin.TEST_CALCULATION, audit) }) {
+                    testCalculation.discard()
+                }
+            },
+            void = { dose ->
+                confirmed(DoseHistoryText.voidQuestion(dose, zone), { doseHistory.log.voidDose(it, dose.eventId) })
+            },
         ).render()
     }
 
@@ -331,6 +412,8 @@ class MainActivity : ComponentActivity() {
             // ADR 0021, F2: each entry into Diagnóstico reads the log afresh; no other screen reads it.
             if (destination == Destination.DIAGNOSTICS) dexcomLog.load()
             if (showsDexcomReading(destination)) dexcomReading.load()
+            // ADR 0028: each entry into Bolo reads the local dose ledger afresh.
+            if (destination == Destination.BOLUS) doseHistory.load()
         }
         if (destination == Destination.DIAGNOSTICS && dexcomLog.state == null) dexcomLog.load()
         val state = overview.execute()
@@ -376,6 +459,18 @@ class MainActivity : ComponentActivity() {
         var dexcomLogReader: (() -> ObservationSummaryRead)? = null
         /** Process-local test seam for the latest reading of Inicio and Bolo (ADR 0023); production reads the app log. */
         var dexcomPresentationReader: ((Long) -> LatestReadingPresentation)? = null
+        /** Process-local test seam for the dose ledger (ADR 0028); production uses the app database. */
+        var doseLedgerFactory: ((Context) -> ClosableDoseLedger)? = null
+        var doseEventIds: () -> String = { UUID.randomUUID().toString() }
+
+        /**
+         * The ledger the activity uses. During instrumentation a missing synthetic factory gives an unavailable
+         * ledger, so the app's own file is never opened and the history is unknown, not empty.
+         */
+        internal fun doseLedger(context: Context): ClosableDoseLedger =
+            doseLedgerFactory?.invoke(context) ?: if (DoseStorageGuard.active) UnavailableDoseLedger
+            else SqliteDoseLedger(context)
+
         /** Wall clock of the presentation and the test calculation; injectable for deterministic tests. */
         var clock: () -> Long = { System.currentTimeMillis() }
     }

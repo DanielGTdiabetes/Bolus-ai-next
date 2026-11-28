@@ -218,6 +218,12 @@ valor como manual. Un adaptador para Bolo deberá conservar la procedencia y la
 huella del IOB calculado. La pantalla Bolo sigue con IOB manual y la elección
 del origen de las dosis reales queda pendiente.
 
+### Productor e IOB en Bolo — 2026-11-28
+
+El [ADR 0028](0028-local-dose-ledger-and-calculated-iob.md) añade el productor:
+el registro local de dosis. `TestCalculation` lo traduce a `DoseHistory` y Bolo
+puede usar el IOB calculado, con su procedencia en la huella del bolo.
+
 ## Condiciones para revisar este ADR
 
 - Cambios en `iob.py` o `curves.py` en un SHA posterior de Legacy.

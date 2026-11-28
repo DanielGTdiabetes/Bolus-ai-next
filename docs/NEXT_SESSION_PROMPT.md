@@ -53,6 +53,25 @@ hasta el IOB candidato y el total de prueba. Ver ADR 0026, «Prueba con historia
 sintético». Bolo conserva el IOB manual. Antes de conectarlo al historial real,
 queda elegir su origen y llevar al cálculo la procedencia y huella del IOB.
 
+ENTREGA 2026-11-28 — HISTORIAL LOCAL DE DOSIS E IOB CALCULADO EN BOLO (ADR 0028)
+Decisión del propietario: el historial de dosis es local y lo alimenta Bolo,
+como en `bolus_ai`; Next debe funcionar entero en el móvil. `shared/insulin-history`
+(inicio del registro, dosis y anulación, append-only e idempotente),
+`insulin-doses.db` v1 y elección en Bolo entre IOB a mano e IOB calculado. El IOB
+calculado lleva su huella a la del bolo. Registro sin empezar, ilegible o sin
+cubrir toda la acción de la insulina bloquea; nunca es 0. Entradas sin autoridad
+de tratamiento y sin sincronización. `main` de Legacy era `e48c4ab` ese día; las
+reglas siguen fijadas en `bcac891` y la diferencia no está auditada.
+Las pruebas que quieran un registro en dispositivo inyectan
+`MainActivity.doseLedgerFactory`; sin ella el registro es no disponible.
+Una dosis registrada desde un cálculo guarda en su fila el registro de auditoría
+(petición canónica y resultado). `verify.ps1 -DeviceTests`: 189 instrumentadas OK
+en el Pixel. En ese Pixel el receptor Dexcom de Next está habilitado para la
+recepción real: antes de las pruebas `pm default-state` y después `pm enable`,
+ambos con `run-as org.bolusai.next` (docs/validation/local-dose-ledger-2026-11-28.md).
+Pendiente: recorrido manual del registro en Bolo y prueba instrumentada de sus
+diálogos.
+
 SIGUIENTE
 - Teléfono: cálculo con perfil real confirmado (P6) y actualización sobre un
   perfil v2 real existente (P7 de la validación de límites). B1 tiene evidencia
@@ -61,10 +80,9 @@ SIGUIENTE
   pruebas ya ejecutadas sin cambios que lo justifiquen. En esta sesión Codex
   hizo las pruebas del Pixel mientras Claude avanzaba desde la nube, sin
   modificar la implementación de perfil o motor de Claude.
-- Sin teléfono: productor del historial local de insulina, en entrega separada
-  tras decidir el origen de las dosis reales. Después, conectar `CandidateIob`
-  a Bolo con procedencia explícita. Luego fibra/Warsaw (LC-008). Resolver y
-  registrar el SHA remoto de Legacy antes de una nueva auditoría.
+- Sin teléfono: fibra/Warsaw (LC-008); después techo de IOB, intervalo mínimo
+  entre bolos y bolo extendido o dual. Comparar Legacy `bcac891..e48c4ab` antes
+  de capturar vectores nuevos.
 No repetir las decisiones ya aprobadas.
 
 CONTINUACIÓN ACTIVA — 2026-10-12
@@ -527,9 +545,13 @@ docs/EXECUTION_PLAN.md §3.3. Un ADR breve cubre cambios estructurales o de
 seguridad relevantes; las decisiones rutinarias dentro del alcance autorizado
 se resuelven durante la implementación. Preguntar juntos los puntos clínicos
 o de alcance pendientes y aprovechar aprobaciones ya registradas.
-Conservar PR a `main`, revisión automática de Codex, corrección y regresión de
-hallazgos válidos, respuesta y resolución de hilos, y CI «Verify» (Windows)
-en verde antes de fusionar. No repetir rondas sin cambios o motivos pendientes.
+Conservar PR a `main` y CI «Verify» (Windows) en verde antes de fusionar. Desde
+el 2026-11-28 no se usa Codex: su revisión automática no es puerta de entrega ni
+se responden sus hilos; un hallazgo válido se corrige con su regresión. Ese día
+el propietario delegó en Claude la responsabilidad del proyecto: decide lo
+técnico y fusiona las PR de prueba con verificación local y CI en verde. Siguen
+reservadas al propietario la autorización de uso terapéutico y cualquier cambio
+en Legacy o producción. No repetir rondas sin cambios o motivos pendientes.
 En sesiones cloud sin SDK: instalar Android SDK 36
 (commandlinetools + `platforms;android-36`, `build-tools;36.0.0`) en el
 directorio temporal y exportar `ANDROID_HOME`; PowerShell 7 portátil sirve para
