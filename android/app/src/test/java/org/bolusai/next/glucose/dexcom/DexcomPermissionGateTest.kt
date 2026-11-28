@@ -122,6 +122,23 @@ class DexcomPermissionGateTest {
         assertEquals(false, read)
     }
 
+    /** Pixel, 2026-11-15: `producer_version_changed` under the previous version; lifted by the owner on 2026-11-28. */
+    @Test fun aBlockOfASupersededPolicyVersionNoLongerClosesTheGateAndIsKept() {
+        val previous = DexcomApprovedPermissionSet.PREVIOUS_POLICY_VERSIONS
+        assertEquals(listOf("adr0023-i2b-2026-10-12"), previous)
+        assertEquals("adr0023-i2b-2026-11-28", DexcomApprovedPermissionSet.POLICY_VERSION)
+        assertTrue(DexcomApprovedPermissionSet.POLICY_VERSION !in previous)
+        val blocks = Blocks()
+        blocks.block(previous.single(), GateCause.VERSION_CHANGED, 1L)
+        val gate = DexcomPermissionGate(blocks)
+        assertTrue(gate.check({ snapshot() }) { 2L } is PermissionGate.Open)
+        assertEquals(listOf(previous.single() to GateCause.VERSION_CHANGED), blocks.written)
+        // The rule itself is unchanged: another Dexcom version blocks again, now under the current version.
+        val other = snapshot(listOf(holder(dexcom, 10451, version = 4538), holder(legacy, 10450), holder(watch, 10350), next))
+        assertEquals(PermissionGate.Closed(GateCause.VERSION_CHANGED), gate.check({ other }) { 3L })
+        assertEquals(PermissionGate.Closed(GateCause.DURABLE_BLOCK_ACTIVE, GateCause.VERSION_CHANGED), gate.check({ snapshot() }) { 4L })
+    }
+
     @Test fun nonDurableCausesWriteNothing() {
         val blocks = Blocks()
         DexcomPermissionGate(blocks).check({ snapshot(visible = false) }) { 1L }
