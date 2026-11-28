@@ -274,6 +274,37 @@ conjunto aprobado», nunca «enviada por Dexcom».
 | D1 | Prueba sin red | Wi-Fi y datos móviles apagados, Bluetooth activo y sin activar modo avión; comprobar con `dumpsys connectivity` que no hay red validada y que el sensor sigue entregando lecturas. Repetir tras reiniciar y comprobar de nuevo esos estados | **Decidida por el propietario — 2026-10-11**. Indica que activar modo avión desconecta Bluetooth y el sensor G7 de Dexcom. No interrumpir esa conexión para realizar la prueba. Se registra la excepción específica en AGENTS.md §9; se mantiene la validación offline |
 | D2 | Datos en la evidencia | Recuentos, diferencias de tiempo y códigos; nunca valores de glucosa ni `transmitterId` en claro | **Aprobada** el 2026-10-12 |
 
+### Avisos de política retirados de la presentación — 2026-11-28
+
+Decisión del propietario («la app está llena de mensajes de política de
+validación, todo eso se debe eliminar, sobra, ya que es una app privada
+nuestra»). Cambia solo los textos de Inicio y Bolo; no aprueba B1, ningún umbral
+de vigencia ni uso clínico, y la recepción, la selección, el registro y los
+códigos `dexcom_presentation.*` siguen igual.
+
+- **C5**: se conserva la antigüedad («Recibida hace N min, a las HH:mm», contada
+  desde la recepción con el reloj inyectado). Se retira la línea «Vigencia sin
+  política aprobada: no se presenta como actual». El título sigue siendo «Última
+  lectura Dexcom recibida»; ninguna pantalla la llama «actual».
+- **B1**: se retira «Hora de medida: no verificada» y la coletilla «Tiempo
+  contado desde la recepción». La selección sigue siendo por recepción y la
+  causa `selection_pending_b1` sigue visible cuando ocurre.
+- **Procedencia**: se retira «Recibida mediante permiso de un emisor del conjunto
+  aprobado, no atribuida a Dexcom». La procedencia sigue en la huella del cálculo
+  de prueba y en el registro.
+- **B4 (a) / estado**: se retira «No aprobada para uso clínico».
+- Se conservan todas las causas de C6 y las de número retenido (fuera de
+  `1..400`, conflicto, reloj anterior a la recepción), con su código.
+- La tarjeta «Glucosa actual · Sin lectura» de Inicio, Bolo y Ajustes ya no añade
+  «Política de validación de glucosa pendiente»; esa línea queda en Diagnóstico.
+  Cualquier otro estado de glucosa (sin lectura, caducada, permiso, etc.) se
+  sigue mostrando.
+
+Riesgo aceptado con la decisión: la antigüedad mostrada es desde la recepción,
+no desde la medida, y no hay umbral que oculte una lectura antigua; la
+protección que queda es la propia antigüedad, siempre visible junto al número.
+Pruebas: `DexcomReadingBlockTest`.
+
 ## Documentos afectados por la aceptación
 
 Cada uno lleva ya una nota de rectificación: el opt-in de identidad y la

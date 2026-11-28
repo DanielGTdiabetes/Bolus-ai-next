@@ -24,7 +24,9 @@ internal data class DexcomReadingView(val value: UiText?, val lines: List<UiText
 
 /**
  * Pure composition of the presentation (ADR 0023, part II). The value appears only for [LatestReadingPresentation.Reading],
- * always with the reception time, "hora de medida no verificada", "vigencia sin política aprobada" and the provenance.
+ * always with the time since reception, so an old reading is never shown without its age. By owner decision of
+ * 2026-11-28 the screens no longer repeat the pending-policy notices (measurement time, freshness, provenance of the
+ * approved set, clinical status); the real causes of a missing or withheld number stay.
  */
 internal object DexcomReadingBlock {
     private val clock = DateTimeFormatter.ofPattern("HH:mm")
@@ -36,23 +38,20 @@ internal object DexcomReadingBlock {
             listOf(
                 UiText(R.string.dexcom_reading_received,
                     listOf(presentation.elapsedSinceReceptionMs / 60_000L, time(presentation.receivedAtEpochMs, zone))),
-                UiText(R.string.dexcom_reading_measurement),
-                UiText(R.string.dexcom_reading_freshness),
-                provenance(presentation.provenance),
-                UiText(R.string.dexcom_reading_status),
+                *provenance(presentation.provenance).toTypedArray(),
                 UiText(R.string.dexcom_reading_details, listOf(presentation.transmitterShort, presentation.trendLiteral)),
             ),
         )
-        is LatestReadingPresentation.Withheld -> DexcomReadingView(null, listOf(
-            UiText(when (presentation.cause) {
+        is LatestReadingPresentation.Withheld -> DexcomReadingView(null, buildList {
+            add(UiText(when (presentation.cause) {
                 WithheldCause.OUTSIDE_PRODUCER_INTERVAL -> R.string.dexcom_reading_withheld_outside
                 WithheldCause.CONFLICT -> R.string.dexcom_reading_withheld_conflict
                 WithheldCause.RECEPTION_AFTER_NOW -> R.string.dexcom_reading_withheld_clock
-            }),
-            UiText(R.string.dexcom_reading_withheld_received, listOf(time(presentation.receivedAtEpochMs, zone))),
-            provenance(presentation.provenance),
-            UiText(R.string.dexcom_reading_code, listOf(presentation.cause.code)),
-        ))
+            }))
+            add(UiText(R.string.dexcom_reading_withheld_received, listOf(time(presentation.receivedAtEpochMs, zone))))
+            addAll(provenance(presentation.provenance))
+            add(UiText(R.string.dexcom_reading_code, listOf(presentation.cause.code)))
+        })
         is LatestReadingPresentation.NoReading -> DexcomReadingView(null, buildList {
             add(UiText(when (presentation.cause) {
                 NoReadingCause.RECEIVER_DISABLED -> R.string.dexcom_reading_receiver_disabled
@@ -69,9 +68,10 @@ internal object DexcomReadingBlock {
         })
     }
 
-    private fun provenance(provenance: MessageProvenance) = when (provenance) {
-        is ApprovedPermissionSet -> UiText(R.string.dexcom_reading_provenance_set)
-        is AuthenticatedSender -> UiText(R.string.dexcom_reading_provenance_strict, listOf(provenance.packageName))
+    /** The approved permission set is the normal path and adds no line; an authenticated sender names its package. */
+    private fun provenance(provenance: MessageProvenance): List<UiText> = when (provenance) {
+        is ApprovedPermissionSet -> emptyList()
+        is AuthenticatedSender -> listOf(UiText(R.string.dexcom_reading_provenance_strict, listOf(provenance.packageName)))
     }
 
     private fun time(epochMs: Long, zone: ZoneId): String = clock.format(Instant.ofEpochMilli(epochMs).atZone(zone))

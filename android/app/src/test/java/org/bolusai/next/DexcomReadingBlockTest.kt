@@ -22,16 +22,12 @@ class DexcomReadingBlockTest {
     private val utc = ZoneId.of("UTC")
     private val set = ApprovedPermissionSet("adr0023-i2b-2026-10-12", "c".repeat(64))
 
-    @Test fun aShownReadingAlwaysCarriesItsLimitations() {
+    @Test fun aShownReadingAlwaysCarriesItsAgeAndNoPolicyNotice() {
         val view = DexcomReadingBlock.view(LatestReadingPresentation.Reading(123, 3_600_000L, 185_000L, set, "ab12cd34",
             "SYNTHETIC_TREND"), utc)
         assertEquals(UiText(R.string.dexcom_reading_value, listOf(123)), view.value)
         assertEquals(listOf(
             UiText(R.string.dexcom_reading_received, listOf(3L, "01:00")),
-            UiText(R.string.dexcom_reading_measurement),
-            UiText(R.string.dexcom_reading_freshness),
-            UiText(R.string.dexcom_reading_provenance_set),
-            UiText(R.string.dexcom_reading_status),
             UiText(R.string.dexcom_reading_details, listOf("ab12cd34", "SYNTHETIC_TREND")),
         ), view.lines)
     }

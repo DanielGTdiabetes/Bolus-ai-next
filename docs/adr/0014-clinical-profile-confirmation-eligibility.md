@@ -1252,3 +1252,15 @@ Aceptación: tras esta revisión (commit `0d4a3fd`, CI en verde) el propietario
 aceptó el ADR el 2026-10-03. C7 se aprueba como solución provisional: la
 elección entre añadir motivos al contrato v1 o crear un contrato v2 sigue
 pendiente y debe resolverse antes de cualquier aprobación clínica.
+
+## 17. Avisos de política retirados de la pantalla (2026-11-28)
+
+Decisión del propietario (AGENTS.md §3, «Avisos de política en la interfaz»):
+los textos de E5 a E11 y el aviso de confirmación ya no terminan en «Cálculo
+todavía bloqueado», la explicación de la revisión se reduce a su primera frase y
+se retiran el aviso inicial del perfil y «Perfil · no se usa para calcular» de
+Bolo. Sustituye al primer principio de 9.1 y a los textos literales de 9.2 y de
+la sección 10 en lo que se refiere a esa coletilla. Confirmar datos sigue sin
+aprobar uso clínico y los estados, eventos y códigos no cambian.
+`ClinicalProfileConfirmationUiDeviceTest` comprueba que ningún texto afirma una
+aprobación y que la coletilla ya no aparece.

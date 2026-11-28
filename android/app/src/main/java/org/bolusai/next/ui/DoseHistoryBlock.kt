@@ -53,8 +53,9 @@ internal class DoseHistoryModel(private val ledger: ClosableDoseLedger, val log:
 /** Pure text of the dose ledger, testable without views. */
 internal object DoseHistoryText {
     const val TITLE = "Historial de dosis (local)"
-    const val BANNER = "Anotación local para el IOB de prueba. Se guarda solo en este móvil: no se sincroniza, " +
-        "no llega a bolus_ai y no autoriza tratamiento."
+    /** Kept on purpose: a dose noted here is unknown to bolus_ai, whose IOB will not count it. */
+    const val BANNER = "Anotación local para el IOB calculado. Se guarda solo en este móvil: no se sincroniza " +
+        "ni llega a bolus_ai."
     const val NOT_STARTED = "Registro sin empezar. Desde que lo empieces, anota aquí todas las dosis de insulina " +
         "rápida: el IOB calculado se bloquea hasta que el registro cubra toda la acción de la insulina del perfil."
     const val START = "Empezar el registro de dosis ahora"

@@ -120,7 +120,7 @@ class ClinicalProfileUnavailabilityDeviceTest {
         scenario.onActivity { it.findViewById<View>(R.id.bottom_navigation).findViewWithTag<View>("tab:/menu").performClick() }
         click(scenario, "link:/settings")
         click(scenario, "settings:CALCULATION")
-        await(scenario, "profile:safety") { viewOrNull(it, "profile:safety") != null }
+        await(scenario, "profile:title") { viewOrNull(it, "profile:title") != null }
     }
 
     private fun block(activity: MainActivity): TextView = viewOrNull(activity, "profile:unavailability") as TextView

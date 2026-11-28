@@ -110,14 +110,16 @@ internal object TestCalculationText {
         CandidateStep.HYPO_STOP to R.string.test_calc_step_hypo_stop,
     )
 
+    /**
+     * Warnings about the pending validation policy. The engine keeps emitting them and the audit record keeps them;
+     * by owner decision of 2026-11-28 (ADR 0024) the screen does not list them.
+     */
+    private val policyWarnings = setOf(Warnings.TEST_ONLY, Warnings.RULES_NOT_APPROVED, Warnings.FRESHNESS_NOT_APPROVED,
+        Warnings.MEASUREMENT_TIME_UNVERIFIED, Warnings.DEXCOM_NOT_ATTRIBUTED)
+
     private val warnings = mapOf(
-        Warnings.TEST_ONLY to "Resultado de prueba: no utilizable para tratamiento",
-        Warnings.RULES_NOT_APPROVED to "Reglas candidatas con validación pendiente",
-        Warnings.FRESHNESS_NOT_APPROVED to "Vigencia de la glucosa sin política aprobada",
-        Warnings.MEASUREMENT_TIME_UNVERIFIED to "Hora de medida de la glucosa no verificada",
-        Warnings.DEXCOM_NOT_ATTRIBUTED to "Glucosa recibida del conjunto aprobado, no atribuida a Dexcom",
-        Warnings.MANUAL_IOB to "IOB introducido a mano, sin verificar",
-        Warnings.CALCULATED_IOB to "IOB calculado del historial local con reglas candidatas, sin verificar",
+        Warnings.MANUAL_IOB to "IOB introducido a mano",
+        Warnings.CALCULATED_IOB to "IOB calculado del historial local",
         Warnings.MAX_BOLUS_LIMITED to "Total limitado por el bolo máximo del perfil",
         Warnings.BELOW_HYPO_STOP to "Glucosa por debajo de la parada de Legacy (70 mg/dL)",
     )
@@ -125,6 +127,9 @@ internal object TestCalculationText {
     fun stepLabel(step: CandidateStep): Int = steps.getValue(step)
 
     fun warning(code: String): String = warnings[code]?.let { "$it ($code)" } ?: code
+
+    /** The warnings the screen lists: every code of the result except the pending-policy ones. Unknown codes stay. */
+    fun shownWarnings(codes: Collection<String>): List<String> = codes.filterNot { it in policyWarnings }
 
     /** Display only: the engine value with at most three decimals, half-even, Spanish comma. Not a clinical rounding. */
     fun units(value: Double): String =
@@ -171,7 +176,7 @@ internal object TestCalculationText {
             outcome.contributions.filter { it.remainingUnits > 0.0 }.map {
                 "   ${units(it.units)} U hace ${units(it.elapsedMinutes)} min → quedan ${units(it.remainingUnits)} U"
             }
-    } + ("IOB: reglas ${result.ruleSetId} · Legacy ${result.legacySha.take(12)} · validación ${result.ruleValidation} · " +
+    } + ("IOB: reglas ${result.ruleSetId} · Legacy ${result.legacySha.take(12)} · " +
         "huella ${result.inputFingerprintSha256}")
 
     fun outcome(outcome: StepOutcome): String = when (outcome) {
@@ -253,7 +258,6 @@ internal class TestCalculationScreen(
 
     fun render() {
         label(content, context.getString(R.string.test_calc_title), size = 20f, bold = true)
-        label(content, context.getString(R.string.test_calc_banner), "test_calc:banner", bold = true, ink = R.color.error_text)
         val form = model.form
         val result = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL }
 
@@ -339,7 +343,6 @@ internal class TestCalculationScreen(
     }
 
     private fun renderResult(parent: LinearLayout, result: CandidateResult) {
-        label(parent, context.getString(R.string.test_calc_banner), bold = true, ink = R.color.error_text)
         label(parent, when (val total = result.total) {
             is StepOutcome.Computed -> context.getString(R.string.test_calc_total, TestCalculationText.units(total.units))
             is StepOutcome.Blocked -> context.getString(R.string.test_calc_total_blocked)
@@ -358,12 +361,13 @@ internal class TestCalculationScreen(
         model.iob?.let { iob -> TestCalculationText.iob(iob).forEachIndexed { index, line ->
             label(parent, line, if (index == 0) "test_calc:iob_detail" else null, 13f, ink = R.color.secondary_text)
         } }
-        label(parent, context.getString(R.string.test_calc_warnings), bold = true)
-        result.warnings.forEach { label(parent, "• " + TestCalculationText.warning(it), "test_calc:warning:$it", 13f) }
+        val shown = TestCalculationText.shownWarnings(result.warnings)
+        if (shown.isNotEmpty()) label(parent, context.getString(R.string.test_calc_warnings), bold = true)
+        shown.forEach { label(parent, "• " + TestCalculationText.warning(it), "test_calc:warning:$it", 13f) }
         label(parent, context.getString(R.string.test_calc_not_applied, result.notApplied.joinToString(", ")), size = 13f,
             ink = R.color.secondary_text)
         label(parent, context.getString(R.string.test_calc_identity, result.engineVersion, result.ruleSetId,
-            result.legacySha.take(12), result.ruleValidation), size = 12f, ink = R.color.secondary_text)
+            result.legacySha.take(12)), size = 12f, ink = R.color.secondary_text)
         label(parent, context.getString(R.string.test_calc_fingerprint, result.inputFingerprintSha256), "test_calc:fingerprint",
             12f, ink = R.color.secondary_text)
         model.calculatedAtEpochMs?.let {

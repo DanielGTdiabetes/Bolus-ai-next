@@ -2,7 +2,6 @@
 <resources>
     <string name="back">Volver</string>
     <string name="back_symbol">‹</string>
-    <string name="shell_safety">En desarrollo · cálculo y tratamientos bloqueados</string>
     <string name="home">Inicio</string>
     <string name="companion">Compañero</string>
     <string name="scan">Escanear</string>
@@ -50,18 +49,14 @@
     <string name="history_pending">Historial local pendiente</string>
     <string name="history_detail">Todavía no se guardan ni se consultan bolos, comidas o tratamientos en Next. La actividad de Legacy no se ha importado.</string>
     <string name="view_all">Ver todo</string>
-    <string name="calculation_detail">Faltan entradas validadas y reglas aprobadas. No hay una dosis disponible para revisar o confirmar.</string>
+    <string name="calculation_detail">No hay una dosis disponible para revisar o confirmar.</string>
     <string name="inputs_title">Entradas del cálculo</string>
-    <string name="profile_absent">Perfil · no se usa para calcular</string>
-    <string name="profile_detail">Parámetros clínicos, unidades y horarios pendientes. Configúralos en Ajustes cuando esté disponible la edición local.</string>
-    <string name="iob_absent">IOB · desconocido</string>
-    <string name="iob_detail">No hay historial local de insulina validado ni algoritmo aprobado.</string>
     <string name="meal_title">¿Qué vas a comer?</string>
     <string name="meal_detail">Sin comida introducida. La entrada manual y la revisión de importaciones aún no están disponibles.</string>
     <string name="macros_absent">Carbohidratos · sin dato\nGrasas · sin dato\nProteínas · sin dato\nFibra · sin dato\nFecha / hora · sin dato</string>
     <string name="calculate_disabled">Calcular bolo · bloqueado</string>
     <string name="confirm_disabled">Confirmar y registrar · bloqueado</string>
-    <string name="manual_detail">El cálculo manual de contingencia también requiere reglas y entradas aprobadas. Esta pantalla no permite omitir los bloqueos.</string>
+    <string name="manual_detail">El cálculo manual de contingencia aún no está disponible en Next.</string>
     <string name="alerts_title">Avisos y alertas</string>
     <string name="alerts_detail">El compañero aún no evalúa alertas ni genera avisos en Next. Este estado no significa que no existan alertas clínicas.</string>
     <string name="scan_detail">Foto, báscula y composición de Mi plato. Estas herramientas aún no obtienen ni analizan alimentos en Next.</string>
@@ -83,12 +78,12 @@
     <string name="check_isf">Comprobar ISF</string>
     <string name="scan_food">Escanear comida</string>
     <string name="calculate_bolus_link">Calcular bolo</string>
-    <string name="forecast_detail">Tendencia y evolución estimada no disponibles. Faltan glucosa validada y un modelo local aprobado; no se muestra una curva simulada.</string>
+    <string name="forecast_detail">Tendencia y evolución estimada no disponibles. No se muestra una curva simulada.</string>
     <string name="basal_detail">Registro y revisión de la basal pendientes. No hay pauta ni dosis disponibles en Next.</string>
     <string name="basal_disabled">Registrar basal · bloqueado</string>
     <string name="foods_detail">Catálogo y búsqueda local pendientes. No se han importado alimentos ni valores nutricionales.</string>
     <string name="favorites_detail">Biblioteca personal pendiente. Los platos guardados en Legacy no se han importado a Next.</string>
-    <string name="learning_detail">Patrones y absorción no disponibles. Faltan historial local y reglas aprobadas.</string>
+    <string name="learning_detail">Patrones y absorción no disponibles todavía.</string>
     <string name="suggestions_detail">Recomendaciones para revisar no disponibles. Next todavía no genera ni aplica sugerencias.</string>
     <string name="body_map_detail">Rotación de zonas de inyección pendiente. No hay zonas recomendadas ni registros locales.</string>
     <string name="profile_account">Información de cuenta</string>

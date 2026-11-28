@@ -135,9 +135,6 @@ class NavigationDeviceTest {
         scenario.onActivity { activity ->
             assertEquals(destination.route, activity.findViewById<TextView>(R.id.screen_title).tag)
             val root = activity.findViewById<View>(R.id.app_shell)
-            val safety = activity.findViewById<TextView>(R.id.non_authoritative_label)
-            assertTrue(safety.getGlobalVisibleRect(Rect()))
-            assertEquals(activity.getString(R.string.shell_safety), safety.text.toString())
             val selected = views(activity.findViewById(R.id.bottom_navigation)).filter { it.isSelected }
             assertEquals(listOf("tab:${destination.tab.route}"), selected.map { it.tag })
             views(root).filter { it.tag?.toString()?.startsWith("blocked:") == true }.forEach {

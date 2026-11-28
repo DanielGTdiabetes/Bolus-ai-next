@@ -119,13 +119,31 @@ Esta autorización prevalece sobre puertas anteriores que impidan desarrollar
 o simular únicamente por faltar aprobación para tratamiento. No repetir esa
 consulta en cada paso ni imponer el cierre de Dexcom antes de desarrollar el motor.
 
-Los resultados de prueba deben identificarse como no utilizables para tratamiento;
-las lecturas reales conservan sus estados y limitaciones, sin convertirlas en
-entradas clínicamente validadas. No inventar fórmulas, datos, IOB, umbrales ni
+Los resultados de prueba se identifican como no utilizables para tratamiento en
+los datos (resultado del motor, registro de auditoría, códigos estables) y en la
+documentación; las lecturas reales conservan sus estados y limitaciones, sin
+convertirlas en entradas clínicamente validadas. No inventar fórmulas, datos, IOB, umbrales ni
 defaults; una ausencia bloquea solo el cálculo o componente que la necesita.
 Usar el motor único, pruebas proporcionales y datos minimizados. No registrar ni
 sincronizar tratamientos reales, modificar productores o Legacy, ni conceder
 autoridad clínica a Next. Esa promoción requiere validación final y autorización.
+
+### Avisos de política en la interfaz — 2026-11-28
+
+Decisión del propietario: Next es una app privada y sus pantallas no repiten
+avisos de política de validación («no aprobada para uso», «vigencia sin política
+aprobada», «no utilizar para tratamiento», «cálculo todavía bloqueado» y
+similares). La decisión solo cambia la presentación:
+
+- no cambia bloqueos fail-closed, códigos estables, lo que se persiste ni el motor;
+- se muestra siempre la causa real de un dato ausente, retenido o bloqueado y la
+  antigüedad de una lectura; nunca un dato antiguo sin su antigüedad;
+- Diagnóstico y los detalles técnicos plegados pueden conservar sus líneas;
+- no concede autoridad de tratamiento ni aprueba reglas clínicas: eso sigue
+  exigiendo validación final y autorización.
+
+Las reglas de este archivo y de los ADR que pedían esos textos en pantalla
+(§7, ADR 0014 §9.1, ADR 0023 B1 y C5, ADR 0024 §4) se leen con esta decisión.
 
 ## 4. Arquitectura obligatoria
 
@@ -249,8 +267,10 @@ la funcionalidad que dependa de ellos.
   versión de inputs, perfil, IOB, componentes, redondeo, bloqueos y resultado.
 - Las comparaciones no pueden alterar la decisión de Legacy ni crear efectos
   laterales clínicos.
-- La UI y los datos deben marcar inequívocamente los resultados de sombra como no
-  accionables/no autoritativos.
+- Los datos deben marcar inequívocamente los resultados de sombra como no
+  accionables/no autoritativos. La interfaz no repite ese aviso en cada pantalla
+  (§3, «Avisos de política en la interfaz»), pero nunca ofrece una acción de
+  tratamiento a partir de ellos.
 - Registrar discrepancias con datos minimizados o seudonimizados y clasificación
   de causa; no registrar secretos ni datos personales innecesarios.
 - Una discrepancia no se “arregla” copiando el resultado de Legacy: se explica,

@@ -155,3 +155,23 @@ perfil y la ruta terapéutica permanece bloqueada.
   hidratos de la comida, descarte al cambiar el formulario y formato no clínico.
 - Queda pendiente la aprobación clínica de cada regla (LC-006 a LC-011) y de los
   límites. El cálculo de prueba en el Pixel tampoco está hecho todavía.
+
+## Avisos de política retirados de la pantalla — 2026-11-28
+
+Decisión del propietario: la app es privada y la pantalla no repite avisos de
+política de validación. Se retiran de Bolo el rótulo «PRUEBA · NO UTILIZAR PARA
+TRATAMIENTO…» (formulario y resultado), el estado de validación de las líneas de
+identidad del motor y del IOB, y de la lista «Avisos» los códigos `test_only`,
+reglas no aprobadas, vigencia no aprobada, hora de medida no verificada y
+glucosa no atribuida a Dexcom (`TestCalculationText.shownWarnings`).
+
+No cambia nada más: el motor sigue emitiendo esos avisos y
+`usableForTreatment = false`, el registro de auditoría de una dosis anotada los
+conserva, la huella es la misma, el resultado sigue sin registrarse ni
+sincronizarse por sí solo y «Confirmar y registrar» sigue deshabilitado. Los
+avisos de un hecho real siguen en pantalla: IOB a mano o calculado, total
+limitado por el bolo máximo y parada por glucosa baja, además de todo paso
+bloqueado con su causa. El historial de dosis conserva que la anotación es local
+y no llega a `bolus_ai`. Pruebas: `TestCalculationTest`
+(`theScreenListsRealWarningsAndNotThePendingPolicyOnes`) y
+`TestCalculationDeviceTest`.

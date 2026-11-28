@@ -76,6 +76,8 @@ prueba, también con lecturas reales, antes de terminar la app. Se documentan
 las reglas y sus validaciones pendientes, sin inventar datos y con resultados
 no utilizables para tratamiento (AGENTS.md §3). La validación clínica final y
 el cambio de autoridad siguen siendo necesarios para usar Next en tratamiento.
+Desde el 2026-11-28, por decisión del propietario, las pantallas no repiten esos
+avisos de política: quedan en los datos, los códigos y la documentación.
 
 ## Estado
 
@@ -136,9 +138,9 @@ volver a confirmar, sin herencia entre versiones) y `clinical-profile.db` pasa a
 v2 con migración verificada. Ajustes → Cálculo permite revisar en solo lectura la
 última versión guardada, confirmar sus datos y retirar esa confirmación como
 acciones separadas, con el historial de confirmaciones. Confirmar datos no
-aprueba su uso clínico: «Datos confirmados» siempre aparece con «Cálculo todavía
-bloqueado», y Bolo muestra «Perfil · no se usa para calcular» sin leer el
-perfil. Véanse el
+aprueba su uso clínico. Hasta el 2026-11-28 «Datos confirmados» aparecía con
+«Cálculo todavía bloqueado» y Bolo mostraba «Perfil · no se usa para calcular»;
+el propietario retiró esos avisos de las pantallas ese día. Véanse el
 [ADR 0014](docs/adr/0014-clinical-profile-confirmation-eligibility.md) y las
 validaciones del [dominio](docs/validation/profile-confirmation-domain-2026-10-03.md)
 y de la [pantalla](docs/validation/profile-confirmation-ui-2026-10-03.md).

@@ -4,6 +4,7 @@ import android.content.Context
 import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.TextView
+import androidx.core.view.isVisible
 import org.bolusai.meals.*
 import org.bolusai.next.R
 
@@ -34,7 +35,6 @@ internal class MealSelectionScreen(
     }
 
     fun render() {
-        label(context.getString(R.string.meal_selection_safety), "selection:safety")
         when (val state = model.selection) {
             null -> label(context.getString(if (model.busy) R.string.draft_saving
                 else R.string.draft_loading), "selection:loading")
@@ -65,7 +65,8 @@ internal class MealSelectionScreen(
                 }
                 label(context.getString(if (record.content.basis == NutritionBasis.TOTAL_GRAMS)
                     R.string.meal_selection_grams else R.string.meal_selection_basis_missing), "selection:basis")
-                label(state.blockCode, "selection:block")
+                // Owner decision 2026-11-28: the code stays in the view for traceability; only a real cause is visible.
+                label(state.blockCode, "selection:block").isVisible = state.obsolete
                 action(R.string.meal_selection_edit, "selection:edit") {
                     // The editor reviews the latest record; the pinned snapshot stays unchanged.
                     edit(state.latest)
