@@ -22,15 +22,20 @@ el registro del sincronizador se leyó con permiso expreso del propietario.
 | Leer hoy tras confirmar el día con `input#date_selector` | Correcto: dos comidas, dos cargas iguales |
 | Comparar totales con MyFitnessPal | Coinciden (comprobado por el propietario) |
 | Importar una comida | «Importada como borrador nuevo (revisión 1)» |
-| Cerrar la app de MyFitnessPal (disparador de Hermes) | Hermes leyó con su sesión: 200, mismas comidas, `no_changes`, 0 fallos |
+| Cerrar la app de MyFitnessPal (disparador de Hermes) | Hermes leyó con su sesión: 200, mismas comidas, `no_changes`, 0 fallos. Visto también en el log de la app de Legacy |
+| Cambiar en la web la columna de sodio por fibra y leer de nuevo | Columnas: calories, carbohydrates, fat, protein, fiber, sugar. Fibra con valor en las dos comidas, igual que en la web |
+| Importar una comida no importada antes | «Importada como borrador nuevo (revisión 1)» |
+| Reimportar la misma versión | «Ya estaba importada esta misma versión»; sin escritura |
+| Reimportar la comida importada antes sin fibra | «Importada como revisión 2 del mismo borrador»; la revisión 1 conserva la fibra sin dato y la 2 guarda `0` |
 
 ## Qué se aprendió de la página real
 
 - La tabla tiene la forma descrita en el ADR 0032: `tr.meal_header`, filas de
   alimentos sin `class`, valores legibles con las reglas del módulo común.
-- Las cabeceras llegan en inglés. Columnas del diario del propietario:
-  calorías, hidratos, grasa, proteína, sodio y azúcar. **Sin fibra**; cambiar
-  las columnas exige la versión de pago de MyFitnessPal.
+- Las cabeceras llegan en inglés, aunque la web del propietario en el
+  ordenador esté en español. Columnas del diario al empezar: calorías,
+  hidratos, grasa, proteína, sodio y azúcar, **sin fibra**. El propietario
+  cambió después sodio por fibra desde la web, sin versión de pago.
 - La página declara su día en `<input type="hidden" id="date_selector"
   value="AAAA-MM-DD">`. También lleva enlaces al día anterior y al siguiente
   con `date=`, que Next no usa.
@@ -53,10 +58,18 @@ el registro del sincronizador se leyó con permiso expreso del propietario.
 
 ## Fibra: diferencia con Legacy
 
-Legacy recibe fibra `0` en todas las comidas de MyFitnessPal del propietario:
-el adaptador de Hermes devuelve `0.0` cuando el nutriente no está en la tabla.
-Next la deja sin dato y Bolo la pide. No se ha decidido ninguna regla para la
-fibra ausente: es una decisión del propietario.
+Mientras la tabla no tuvo columna de fibra, Legacy recibió fibra `0` en todas
+las comidas de MyFitnessPal: el adaptador de Hermes devuelve `0.0` cuando el
+nutriente no está. Next, en el mismo caso, la deja sin dato y Bolo la pide.
+
+Desde que el propietario añadió la columna, Hermes envía a `bolus_ai` la fibra
+real. Si el descuento de fibra está activo allí, las comidas con fibra pueden
+calcularse con menos hidratos netos que antes, y Hermes puede volver a
+presentar como revisión las comidas del día ya importadas. Se le advirtió de
+ambas cosas. Next no modificó nada de Legacy.
+
+No se ha decidido ninguna regla para la fibra ausente: es una decisión del
+propietario, menos urgente ahora que la columna existe.
 
 ## Límites de esta evidencia
 

@@ -419,14 +419,33 @@ cabeceras se leen en inglés y en minúsculas, los totales coinciden con los que
 el propietario ve en MyFitnessPal, dos cargas bastan y la importación crea el
 borrador y no lo duplica.
 
-**Fibra.** El diario del propietario muestra calorías, hidratos, grasa,
-proteína, sodio y azúcar; cambiar las columnas exige la versión de pago. Next
-deja la fibra sin dato. El adaptador de Hermes, releído ese día en solo
-lectura, devuelve `0.0` cuando el nutriente no está en la tabla
-(`mfp_adapter._nutrient`), así que `bolus_ai` recibe fibra `0` en todas las
-comidas de MyFitnessPal. Next no copia ese cero. Queda como decisión del
-propietario si quiere declarar una regla para la fibra ausente de estas
-comidas; mientras tanto Bolo la pide.
+**Fibra.** Al empezar la validación el diario del propietario mostraba
+calorías, hidratos, grasa, proteína, sodio y azúcar, sin fibra, y Next la
+dejaba sin dato. El adaptador de Hermes, releído ese día en solo lectura,
+devuelve `0.0` cuando el nutriente no está en la tabla
+(`mfp_adapter._nutrient`): hasta entonces `bolus_ai` recibía fibra `0` en
+todas las comidas de MyFitnessPal. Next no copia ese cero.
+
+Ese mismo día el propietario cambió en la web de MyFitnessPal la columna de
+sodio por la de fibra (no exige la versión de pago, en contra de lo que se
+creyó al principio). Desde entonces la tabla trae fibra y la leen los dos:
+Next la importa y Hermes la envía a `bolus_ai` con su valor real. Ese cambio
+en lo que recibe Legacy es efecto de un ajuste del propietario en su cuenta,
+no de Next, y se le advirtió antes. Una comida ya importada sin fibra se
+reimportó como revisión nueva al aparecer la columna; la anterior conserva la
+fibra sin dato.
+
+Si la columna volviera a faltar, la fibra quedaría otra vez sin dato y Bolo la
+pediría: no hay ninguna regla para la fibra ausente y decidirla corresponde al
+propietario.
+
+**Idioma.** La web del propietario en el ordenador muestra el diario en
+español («Desayuno», «Carbohidratos», «Fibra»). La página que cargan Next y
+Hermes en `/food/diary` llegó en inglés antes y después del cambio de
+columnas. Next solo reconoce los nombres de columna en inglés: si la página
+llegara en otro idioma, todos los nutrientes quedarían sin dato y las comidas
+tendrían otra identidad. Bloquea, no confunde; no se ha añadido ninguna
+traducción porque no se ha observado ese caso.
 
 **Segunda sesión.** Tras el inicio de sesión en Next, el disparador de Hermes
 se activó al cerrar la app de MyFitnessPal y leyó el diario con su propia

@@ -131,10 +131,14 @@ VALIDADO CON LA SESIÓN REAL el 2026-11-28
 necesita `challenges.cloudflare.com` (admitido solo como recurso); para el día
 de hoy MyFitnessPal quita `date=` de la dirección y el día se confirma con
 `input#date_selector` (`MfpDiaryPage.declaredDates`); totales reales correctos;
-importación sin duplicar; Hermes siguió leyendo con su sesión. El diario del
-propietario no tiene columna de fibra (cambiarla es de pago): Next la deja sin
-dato y Hermes envía `0` a `bolus_ai`. Decisión pendiente del propietario: regla
-para la fibra ausente de las comidas de MyFitnessPal. Vigilar unos días que
+importación sin duplicar (nueva, misma versión y revisión nueva, las tres con
+datos reales); Hermes siguió leyendo con su sesión. El diario no tenía columna
+de fibra y el propietario la añadió ese día desde la web (sodio por fibra, sin
+versión de pago): desde entonces Next la importa y Hermes envía a `bolus_ai`
+la fibra real en lugar de `0`. Sin esa columna Next deja la fibra sin dato;
+la regla para la fibra ausente sigue siendo decisión del propietario. La
+página llega en inglés a Next y a Hermes aunque la web del propietario esté en
+español; Next solo reconoce columnas en inglés. Vigilar unos días que
 `bolus_ai` sigue importando.
 PASOS ANTERIORES, ya hechos salvo la página saneada (ADR 0032, «Pendiente con el
 Pixel y el propietario»): inicio de sesión real y
