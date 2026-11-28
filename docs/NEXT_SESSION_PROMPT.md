@@ -184,6 +184,20 @@ Bolo: sin ejercicio o previsto con minutos enteros e intensidad; datos
 desconocidos bloquean. La sombra lee minutos e intensidad del desglose. Los 325
 cálculos reales de Legacy coinciden con Next.
 
+AVISOS DE POLÍTICA FUERA DE LAS PANTALLAS — DECISIÓN DEL PROPIETARIO 2026-11-28
+«La app está llena de mensajes de Política de validación, todo eso se debe
+eliminar, sobra, ya que es una app privada nuestra». Retirados de Inicio, Bolo,
+Comidas y Ajustes: la franja fija «En desarrollo · cálculo y tratamientos
+bloqueados», «vigencia sin política aprobada», «hora de medida no verificada»,
+«no aprobada para uso clínico», la procedencia del conjunto aprobado, «PRUEBA ·
+NO UTILIZAR PARA TRATAMIENTO», «Perfil · no se usa para calcular», «Cálculo
+todavía bloqueado» y los de comidas. Solo cambia la presentación: bloqueos,
+códigos, persistencia y motor siguen igual; las causas reales y la antigüedad de
+la lectura siguen visibles; Diagnóstico conserva sus líneas. Regla en AGENTS.md
+§3 («Avisos de política en la interfaz») y constancia en los ADR 0014 §17, 0023
+y 0024. No volver a añadir avisos de ese tipo a las pantallas. Las menciones
+anteriores de este documento a esos textos son antecedentes.
+
 SIGUIENTE
 - Teléfono: cálculo con perfil real confirmado (P6) y actualización sobre un
   perfil v2 real existente (P7 de la validación de límites). B1 tiene evidencia

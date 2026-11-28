@@ -246,6 +246,7 @@ class DoseHistoryCalculationTest {
         val lines = TestCalculationText.iob(TestCalculation.iob(at, profile(), log.read()))
         assertTrue(lines.first().startsWith("IOB del historial: 1 U · 1 dosis"))
         assertEquals("   2 U hace 120 min → quedan 1 U", lines[1])
-        assertTrue("validación pending" in lines.last())
+        // Owner decision 2026-11-28: the validation state stays in the result and the audit, not on the screen.
+        assertFalse("validación" in lines.last())
     }
 }

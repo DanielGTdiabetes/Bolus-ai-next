@@ -13,6 +13,7 @@ import org.bolusai.next.meals.SqliteMealRepository
 import org.bolusai.next.profile.SqliteClinicalProfileRepository
 import org.bolusai.next.ui.DexcomReadingModel
 import org.bolusai.profile.*
+import org.bolusai.engine.candidate.Warnings
 import org.junit.After
 import org.junit.Assert.*
 import org.junit.Before
@@ -104,7 +105,9 @@ class TestCalculationDeviceTest {
             click(scenario, "test_calc:run")
             scenario.onActivity {
                 assertEquals(it.getString(R.string.test_calc_total, "8"), (view(it, "test_calc:total") as TextView).text.toString())
-                assertNotNull(view(it, "test_calc:banner"))
+                // Owner decision 2026-11-28: the result no longer repeats the pending-policy notices.
+                assertNull(view(it, "test_calc:banner"))
+                assertNull(view(it, "test_calc:warning:${Warnings.TEST_ONLY}"))
                 assertNotNull(view(it, "test_calc:fingerprint"))
                 assertFalse(requireNotNull(view(it, "blocked:confirm")).isEnabled)
             }

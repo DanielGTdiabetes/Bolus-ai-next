@@ -101,7 +101,7 @@ class ClinicalProfileDeviceTest {
         scenario.onActivity { it.findViewById<View>(R.id.bottom_navigation).findViewWithTag<View>("tab:/menu").performClick() }
         click(scenario, "link:/settings")
         click(scenario, "settings:CALCULATION")
-        awaitView(scenario, "profile:safety")
+        awaitView(scenario, "profile:title")
     }
 
     private fun s(id: Int, vararg args: Any) = context.getString(id, *args)
@@ -833,8 +833,7 @@ class ClinicalProfileDeviceTest {
                     if (root is android.view.ViewGroup) (0 until root.childCount).forEach { walk(root.getChildAt(it)) }
                 }
                 walk(activity.findViewById(R.id.screen_content))
-                // Bolo still reports the profile as unavailable and renders nothing from the saved version.
-                assertTrue(views.filterIsInstance<TextView>().any { it.text.toString() == activity.getString(R.string.profile_absent) })
+                // Bolo renders nothing from the saved version; the block codes still report the profile.
                 assertFalse(views.any { (it.tag as? String)?.startsWith("profile:") == true })
                 assertTrue(text(activity, "blocking_codes").contains("profile"))
             }

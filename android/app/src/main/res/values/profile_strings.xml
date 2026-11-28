@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources xmlns:tools="http://schemas.android.com/tools">
     <string name="profile_section_title">Perfil clínico local</string>
-    <string name="profile_safety">Captura local versionada. Guardar crea una versión nueva e inmutable. Ningún valor se usa para calcular, recomendar ni tratar.</string>
     <string name="profile_loading">Leyendo perfil y confirmaciones…</string>
     <string name="profile_read_failed">No se pudo leer el perfil ni su estado de confirmación · %1$s. No se muestra como sin confirmar.</string>
     <string name="profile_retry">Reintentar lectura</string>
@@ -51,7 +50,7 @@
     <string name="profile_limit_max_correction">Corrección máxima</string>
     <string name="profile_limit_not_in_schema">desconocido (versión sin límites)</string>
     <string name="profile_action_title">Acción de la insulina</string>
-    <string name="profile_action_explanation">Curva, DIA en horas y pico en minutos enteros para el IOB calculado de prueba. Sin valores por defecto: vacío = sin configurar y bloquea el IOB calculado. Validación pendiente, no utilizar para tratamiento. Se confirman con el resto de la versión.</string>
+    <string name="profile_action_explanation">Curva, DIA en horas y pico en minutos enteros para el IOB calculado. Sin valores por defecto: vacío = sin configurar y bloquea el IOB calculado. Se confirman con el resto de la versión.</string>
     <string name="profile_action_not_in_schema_notice">La versión de partida no tiene acción de la insulina: sigue desconocida hasta que elijas una curva o introduzcas un valor. Nada se rellena automáticamente.</string>
     <string name="profile_action_peak_hint">El pico solo lo usan las curvas Walsh y bilineal.</string>
     <string name="profile_action_curve_label">Curva de acción</string>
@@ -60,7 +59,7 @@
     <string name="profile_action_not_in_schema">desconocido (versión sin acción de la insulina)</string>
     <string name="profile_action_preview_unknown">Se guardará: desconocido (versión sin acción de la insulina)</string>
     <string name="profile_nutrition_title">Fibra y grasa/proteína (Warsaw)</string>
-    <string name="profile_nutrition_explanation">Reglas observadas en bolus_ai, de prueba y con validación pendiente. Sin valores por defecto: vacío = sin configurar y bloquea la comida que necesite la regla. Un factor 0 desactiva la regla. Fibra: se descuenta fibra × factor de los hidratos cuando la fibra supera el umbral. Warsaw: grasa y proteína se convierten en hidratos equivalentes con el factor simple, o con el factor dual a partir del umbral de kcal.</string>
+    <string name="profile_nutrition_explanation">Reglas de bolus_ai. Sin valores por defecto: vacío = sin configurar y bloquea la comida que necesite la regla. Un factor 0 desactiva la regla. Fibra: se descuenta fibra × factor de los hidratos cuando la fibra supera el umbral. Warsaw: grasa y proteína se convierten en hidratos equivalentes con el factor simple, o con el factor dual a partir del umbral de kcal.</string>
     <string name="profile_nutrition_not_in_schema_notice">La versión de partida no tiene reglas de fibra ni Warsaw: siguen desconocidas hasta que introduzcas algún valor. Nada se rellena automáticamente.</string>
     <string name="profile_nutrition_fiber_factor">Fibra: factor de descuento</string>
     <string name="profile_nutrition_fiber_threshold">Fibra: umbral</string>
@@ -113,17 +112,17 @@
     <string name="profile_restore_failed">No se puede restaurar · %1$s</string>
     <string name="profile_history_close">Volver al perfil</string>
     <string name="profile_history_back_editor">Volver al editor</string>
-    <!-- ADR 0014: review, confirmation and revocation of the saved data. Never clinical approval.
+    <!-- ADR 0014: review, confirmation and revocation of the saved data.
          PluralsCandidate is ignored where a version number identifies one version; it is not a quantity. -->
-    <string name="profile_gate_incomplete">Versión %1$d · datos incompletos · no se puede confirmar todavía. Cálculo todavía bloqueado.</string>
-    <string name="profile_gate_unconfirmed">Versión %1$d · datos sin confirmar. Cálculo todavía bloqueado.</string>
-    <string name="profile_gate_superseded" tools:ignore="PluralsCandidate">Versión %1$d · datos sin confirmar. La confirmación de la versión %2$d queda en el historial y no se aplica a la versión %1$d. Cálculo todavía bloqueado.</string>
-    <string name="profile_gate_superseded_incomplete" tools:ignore="PluralsCandidate">Versión %1$d · datos incompletos · no se puede confirmar todavía. La confirmación de la versión %2$d queda en el historial y no se aplica a la versión %1$d. Cálculo todavía bloqueado.</string>
-    <string name="profile_gate_superseded_many">Versión %1$d · datos sin confirmar. Las confirmaciones de las versiones %2$s quedan en el historial y no se aplican a la versión %1$d. Cálculo todavía bloqueado.</string>
-    <string name="profile_gate_superseded_many_incomplete">Versión %1$d · datos incompletos · no se puede confirmar todavía. Las confirmaciones de las versiones %2$s quedan en el historial y no se aplican a la versión %1$d. Cálculo todavía bloqueado.</string>
-    <string name="profile_gate_confirmed">Datos confirmados · versión %1$d. Cálculo todavía bloqueado: faltan límites y reglas clínicas aprobados.</string>
-    <string name="profile_gate_revoked">Confirmación retirada · versión %1$d. Revisa los datos y vuelve a confirmarlos si son correctos. Cálculo todavía bloqueado.</string>
-    <string name="profile_gate_confirmed_zone">Datos confirmados · versión %1$d, pero la zona horaria %2$s ya no se reconoce en este dispositivo. Revisa la zona o retira la confirmación. Cálculo todavía bloqueado.</string>
+    <string name="profile_gate_incomplete">Versión %1$d · datos incompletos · no se puede confirmar todavía.</string>
+    <string name="profile_gate_unconfirmed">Versión %1$d · datos sin confirmar.</string>
+    <string name="profile_gate_superseded" tools:ignore="PluralsCandidate">Versión %1$d · datos sin confirmar. La confirmación de la versión %2$d queda en el historial y no se aplica a la versión %1$d.</string>
+    <string name="profile_gate_superseded_incomplete" tools:ignore="PluralsCandidate">Versión %1$d · datos incompletos · no se puede confirmar todavía. La confirmación de la versión %2$d queda en el historial y no se aplica a la versión %1$d.</string>
+    <string name="profile_gate_superseded_many">Versión %1$d · datos sin confirmar. Las confirmaciones de las versiones %2$s quedan en el historial y no se aplican a la versión %1$d.</string>
+    <string name="profile_gate_superseded_many_incomplete">Versión %1$d · datos incompletos · no se puede confirmar todavía. Las confirmaciones de las versiones %2$s quedan en el historial y no se aplican a la versión %1$d.</string>
+    <string name="profile_gate_confirmed">Datos confirmados · versión %1$d.</string>
+    <string name="profile_gate_revoked">Confirmación retirada · versión %1$d. Revisa los datos y vuelve a confirmarlos si son correctos.</string>
+    <string name="profile_gate_confirmed_zone">Datos confirmados · versión %1$d, pero la zona horaria %2$s ya no se reconoce en este dispositivo. Revisa la zona o retira la confirmación.</string>
     <string name="profile_gaps_title">No se puede confirmar: faltan datos.</string>
     <string name="profile_gap_unit">Unidad de glucosa sin declarar</string>
     <string name="profile_gap_zone">Zona horaria sin declarar</string>
@@ -132,7 +131,7 @@
     <string name="profile_review_open">Revisar y confirmar los datos de la versión %1$d…</string>
     <string name="profile_review_blocked">Tienes cambios sin guardar en el editor. Guárdalos o descártalos antes de confirmar. Solo se confirman versiones guardadas.</string>
     <string name="profile_review_title">Revisar datos de la versión %1$d</string>
-    <string name="profile_review_explanation">Vas a declarar que has revisado estos datos guardados y que son los que quieres registrar. Esto no aprueba límites, no comprueba que los valores sirvan para calcular y no autoriza ninguna dosis. El cálculo sigue bloqueado.</string>
+    <string name="profile_review_explanation">Vas a declarar que has revisado estos datos guardados y que son los que quieres registrar.</string>
     <string name="profile_review_identity">Versión %1$d · guardada el %2$s (hora del dispositivo) · huella %3$s</string>
     <string name="profile_review_zero">%1$s–%2$s · 0 · introducido explícitamente</string>
     <string name="profile_review_confirm">Confirmar datos de la versión %1$d</string>
@@ -145,7 +144,7 @@
     <string name="profile_revoke_cancel">Cancelar</string>
     <string name="profile_revoke_recording">Registrando retirada…</string>
     <string name="profile_revoke_undetermined">No se sabe todavía si la retirada se registró · %1$s. Reintenta la lectura antes de volver a retirarla.</string>
-    <string name="profile_notice_confirmed">Datos confirmados · versión %1$d. Cálculo todavía bloqueado.</string>
+    <string name="profile_notice_confirmed">Datos confirmados · versión %1$d.</string>
     <string name="profile_notice_confirm_replayed">La confirmación de la versión %1$d ya se había registrado.</string>
     <string name="profile_notice_confirm_replayed_revoked">Esta confirmación ya se había registrado y después se retiró. No se ha vuelto a confirmar.</string>
     <string name="profile_notice_revoked">Confirmación retirada · versión %1$d.</string>

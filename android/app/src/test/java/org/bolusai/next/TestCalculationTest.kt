@@ -384,6 +384,18 @@ class TestCalculationTest {
         assertTrue(model.invalidated)
     }
 
+    @Test fun theScreenListsRealWarningsAndNotThePendingPolicyOnes() {
+        // Owner decision 2026-11-28 (ADR 0024): the engine keeps every warning; the screen omits the policy ones.
+        val result = TestCalculation.calculate(TestCalculation.request(at, state(), null, null, form))
+        assertTrue(Warnings.TEST_ONLY in result.warnings)
+        val shown = TestCalculationText.shownWarnings(result.warnings + Warnings.BELOW_HYPO_STOP + "unknown.code")
+        listOf(Warnings.TEST_ONLY, Warnings.RULES_NOT_APPROVED, Warnings.FRESHNESS_NOT_APPROVED,
+            Warnings.MEASUREMENT_TIME_UNVERIFIED, Warnings.DEXCOM_NOT_ATTRIBUTED).forEach { assertFalse(it, it in shown) }
+        assertTrue(Warnings.MANUAL_IOB in shown)
+        assertTrue(Warnings.BELOW_HYPO_STOP in shown)
+        assertTrue("unknown.code" in shown)
+    }
+
     @Test fun displayFormattingIsNotAClinicalRounding() {
         assertEquals("2,2", TestCalculationText.units(2.2000000000000002))
         assertEquals("3,364", TestCalculationText.units(3.3636363636363638))

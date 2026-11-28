@@ -160,7 +160,7 @@ class ClinicalProfileConfirmationUiDeviceTest {
         scenario.onActivity { it.findViewById<View>(R.id.bottom_navigation).findViewWithTag<View>("tab:/menu").performClick() }
         click(scenario, "link:/settings")
         click(scenario, "settings:CALCULATION")
-        awaitView(scenario, "profile:safety")
+        awaitView(scenario, "profile:title")
     }
 
     private fun s(id: Int, vararg args: Any) = context.getString(id, *args)
@@ -171,12 +171,13 @@ class ClinicalProfileConfirmationUiDeviceTest {
     private fun descendants(root: View): List<View> = listOf(root) + if (root is android.view.ViewGroup)
         (0 until root.childCount).flatMap { descendants(root.getChildAt(it)) } else emptyList()
 
-    /** ADR 0014, section 9.1: confirmed data never appears without the calculation block, and nothing claims approval. */
+    /**
+     * ADR 0014, section 9.1: nothing claims approval. Since the owner decision of 2026-11-28 the status lines no longer
+     * repeat that the calculation is blocked.
+     */
     private fun assertNeverApproved(activity: MainActivity) {
         val all = texts(activity.findViewById(R.id.screen_content))
-        all.filter { it.contains("Datos confirmados") }.forEach {
-            assertTrue("Without block: $it", it.contains("Cálculo todavía bloqueado"))
-        }
+        assertFalse(all.any { it.contains("Cálculo todavía bloqueado") })
         listOf("perfil válido", "perfil aprobado", "apto para dosificar", "listo para calcular", "perfil activo",
             "Guardar y confirmar").forEach { forbidden ->
             assertFalse(forbidden, all.any { it.contains(forbidden, ignoreCase = true) })
@@ -889,7 +890,7 @@ class ClinicalProfileConfirmationUiDeviceTest {
 
     // Bolo.
 
-    @Test fun bolusSaysTheProfileIsNotUsedEvenWithConfirmedData() {
+    @Test fun bolusShowsTheProfileOnlyInTheTestCalculationLimits() {
         save(0, content())
         externalConfirm()
         launch().use { scenario ->
@@ -897,8 +898,8 @@ class ClinicalProfileConfirmationUiDeviceTest {
             instrumentation.waitForIdleSync()
             scenario.onActivity { activity ->
                 val all = texts(activity.findViewById(R.id.screen_content))
-                assertEquals("Perfil · no se usa para calcular", activity.getString(R.string.profile_absent))
-                assertTrue(all.contains(activity.getString(R.string.profile_absent)))
+                // Owner decision 2026-11-28: no «Perfil · no se usa para calcular» notice.
+                assertFalse(all.any { it.contains("no se usa para calcular") })
                 // ADR 0025 shows confirmation in the separate, non-actionable trial calculation limits.
                 assertNotNull(activity.findViewById<View>(R.id.screen_content)
                     .findViewWithTag<View>("test_calc:limits"))

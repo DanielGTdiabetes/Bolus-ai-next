@@ -159,7 +159,7 @@ class BolusProfileDetailsDeviceTest {
         click(scenario, "tab:/menu")
         click(scenario, "link:/settings")
         click(scenario, "settings:CALCULATION")
-        await(scenario, "profile:safety") { viewOrNull(it, "profile:safety") != null }
+        await(scenario, "profile:title") { viewOrNull(it, "profile:title") != null }
     }
 
     private fun codes(activity: MainActivity) = viewOrNull(activity, "blocking_codes") as TextView

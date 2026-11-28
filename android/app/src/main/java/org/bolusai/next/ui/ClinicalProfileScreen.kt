@@ -25,7 +25,7 @@ import java.util.Date
  * Settings → Cálculo: local clinical profile capture (ADR 0012) with time segment editing (ADR 0013) and the review,
  * confirmation and revocation of saved data (ADR 0014). Appends to [content]; never clears the settings shell. It shows
  * values exactly with the unit of their own version, changes segments only through explicit actions and exposes no
- * calculation path: "Datos confirmados" always comes with "Cálculo todavía bloqueado".
+ * calculation path: the status lines state what is saved and confirmed, nothing else (owner decision 2026-11-28).
  */
 internal class ClinicalProfileScreen(
     private val context: Context,
@@ -82,7 +82,6 @@ internal class ClinicalProfileScreen(
 
     fun render() {
         heading(context.getString(R.string.profile_section_title), "profile:title")
-        notice(context.getString(R.string.profile_safety), "profile:safety")
         model.recoveryFailure?.takeIf { model.editor == null }?.let {
             notice(context.getString(R.string.profile_recovery_failed, it.code), "profile:recovery_failure")
         }

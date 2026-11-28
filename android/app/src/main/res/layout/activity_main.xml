@@ -42,17 +42,6 @@
                 android:textStyle="bold" />
         </LinearLayout>
     </LinearLayout>
-    <TextView
-        android:id="@+id/non_authoritative_label"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:background="@color/non_authoritative_background"
-        android:paddingHorizontal="20dp"
-        android:paddingVertical="9dp"
-        android:text="@string/shell_safety"
-        android:textColor="@color/non_authoritative_text"
-        android:textSize="13sp"
-        android:textStyle="bold" />
     <ScrollView
         android:id="@+id/screen_scroll"
         android:layout_width="match_parent"

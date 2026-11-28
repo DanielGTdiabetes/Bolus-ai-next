@@ -48,13 +48,6 @@ internal class MealDraftScreen(
 
     fun render(kind: MealKind) {
         content.removeAllViews()
-        label(R.string.draft_safety, "meal:safety").apply {
-            setPadding(dp(16), dp(16), dp(16), dp(16))
-            background = GradientDrawable().apply {
-                setColor(context.getColor(R.color.non_authoritative_background))
-                cornerRadius = dp(18).toFloat()
-            }
-        }
         val target = model.historyTarget
         val editor = model.editor
         if (target != null && target.kind == kind) {
@@ -79,7 +72,7 @@ internal class MealDraftScreen(
                         label(record.content.name.editText().ifBlank { context.getString(R.string.draft_unnamed) })
                             .setTypeface(null, Typeface.BOLD)
                         label(context.getString(R.string.draft_revision, record.revision))
-                        label(if (record.content.hasMissingCaptureFields) R.string.draft_incomplete else R.string.draft_unvalidated)
+                        if (record.content.hasMissingCaptureFields) label(R.string.draft_incomplete)
                         action(R.string.draft_review, "meal:edit:${record.id}") { replaceEditor { model.edit(record) } }
                         action(R.string.meal_history_open, "meal:history:${record.id}") {
                             model.openHistory(record.id, record.kind)

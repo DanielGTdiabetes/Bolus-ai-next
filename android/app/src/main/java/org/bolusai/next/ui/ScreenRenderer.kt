@@ -188,7 +188,6 @@ internal class ScreenRenderer(
             Destination.PROFILE -> {
                 info(R.string.sick_mode, R.string.sick_detail)
                 info(R.string.profile_account, R.string.profile_account_detail)
-                info(R.string.profile_absent, R.string.profile_detail)
                 link(Destination.SETTINGS)
             }
             Destination.SUPPLIES -> info(R.string.supplies, R.string.supplies_detail)
@@ -210,7 +209,7 @@ internal class ScreenRenderer(
             Destination.MEALS -> renderMeals?.invoke(MealKind.DRAFT)
                 ?: info(R.string.meals, R.string.meals_detail)
             Destination.DIAGNOSTICS -> {
-                glucose(state)
+                glucose(state, technical = true)
                 info(R.string.diagnostics, R.string.sync_detail)
                 details(blocking)
                 dexcomLog(requireNotNull(dexcomLog) { "dexcom_log.missing" })
@@ -230,18 +229,27 @@ internal class ScreenRenderer(
         }
     }
 
-    private fun glucose(state: UnavailableOverview) {
+    /**
+     * Owner decision 2026-11-28: the pending validation policy is not a notice of the screens. Its line stays in
+     * Diagnóstico ([technical]); every other glucose state is a real cause and is always shown.
+     */
+    private fun showsStatus(key: GlucoseStatusMessageKey, technical: Boolean) =
+        technical || key != GlucoseStatusMessageKey.POLICY_NOT_APPROVED
+
+    private fun glucose(state: UnavailableOverview, technical: Boolean = false) {
         val model = GlucoseStatusPresenter.present(state.glucose)
         card().also {
             text(it, R.string.glucose_current, 17f, true)
-            text(it, glucoseTitle(model.messageKey), ink = R.color.error_text).tag = "glucose_status"
+            if (showsStatus(model.messageKey, technical)) {
+                text(it, glucoseTitle(model.messageKey), ink = R.color.error_text).tag = "glucose_status"
+            }
             text(it, R.string.glucose_metadata, 13f, ink = R.color.secondary_text)
         }
     }
 
     /**
-     * Technical presentation of the latest Dexcom reading (ADR 0023, C1): composed lines only. The clinical status card
-     * above stays "sin lectura" for calculation: nothing here reaches the overview or the engine.
+     * Presentation of the latest Dexcom reading (ADR 0023, C1): composed lines only. The status card above stays
+     * "sin lectura" for calculation: nothing here reaches the overview or the engine.
      */
     private fun dexcomReading(view: DexcomReadingView?) {
         if (view == null) return
@@ -263,8 +271,10 @@ internal class ScreenRenderer(
                 intArrayOf(color(R.color.hero_start), color(R.color.hero_end))).apply { cornerRadius = dp(22).toFloat() }
             text(it, R.string.glucose_current, 15f, true, R.color.on_hero)
             text(it, R.string.glucose_absent, 30f, true, R.color.on_hero)
-            text(it, glucoseTitle(GlucoseStatusPresenter.present(state.glucose).messageKey), 14f, ink = R.color.on_hero)
-                .tag = "glucose_status"
+            val key = GlucoseStatusPresenter.present(state.glucose).messageKey
+            if (showsStatus(key, technical = false)) {
+                text(it, glucoseTitle(key), 14f, ink = R.color.on_hero).tag = "glucose_status"
+            }
             text(it, R.string.glucose_metadata, 13f, ink = R.color.on_hero)
             link(Destination.FORECAST, parent = it)
         }
@@ -303,7 +313,6 @@ internal class ScreenRenderer(
         heading(R.string.recent_activity)
         info(R.string.history_pending, R.string.history_detail)
         link(Destination.HISTORY, R.string.view_all)
-        info(R.string.calculation_blocked, R.string.calculation_detail, R.color.non_authoritative_background)
     }
 
     private fun menu() {
@@ -323,8 +332,6 @@ internal class ScreenRenderer(
         heading(R.string.inputs_title)
         glucose(state)
         if (destination == Destination.BOLUS) dexcomReading(reading)
-        info(R.string.iob_absent, R.string.iob_detail)
-        info(R.string.profile_absent, R.string.profile_detail)
         link(Destination.SETTINGS)
         heading(R.string.meal_title)
         if (renderSelection != null) renderSelection.invoke() else {
@@ -359,7 +366,7 @@ internal class ScreenRenderer(
         text(content, R.string.settings_detail, 14f, ink = R.color.secondary_text)
         when (selected) {
             SettingsSection.CALCULATION -> {
-                // Local capture only (ADR 0012). Bolo keeps reporting the profile as unavailable for calculation.
+                // Local capture (ADR 0012); the test calculation of Bolo reads the confirmed version (ADR 0024).
                 if (renderProfile != null) renderProfile.invoke() else {
                     info(R.string.clinical_parameters, R.string.clinical_fields)
                     disabled(R.string.save_profile_disabled, "save_profile")
