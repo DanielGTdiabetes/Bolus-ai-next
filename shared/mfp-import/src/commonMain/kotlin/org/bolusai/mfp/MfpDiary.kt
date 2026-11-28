@@ -41,6 +41,13 @@ enum class MfpFailure(val code: String) {
     /** A meal without a name or two meals with the same name: their identities would collide. */
     AMBIGUOUS_MEALS("mfp.page.ambiguous_meals"),
 
+    /**
+     * The first header names none of the nutrients this module reads. The page may be in another language, where the
+     * meal names differ too and would give the meals another identity. Nothing of such a page is imported: a diary
+     * with every nutrient unknown is not a reading.
+     */
+    COLUMNS_NOT_RECOGNIZED("mfp.page.columns_not_recognized"),
+
     /** The reading port could not load the page. Reported by the platform adapter, never by the interpreter. */
     TRANSPORT_FAILED("mfp.read.transport_failed"),
 }
@@ -120,6 +127,9 @@ class MfpDiaryInterpreter(private val sha256: MfpSha256) {
         }
         // The Legacy library takes the columns of the first header for every meal.
         val columns = page.meals.first().header.drop(1).map(::columnName)
+        if (MfpNutrient.entries.none { it.column in columns }) {
+            return MfpDiaryReading.Failed(MfpFailure.COLUMNS_NOT_RECOGNIZED)
+        }
         val meals = page.meals.mapIndexedNotNull { index, rows ->
             if (rows.foods.isEmpty()) null else meal(date, names[index], columns, rows.foods)
         }

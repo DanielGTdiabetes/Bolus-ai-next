@@ -442,10 +442,27 @@ propietario.
 **Idioma.** La web del propietario en el ordenador muestra el diario en
 español («Desayuno», «Carbohidratos», «Fibra»). La página que cargan Next y
 Hermes en `/food/diary` llegó en inglés antes y después del cambio de
-columnas. Next solo reconoce los nombres de columna en inglés: si la página
-llegara en otro idioma, todos los nutrientes quedarían sin dato y las comidas
-tendrían otra identidad. Bloquea, no confunde; no se ha añadido ninguna
-traducción porque no se ha observado ese caso.
+columnas. Next solo reconoce los nombres de columna en inglés. Si la página
+llegara en otro idioma, ningún nutriente se leería y las comidas tendrían otra
+identidad (`…:desayuno`); sin más, la lectura se completaría con todo sin dato
+y se podría importar un borrador vacío con esa otra identidad, quedando
+bloqueado solo el cálculo. Para que eso no ocurra, una cabecera que no nombra
+ninguno de los nutrientes que Next lee es un fallo propio,
+`mfp.page.columns_not_recognized`, y de esa página no se importa nada. No se
+ha añadido ninguna traducción porque no se ha observado ese caso.
+
+**Riesgo abierto: redirecciones de recursos.** El filtro de `MfpHosts` se
+aplica en `shouldInterceptRequest`, que recibe la dirección que pide la
+página. No está comprobado que Android vuelva a llamarlo con el destino cuando
+un recurso permitido responde con una redirección a otro dominio; si no lo
+hace, ese destino saldría sin pasar por el filtro. La página mostrada sí está
+cubierta (`shouldOverrideUrlLoading` y la comprobación del host final al
+leer). No afecta al cálculo ni a lo que se importa, pero sí al límite de red
+declarado, que hasta cerrarlo debe leerse como «las peticiones que la página
+hace directamente». Candidata a solución: una configuración de seguridad de
+red de Android que solo confíe en certificados para los dominios permitidos,
+de modo que el límite lo imponga el sistema y no solo el `WebView`. Necesita
+prueba con la sesión real antes de darla por buena.
 
 **Segunda sesión.** Tras el inicio de sesión en Next, el disparador de Hermes
 se activó al cerrar la app de MyFitnessPal y leyó el diario con su propia

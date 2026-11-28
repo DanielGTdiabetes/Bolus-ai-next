@@ -138,8 +138,15 @@ versión de pago): desde entonces Next la importa y Hermes envía a `bolus_ai`
 la fibra real en lugar de `0`. Sin esa columna Next deja la fibra sin dato;
 la regla para la fibra ausente sigue siendo decisión del propietario. La
 página llega en inglés a Next y a Hermes aunque la web del propietario esté en
-español; Next solo reconoce columnas en inglés. Vigilar unos días que
-`bolus_ai` sigue importando.
+español; Next solo reconoce columnas en inglés y una cabecera sin ninguna
+columna conocida da `mfp.page.columns_not_recognized` (no se importa nada).
+RIESGO ABIERTO (ADR 0032, «Riesgo abierto: redirecciones de recursos»): no
+está comprobado que el filtro de `MfpHosts` vea el destino cuando un recurso
+permitido redirige a otro dominio. Candidata: configuración de seguridad de
+red que solo confíe en certificados de los dominios permitidos (hoy
+`verify.ps1` prohíbe `networkSecurityConfig`; habría que cambiarlo a
+propósito) y prueba con la sesión real. Vigilar unos días que `bolus_ai` sigue
+importando.
 PASOS ANTERIORES, ya hechos salvo la página saneada (ADR 0032, «Pendiente con el
 Pixel y el propietario»): inicio de sesión real y
 lectura de un día, anotando los hosts bloqueados; página real saneada como
