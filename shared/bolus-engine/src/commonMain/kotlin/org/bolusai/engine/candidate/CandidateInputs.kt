@@ -125,6 +125,31 @@ public data class NutritionRules(
     }
 }
 
+/** Intensities of Legacy `ExerciseIntensity`. Legacy reads an unknown text as moderate; Next has no such fallback. */
+public enum class ExerciseIntensity(public val code: String) {
+    LOW("low"),
+    MODERATE("moderate"),
+    HIGH("high"),
+    ;
+
+    public companion object {
+        public fun fromCode(code: String): ExerciseIntensity? = entries.firstOrNull { it.code == code }
+    }
+}
+
+/**
+ * Exercise declared for this calculation (ADR 0031), as Legacy `ExerciseParams`. [NotPlanned] is a declaration, the
+ * same as Legacy `planned = false`. A planned exercise whose minutes or intensity are unknown is unavailable in the
+ * request and blocks; it is never read as no exercise.
+ */
+public sealed interface ExercisePlan {
+    public data object NotPlanned : ExercisePlan
+
+    public data class Planned(public val minutes: Int, public val intensity: ExerciseIntensity) : ExercisePlan {
+        init { require(minutes >= 0) { "engine.exercise.negative_minutes" } }
+    }
+}
+
 /**
  * IOB as provided, with its provenance. A manual value is typed by the user (semantics pending, Legacy LC-011). A
  * calculated value comes from the candidate IOB over a dose history (ADR 0026, ADR 0028): it keeps the exact double
@@ -223,6 +248,7 @@ public data class CandidateRequest(
     public val iob: Input<IobValue>,
     public val nutrition: MealNutrition = MealNutrition.UNKNOWN,
     public val warsawStrategy: WarsawStrategy = WarsawStrategy.AUTO,
+    public val exercise: Input<ExercisePlan> = Input.Provided(ExercisePlan.NotPlanned),
 ) {
     init {
         val minute = (localMinuteOfDay as? Input.Provided)?.value

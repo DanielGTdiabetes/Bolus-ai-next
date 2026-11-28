@@ -56,6 +56,7 @@ internal fun request(
     iob: String? = "0",
     nutrition: MealNutrition = NO_NUTRIENTS,
     strategy: WarsawStrategy = WarsawStrategy.AUTO,
+    exercise: Input<ExercisePlan> = Input.Provided(ExercisePlan.NotPlanned),
 ) = CandidateRequest(
     calculationAtEpochMs = 2_000L,
     localMinuteOfDay = minute,
@@ -66,6 +67,7 @@ internal fun request(
     iob = if (iob == null) Input.Unavailable("iob.unknown") else Input.Provided(IobValue(q(iob))),
     nutrition = nutrition,
     warsawStrategy = strategy,
+    exercise = exercise,
 )
 
 private fun units(outcome: StepOutcome): Double = (outcome as StepOutcome.Computed).units
@@ -122,7 +124,8 @@ class CandidateEngineTest {
         val result = CandidateEngine.calculate(request(iob = null))
         assertEquals(2.0, units(result.step(CandidateStep.CORRECTION_LIMIT)))
         assertEquals(listOf("iob.unknown"), causes(result.step(CandidateStep.IOB)))
-        assertEquals(listOf("depends_on.iob"), causes(result.step(CandidateStep.ROUNDING)))
+        assertEquals(listOf("depends_on.iob"), causes(result.step(CandidateStep.EXERCISE)))
+        assertEquals(listOf("depends_on.exercise"), causes(result.step(CandidateStep.ROUNDING)))
         assertTrue(result.total is StepOutcome.Blocked)
     }
 

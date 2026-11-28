@@ -30,6 +30,11 @@ CAPTURES = [
         ENGINE / "commonMain/kotlin/org/bolusai/engine/candidate/CandidateEngine.kt",
     ),
     (
+        "capture_exercise_vectors.py",
+        ENGINE / "commonTest/kotlin/org/bolusai/engine/candidate/CandidateExerciseLegacyVectors.kt",
+        ENGINE / "commonMain/kotlin/org/bolusai/engine/candidate/CandidateEngine.kt",
+    ),
+    (
         "capture_iob_vectors.py",
         ENGINE / "commonTest/kotlin/org/bolusai/engine/iob/CandidateIobLegacyVectors.kt",
         ENGINE / "commonMain/kotlin/org/bolusai/engine/iob/CandidateIob.kt",

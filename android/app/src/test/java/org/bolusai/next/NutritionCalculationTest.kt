@@ -1,6 +1,9 @@
 package org.bolusai.next
 
 import org.bolusai.engine.candidate.CandidateStep
+import org.bolusai.engine.candidate.ExerciseIntensity
+import org.bolusai.engine.candidate.ExercisePlan
+import org.bolusai.engine.candidate.Input
 import org.bolusai.engine.candidate.StepOutcome
 import org.bolusai.engine.candidate.WarsawStrategy
 import org.bolusai.next.application.TestCalculation
@@ -115,6 +118,34 @@ class NutritionCalculationTest {
         assertEquals(8.0, total(form.copy(fiber = "12", fat = "40", protein = "40"), off), 1e-9)
         assertTrue("Fibra: factor de descuento: 0 × (regla desactivada)" in
             TestCalculationText.limits(TestCalculation.profile(off)).lines())
+    }
+
+    @Test fun aPlannedExerciseReducesTheDoseThroughTheEngine() {
+        // ADR 0031: 8 U reduced 30 % by 60 min of moderate intensity.
+        val planned = form.copy(exercisePlanned = true, exerciseMinutes = "60", exerciseIntensity = ExerciseIntensity.MODERATE)
+        assertEquals(5.6, total(planned), 1e-9)
+        assertEquals(Input.Provided(ExercisePlan.Planned(60, ExerciseIntensity.MODERATE)), TestCalculation.exercise(planned))
+        // Minutes and intensity typed while "not planned" is selected are not used.
+        assertEquals(8.0, total(planned.copy(exercisePlanned = false)), 1e-9)
+        assertEquals(Input.Provided(ExercisePlan.NotPlanned), TestCalculation.exercise(form))
+        assertNotEquals(calculate(form).inputFingerprintSha256, calculate(planned).inputFingerprintSha256)
+        assertFalse(calculate(planned).usableForTreatment)
+    }
+
+    @Test fun aPlannedExerciseWithUnknownDataBlocksAndIsNeverReadAsNone() {
+        fun exerciseCauses(form: TestCalculationForm): List<String> {
+            val result = calculate(form)
+            assertTrue(result.total is StepOutcome.Blocked)
+            return (result.step(CandidateStep.EXERCISE) as StepOutcome.Blocked).causes
+        }
+        val planned = form.copy(exercisePlanned = true, exerciseMinutes = "45", exerciseIntensity = ExerciseIntensity.LOW)
+        assertEquals(listOf("exercise.minutes.missing"), exerciseCauses(planned.copy(exerciseMinutes = " ")))
+        assertEquals(listOf("exercise.intensity.missing"), exerciseCauses(planned.copy(exerciseIntensity = null)))
+        listOf("4.5", "-10", "media hora", "45 min", "99999").forEach {
+            assertEquals(it, listOf("exercise.minutes.invalid"), exerciseCauses(planned.copy(exerciseMinutes = it)))
+        }
+        // Zero minutes is a declared value: no reduction.
+        assertEquals(8.0, total(planned.copy(exerciseMinutes = "0")), 1e-9)
     }
 
     @Test fun nutrientsRulesAndStrategyEnterTheFingerprint() {

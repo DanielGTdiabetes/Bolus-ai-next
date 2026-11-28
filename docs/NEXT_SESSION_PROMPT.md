@@ -98,6 +98,14 @@ nada hoy, así que no hay doble escritura. Cuando Next asuma esta función debe
 haber relevo explícito: nunca Legacy y Next emitiendo a la vez, o Dexcom
 tendrá entradas duplicadas. Lo mismo vale para Nightscout.
 
+ENTREGA 2026-11-28 — REDUCCIÓN POR EJERCICIO (ADR 0031)
+Tabla de Legacy `bcac891` (baja 0,15/0,30; moderada 0,30/0,55; alta 0,45/0,75 a
+60 y 120 min) en el motor `0.6.0-candidate`, conjunto v3, códec v4, con 23
+vectores (`capture_exercise_vectors.py`). Paso `exercise` entre IOB y redondeo.
+Bolo: sin ejercicio o previsto con minutos enteros e intensidad; datos
+desconocidos bloquean. La sombra lee minutos e intensidad del desglose. Los 325
+cálculos reales de Legacy coinciden con Next.
+
 SIGUIENTE
 - Teléfono: cálculo con perfil real confirmado (P6) y actualización sobre un
   perfil v2 real existente (P7 de la validación de límites). B1 tiene evidencia
@@ -111,9 +119,8 @@ SIGUIENTE
   7 no comparables por reducción de ejercicio
   (docs/validation/shadow-replay-real-data-2026-11-28.md). El propietario
   autorizó leer la base del NAS por Portainer, solo `SELECT`; usar `psql` sin
-  terminal y con `-P pager=off`, o se queda colgado. Para que esos 7 sean
-  comparables hay que implementar la reducción por ejercicio. Repetir la
-  exportación cuando haya más cálculos. Triar cada `MISMATCH` y añadir su
+  terminal y con `-P pager=off`, o se queda colgado. Los 7 con ejercicio ya
+  coinciden (ADR 0031). Repetir la exportación cuando haya más cálculos. Triar cada `MISMATCH` y añadir su
   prueba. Los datos
   reales y el detalle no entran en el repositorio; solo el resumen de
   recuentos. Legacy también está instalada en el Pixel y puede consultarse en

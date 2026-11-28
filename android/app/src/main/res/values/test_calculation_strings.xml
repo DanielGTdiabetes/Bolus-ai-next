@@ -28,6 +28,8 @@
     <string name="test_calc_step_correction">B) Corrección</string>
     <string name="test_calc_step_correction_limit">B2) Límite de corrección</string>
     <string name="test_calc_step_iob">C) IOB sobre corrección positiva</string>
+    <string name="test_calc_exercise_minutes">Minutos de ejercicio (enteros). Vacío = desconocido y bloquea</string>
+    <string name="test_calc_step_exercise">C2) Reducción por ejercicio</string>
     <string name="test_calc_step_rounding">D) Redondeo</string>
     <string name="test_calc_step_max_bolus">E) Bolo máximo</string>
     <string name="test_calc_step_hypo_stop">F) Parada por glucosa baja de Legacy</string>

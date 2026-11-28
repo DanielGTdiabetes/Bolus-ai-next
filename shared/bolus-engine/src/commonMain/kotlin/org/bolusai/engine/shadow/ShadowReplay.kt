@@ -6,6 +6,8 @@ import org.bolusai.engine.candidate.CandidateResult
 import org.bolusai.engine.candidate.CandidateStep
 import org.bolusai.engine.candidate.CarbsOrigin
 import org.bolusai.engine.candidate.CarbsValue
+import org.bolusai.engine.candidate.ExerciseIntensity
+import org.bolusai.engine.candidate.ExercisePlan
 import org.bolusai.engine.candidate.GlucoseOrigin
 import org.bolusai.engine.candidate.GlucoseUnitCode
 import org.bolusai.engine.candidate.GlucoseValue
@@ -27,7 +29,7 @@ import kotlin.math.max
  * database, records a treatment or changes Legacy: the caller passes minimised text records and gets a comparison.
  *
  * A comparison is a match only when the inputs are known to be equivalent. Anything Legacy applied that Next does
- * not (Techne, exercise, IOB ceiling, stale or absent glucose) or anything the trace does not carry makes
+ * not (Techne, IOB ceiling, stale or absent glucose) or anything the trace does not carry makes
  * the record not comparable; an unexplained difference is a mismatch and is never counted as a match.
  */
 public enum class ShadowClass {
@@ -185,11 +187,20 @@ public object ShadowReplay {
             "true" -> if (!f["trend"].isNullOrBlank()) reasons += "legacy.techne_rounding_possible"
             else -> reasons += "trace.missing.techne_enabled"
         }
-        when (f["exercise"]) {
-            "false" -> Unit
-            "true" -> reasons += "legacy.exercise_reduction_applied"
-            else -> reasons += "trace.missing.exercise"
+        // Exercise is not a field of the trace: the extractor reads minutes and intensity from the breakdown line.
+        val exercise: ExercisePlan = when (f["exercise"]) {
+            "false" -> ExercisePlan.NotPlanned
+            "true" -> {
+                val minutes = f["exercise_minutes"]?.toIntOrNull()?.takeIf { it > 0 }
+                val intensity = f["exercise_intensity"]?.let(ExerciseIntensity::fromCode)
+                if (minutes == null) reasons += "trace.missing.exercise_minutes"
+                // Legacy reads an unknown intensity as moderate; Next does not, so it cannot be replayed.
+                if (intensity == null) reasons += "legacy.exercise_intensity_not_replayable"
+                if (minutes != null && intensity != null) ExercisePlan.Planned(minutes, intensity) else ExercisePlan.NotPlanned
+            }
+            else -> { reasons += "trace.missing.exercise"; ExercisePlan.NotPlanned }
         }
+        if (exercise is ExercisePlan.Planned) notes += "exercise.reduction_replayed"
         if (iob != null && iob < 0.0) reasons += "trace.negative_iob"
         if (reasons.isNotEmpty()) return notComparable()
 
@@ -216,6 +227,7 @@ public object ShadowReplay {
             iob = Input.Provided(IobValue.replayed(iobUnits, calculation.reference)),
             nutrition = MealNutrition(Input.Provided(fiber!!), Input.Provided(fat!!), Input.Provided(protein!!)),
             warsawStrategy = strategy,
+            exercise = Input.Provided(exercise),
         ))
 
         fun diffs(result: CandidateResult): List<ComponentDiff>? {
@@ -240,8 +252,8 @@ public object ShadowReplay {
 
         // Legacy IOB ceiling: not applied by Next. It only matters when it would have reduced the dose.
         f["max_iob"]?.toDoubleOrNull()?.takeIf { it > 0.0 }?.let { ceiling ->
-            val projected = iob + fact(base, CandidateStep.ROUNDING, "unrounded_u") +
-                fact(base, CandidateStep.ROUNDING, "unrounded_extended_u")
+            // Legacy checks the ceiling before the exercise reduction.
+            val projected = iob + units(base, CandidateStep.IOB) + units(base, CandidateStep.EXTENDED)
             if (projected > ceiling) {
                 reasons += "legacy.max_iob_ceiling_applies"
                 return notComparable()

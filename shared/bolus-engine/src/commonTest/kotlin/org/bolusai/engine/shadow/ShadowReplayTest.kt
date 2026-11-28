@@ -66,7 +66,9 @@ class ShadowReplayTest {
             compare("glucose" to null) to "legacy.glucose_absent",
             compare("glucose_stale" to "true") to "legacy.glucose_stale",
             compare("techne_enabled" to "true", "trend" to "SingleUp") to "legacy.techne_rounding_possible",
-            compare("exercise" to "true") to "legacy.exercise_reduction_applied",
+            compare("exercise" to "true") to "trace.missing.exercise_minutes",
+            compare("exercise" to "true", "exercise_minutes" to "60", "exercise_intensity" to "extreme") to
+                "legacy.exercise_intensity_not_replayable",
             compare("max_iob" to "5") to "legacy.max_iob_ceiling_applies",
             compare("carbs" to null) to "trace.missing.carbs",
             compare("expected.total_u" to null) to "trace.missing.expected.total_u",
@@ -108,6 +110,18 @@ class ShadowReplayTest {
         assertEquals(ShadowClass.MISMATCH, compare(*adjusted, "autosens_ratio" to "1.0", "expected.total_u" to "4.0").shadowClass)
         // A component further away than the three decimals allow stays a mismatch.
         assertEquals(ShadowClass.MISMATCH, compare(*adjusted, "expected.meal_u" to "4.02", "expected.total_u" to "4.0").shadowClass)
+    }
+
+    @Test fun exerciseIsReplayedFromTheMinutesAndIntensityOfTheBreakdown() {
+        // 8 U reduced 15 % by 60 min of low intensity: 6.8 U.
+        val exercise = arrayOf<Pair<String, String?>>("exercise" to "true", "exercise_minutes" to "60",
+            "exercise_intensity" to "low")
+        val result = compare(*exercise, "expected.total_u" to "6.8")
+        assertEquals(ShadowClass.MATCH, result.shadowClass)
+        assertEquals(listOf("exercise.reduction_replayed"), result.reasons)
+        assertEquals(ShadowClass.MISMATCH, compare(*exercise).shadowClass)
+        // The IOB ceiling is checked against the dose before the reduction, as Legacy does.
+        assertEquals(ShadowClass.NOT_COMPARABLE, compare(*exercise, "expected.total_u" to "6.8", "max_iob" to "7").shadowClass)
     }
 
     @Test fun whatDoesNotChangeTheDoseStaysComparable() {

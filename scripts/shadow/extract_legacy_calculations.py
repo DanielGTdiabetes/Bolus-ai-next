@@ -26,10 +26,13 @@ Usage (run with `python3 -I`):
 import argparse
 import hashlib
 import json
+import re
 import sys
 from decimal import Decimal
 
 FORMAT = "bolus-ai-next/shadow-legacy-calculations/v1"
+# Legacy: explain.append(f"D) Ejercicio ({inp.exercise_intensity} {inp.exercise_minutes}m): -{int(red*100)}%")
+EXERCISE_LINE = re.compile(r"^D\) Ejercicio \((\S+) (\d+)m\)")
 NULL = "~"
 
 
@@ -66,6 +69,8 @@ def record(row):
     if snapshot.get("total_u_final") is None:
         return None
     trend = glucose.get("trend")
+    exercise = None if explain is None else next((m for m in (EXERCISE_LINE.match(str(line)) for line in explain) if m), None)
+    exercise_named = explain is not None and any(str(line).startswith("D) Ejercicio") for line in explain)
     return [
         ("record", hashlib.sha256(str(row.get("id")).encode("utf-8")).hexdigest()[:16]),
         ("source", str(snapshot.get("source") or NULL)),
@@ -90,7 +95,9 @@ def record(row):
         ("dual_bolus_enabled", boolean(ratios.get("dual_bolus_enabled"))),
         ("config_hash", str(ratios.get("config_hash") or NULL)),
         # Legacy writes one breakdown line per applied exercise reduction; the trace has no other record of it.
-        ("exercise", NULL if explain is None else boolean(any(str(line).startswith("D) Ejercicio") for line in explain))),
+        ("exercise", NULL if explain is None else boolean(exercise_named)),
+        ("exercise_minutes", exercise.group(2) if exercise else NULL),
+        ("exercise_intensity", exercise.group(1) if exercise else NULL),
         ("expected.meal_u", number(snapshot.get("meal_component_u"))),
         ("expected.correction_u", number(snapshot.get("correction_component_u"))),
         ("expected.iob_applied_u", number(snapshot.get("iob_applied_to_correction_u"))),

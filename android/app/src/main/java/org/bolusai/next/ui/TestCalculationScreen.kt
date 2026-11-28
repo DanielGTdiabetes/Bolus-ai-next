@@ -13,6 +13,7 @@ import androidx.lifecycle.ViewModel
 import org.bolusai.engine.candidate.CandidateRequest
 import org.bolusai.engine.candidate.CandidateResult
 import org.bolusai.engine.candidate.CandidateStep
+import org.bolusai.engine.candidate.ExerciseIntensity
 import org.bolusai.engine.candidate.Input
 import org.bolusai.engine.candidate.ProfileSnapshot
 import org.bolusai.engine.candidate.Quantity
@@ -103,6 +104,7 @@ internal object TestCalculationText {
         CandidateStep.CORRECTION to R.string.test_calc_step_correction,
         CandidateStep.CORRECTION_LIMIT to R.string.test_calc_step_correction_limit,
         CandidateStep.IOB to R.string.test_calc_step_iob,
+        CandidateStep.EXERCISE to R.string.test_calc_step_exercise,
         CandidateStep.ROUNDING to R.string.test_calc_step_rounding,
         CandidateStep.MAX_BOLUS to R.string.test_calc_step_max_bolus,
         CandidateStep.HYPO_STOP to R.string.test_calc_step_hypo_stop,
@@ -278,6 +280,24 @@ internal class TestCalculationScreen(
             model.update(model.form.copy(warsawStrategy = WarsawStrategy.NORMAL)); changed()
         }
 
+        label(content, "Ejercicio", bold = true)
+        choice("Sin ejercicio previsto", "test_calc:exercise:none", !form.exercisePlanned) {
+            model.update(model.form.copy(exercisePlanned = false)); changed()
+        }
+        choice("Ejercicio previsto: reduce el bolo", "test_calc:exercise:planned", form.exercisePlanned) {
+            model.update(model.form.copy(exercisePlanned = true)); changed()
+        }
+        if (form.exercisePlanned) {
+            field(R.string.test_calc_exercise_minutes, "test_calc:exercise:minutes", form.exerciseMinutes, result) {
+                model.form.copy(exerciseMinutes = it)
+            }
+            listOf(ExerciseIntensity.LOW to "Intensidad baja", ExerciseIntensity.MODERATE to "Intensidad moderada",
+                ExerciseIntensity.HIGH to "Intensidad alta").forEach { (intensity, name) ->
+                choice(name, "test_calc:exercise:${intensity.code}", form.exerciseIntensity == intensity) {
+                    model.update(model.form.copy(exerciseIntensity = intensity)); changed()
+                }
+            }
+        }
         label(content, context.getString(R.string.test_calc_glucose_source), bold = true)
         choice(R.string.test_calc_glucose_manual, "test_calc:glucose:manual", form.glucoseChoice == GlucoseChoice.MANUAL, true) {
             model.update(model.form.copy(glucoseChoice = GlucoseChoice.MANUAL)); changed()

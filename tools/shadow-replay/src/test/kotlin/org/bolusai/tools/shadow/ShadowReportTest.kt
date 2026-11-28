@@ -16,10 +16,10 @@ class ShadowReportTest {
 
     @Test fun theSyntheticExportIsClassifiedRecordByRecord() {
         assertEquals(listOf(ShadowClass.MATCH, ShadowClass.MATCH, ShadowClass.MATCH, ShadowClass.NOT_COMPARABLE,
-            ShadowClass.NOT_COMPARABLE, ShadowClass.MISMATCH, ShadowClass.MATCH_STRATEGY_INFERRED,
+            ShadowClass.MATCH, ShadowClass.MISMATCH, ShadowClass.MATCH_STRATEGY_INFERRED,
             ShadowClass.MISMATCH), comparisons.map { it.shadowClass })
         assertEquals(listOf("legacy.glucose_stale"), comparisons[3].reasons)
-        assertEquals(listOf("legacy.exercise_reduction_applied"), comparisons[4].reasons)
+        assertEquals(listOf("exercise.reduction_replayed"), comparisons[4].reasons)
         assertEquals(listOf("differs.total_u"), comparisons[5].reasons)
         assertEquals(listOf("warsaw_strategy.normal_inferred", "settings.unverified_for_nutrients"), comparisons[6].reasons)
         // Autosens 1.1 with unadjusted ratios in the synthetic row: replayed, and the difference is reported.
@@ -28,7 +28,7 @@ class ShadowReportTest {
 
     @Test fun theSummaryHasCountsAndNoClinicalValue() {
         val summary = ShadowReport.summary(input, comparisons)
-        assertTrue("- Calculations: 8; comparable: 6; matches: 4" in summary.lines())
+        assertTrue("- Calculations: 8; comparable: 7; matches: 5" in summary.lines())
         assertTrue("| MISMATCH | 2 |" in summary.lines())
         assertTrue("| NOT_COMPARABLE:legacy.glucose_stale | 1 |" in summary.lines())
         assertTrue("not usable for treatment" in summary)
@@ -40,7 +40,7 @@ class ShadowReportTest {
     @Test fun theDetailsListOnlyWhatIsNotAPlainMatchAndSayTheyAreClinical() {
         val details = ShadowReport.details(comparisons)
         assertTrue(details.startsWith("# Shadow replay details: CLINICAL VALUES"))
-        assertEquals(5, details.lines().count { it.startsWith("## ") })
+        assertEquals(4, details.lines().count { it.startsWith("## ") })
         assertTrue(details.lines().any { it.endsWith(": MISMATCH") })
         assertTrue("- total_u: legacy 8.4, next 8.0  <-- differs" in details.lines())
         assertFalse(comparisons.first().reference in details)
