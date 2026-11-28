@@ -108,5 +108,13 @@ de forma durable, ahora bajo la versión nueva. Prueba:
   Dexcom se actualiza a otra versión. Ambos casos requieren decisión nueva.
 - **Diagnóstico no muestra el bloqueo durable.** Conviene añadir a sus líneas
   la causa guardada para la versión vigente, con su prueba. No se cambia aquí.
-- Comprobar en el Pixel, tras instalar esta versión, que vuelven a entrar
-  mensajes (recuentos, sin valores).
+
+## Comprobación en el Pixel tras el cambio
+
+APK de depuración de esta entrega instalada con `adb install -r` el 2026-11-28
+a las 16:31 (+01:00), conservando los datos; receptor habilitado y permiso
+concedido sin tocarlos. `dexcom-observations.db` volvió a escribirse a las
+16:34:39 y contiene un primer mensaje con la política `adr0023-i2b-2026-11-28`;
+la fila de bloqueo de la versión anterior sigue en el registro. Comprobado
+por fecha del fichero y coincidencia de texto, sin leer valores. No se
+comprobó en pantalla qué muestran Inicio y Bolo.
