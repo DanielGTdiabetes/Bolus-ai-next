@@ -428,6 +428,20 @@ técnicas, sin nuevas decisiones clínicas:
 - La ruta estricta se conserva para una política aprobada inyectada. En
   producción, con `Pending`, el receiver usa la ruta por permiso.
 
+## Bloqueo durable levantado por el propietario — 2026-11-28
+
+El 2026-11-15 el Pixel registró un bloqueo durable
+`dexcom_reception.producer_version_changed` bajo `adr0023-i2b-2026-10-12`:
+llegó un mensaje con Dexcom en un `versionCode` distinto de 4537, antes de que
+el propietario la reinstalara ese mismo día en 4537 con el firmante aprobado.
+El 2026-11-28 el propietario decidió levantarlo («desbloquéalo»): la versión de
+política pasa a `adr0023-i2b-2026-11-28`, con el mismo conjunto y las mismas
+anclas de la tabla anterior. La APK instalada no es el binario del inventario
+L1 (mismo paquete, versión y firmante, otro SHA-256); queda aceptada con el
+límite ya descrito de que las anclas no prueban igualdad binaria. Evidencia,
+opciones y riesgos en la
+[validación](../validation/dexcom-durable-block-2026-11-28.md).
+
 ## Fuentes y condiciones para revisar
 
 Fuentes primarias consultadas el 2026-10-11; no prueban todavía el comportamiento

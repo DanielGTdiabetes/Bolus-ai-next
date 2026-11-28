@@ -85,13 +85,13 @@ class DexcomLogBlockTest {
             "dexcom_receiver.component=enabled",
             "dexcom_receiver.policy=pending",
             "dexcom_log.read.pending",
-            "dexcom_reception.policy=adr0023-i2b-2026-10-12",
+            "dexcom_reception.policy=adr0023-i2b-2026-11-28",
             "dexcom_reception.next_permission=missing",
             "dexcom_reception.gate_now=dexcom_reception.visibility_unproven",
             "dexcom_reception.full_visibility=false",
             "dexcom_reception.visible_holders=org.bolusai.next",
         ), DexcomLogBlock.lines(DexcomLogState.Reading, status))
-        assertEquals(listOf("dexcom_reception.policy=adr0023-i2b-2026-10-12", "dexcom_reception.next_permission=granted",
+        assertEquals(listOf("dexcom_reception.policy=adr0023-i2b-2026-11-28", "dexcom_reception.next_permission=granted",
             "dexcom_reception.gate_now=dexcom_reception.holders_query_failed", "dexcom_reception.snapshot=query_failed"),
             DexcomReceiverStatus.receptionLines(true, HolderSnapshot.QueryFailed))
     }

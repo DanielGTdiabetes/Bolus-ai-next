@@ -7,10 +7,17 @@ import java.security.MessageDigest
  * Anchors approved by the owner on 2026-10-12 (ADR 0023, L2, I-1, I-2 option b, I-5 option a). They are not secrets
  * and are reviewed by pull request; verify.ps1 compares them with the ADR table. A change of any of them is a new
  * [POLICY_VERSION], which is also how a durable block is lifted: never automatically.
+ *
+ * `adr0023-i2b-2026-11-28`: same anchors. The owner lifted on 2026-11-28 the durable block `producer_version_changed`
+ * that the Pixel recorded on 2026-11-15 under [PREVIOUS_POLICY_VERSIONS], after he reinstalled Dexcom
+ * (docs/validation/dexcom-durable-block-2026-11-28.md).
  */
 internal object DexcomApprovedPermissionSet {
     const val PERMISSION = "com.dexcom.cgm.EXTERNAL_PERMISSION"
-    const val POLICY_VERSION = "adr0023-i2b-2026-10-12"
+    const val POLICY_VERSION = "adr0023-i2b-2026-11-28"
+
+    /** Superseded versions. Their durable blocks stay in the log and no longer close the gate. */
+    val PREVIOUS_POLICY_VERSIONS: List<String> = listOf("adr0023-i2b-2026-10-12")
     const val DEFINER_PACKAGE = "com.dexcom.g7"
     const val NEXT_PACKAGE = "org.bolusai.next"
 
