@@ -91,12 +91,13 @@ servidor. El BMAX ya no existe: lo sustituye el EVO-X2.
 Auditoría y diseño en docs/adr/0032-myfitnesspal-session-on-device.md, en estado
 propuesto. Condición del propietario: no puede crear conflicto con `bolus_ai`
 (sesión propia en el móvil, solo lectura, nada hacia Legacy, solo a petición,
-interruptor apagado por defecto). Bloqueado por una entrada: el código que habla
-con MyFitnessPal (`mfp_adapter.py`, `mfp_wrapper.py`, `cookie_auth.py`) no está
-en el repositorio de Legacy, sino en el mini PC, en `/opt/hermes-mcp/myfitnesspal`.
-No inventar direcciones ni formatos: pedir ese código al propietario (sin su
-`.env`) y una respuesta real saneada del diario. La clave de host SSH del mini
-PC no está aceptada en este equipo; no aceptarla sin su permiso.
+interruptor apagado por defecto). El adaptador del mini PC ya está auditado
+(sección «Adaptador del mini PC» del ADR): usa la librería pública
+`myfitnesspal` 2.1.2 y lee la página `https://www.myfitnesspal.com/food/diary?date=`
+con la sesión; no hay interfaz privada. SIGUIENTE PASO: implementar la primera
+entrega del «Plan de implementación» del ADR 0032 (módulo `shared/mfp-import`,
+sin teléfono). El EVO-X2 es accesible por SSH con el alias `evo-x2` y clave;
+solo lectura, sin abrir su `.env`.
 
 ESCRITURA EN DEXCOM — AVISO DEL PROPIETARIO 2026-11-28
 Legacy escribe en el historial de la app Dexcom todos los bolos y la insulina

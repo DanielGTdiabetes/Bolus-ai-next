@@ -1,7 +1,7 @@
 # ADR 0032: enlace MyFitnessPal por sesión en el propio móvil
 
-- Estado: **propuesto**. Recoge la auditoría, las decisiones ya tomadas por el
-  propietario y lo que falta para poder implementar. No hay código todavía
+- Estado: **propuesto**, con la auditoría completa. Recoge las decisiones del
+  propietario, cómo lee Legacy el diario y el diseño. No hay código todavía
 - Fecha: 2026-11-28
 - Fase y criterio de aceptación: fase 8 (enlace MyFitnessPal con independencia
   del cálculo local)
@@ -67,9 +67,52 @@ En el repositorio de `bolus_ai` están el disparador
 Vive en el mini PC, en `/opt/hermes-mcp/myfitnesspal`. Sin él no se conocen las
 direcciones exactas ni el formato de la respuesta, y no se van a inventar.
 
-Acceso intentado el 2026-11-28: el BMAX ya no existe; el mini PC actual
-responde por SSH en su dirección de Tailscale, pero su clave de host no está
-aceptada en este equipo y no se aceptó sin consultar al propietario.
+### Adaptador del mini PC, leído el 2026-11-28
+
+Con permiso del propietario se leyó por SSH, en solo lectura y con la clave ya
+configurada (alias `evo-x2`), el código del adaptador en el EVO-X2. No se abrió
+su `.env`, ni `config/`, ni `logs/`, ni ninguna cookie.
+
+No hay ninguna interfaz privada. El adaptador usa la librería pública
+`myfitnesspal` 2.1.2 (`requirements.txt`), que descarga la página web del diario
+y la analiza:
+
+- **Petición.** `GET https://www.myfitnesspal.com/food/diary?date=AAAA-MM-DD`
+  con las cookies de la sesión. La librería construye `/food/diary/<usuario>` y
+  el adaptador quita el usuario (`_rewrite_diary_url`); admite también
+  `/es/food/diary`. Cabeceras de navegador normales.
+- **Otras dos peticiones que Next no necesita:**
+  `https://www.myfitnesspal.com/user/auth_token?refresh=true` y
+  `https://api.myfitnesspal.com/v2/users/<id>`, solo para obtener el nombre de
+  usuario. La segunda falla a veces con 500 y el adaptador lo tolera.
+- **Tabla.** Cada comida empieza en una fila `tr` con clase `meal_header`. Su
+  primera celda es el nombre de la comida, en minúsculas; las demás son los
+  nombres de las columnas, en minúsculas, y `carbs` se lee como
+  `carbohydrates`. Las columnas las elige el usuario en MyFitnessPal: la fibra
+  solo aparece si la tiene configurada. La librería usa las columnas de la
+  primera cabecera para todas las comidas.
+- **Alimentos.** Las filas siguientes sin atributo `class` son los alimentos;
+  la primera fila con clase termina la comida. El nombre es el texto del enlace
+  `a` de la primera celda. El valor de cada celda es el texto del
+  `span.macro-value` si la celda tiene hijos, o su texto. Las celdas que
+  sobran (botón de borrar) se ignoran.
+- **Números.** Se eliminan todos los caracteres salvo dígitos, `-` y `.` y se
+  convierte a número. **Si no se puede, la librería devuelve 0.** Next no copia
+  eso: un valor ilegible es desconocido.
+- **Cantidad y unidad.** Salen del nombre con la expresión
+  `(.+), (\d[\d\.]*) ([\w\(\)]+)(?: \(.*\))?`: nombre corto, cantidad y unidad.
+- **Totales de la comida.** La librería los calcula sumando los alimentos; no
+  lee un total de la página. Por eso el control de Legacy «total frente a suma
+  de alimentos, 1 g» compara dos valores que salen de las mismas filas.
+- **Respuestas que no son el diario** (`_detect_bad_response`): la dirección
+  final contiene `/account/ad_consents` (hay que aceptar el consentimiento en un
+  navegador); el título contiene `myfitnesspal | challenge` o `captcha`, o el
+  HTML contiene `cf-challenge` (desafío); título `myfitnesspal | blocked`
+  (sesión, IP o cookies bloqueadas); HTTP 401 o 403 (sesión rechazada); 429
+  (límite de peticiones); 500 o más. Si llega la página de inicio de sesión no
+  hay ninguna `meal_header`. El texto `diary is locked with a key` indica un
+  diario protegido.
+- El adaptador reintenta hasta 3 veces con espera creciente.
 
 ## Diseño propuesto
 
@@ -129,13 +172,39 @@ almacén de cookies. Sin verificar.
 
 ## Lo que falta para implementar
 
-1. **El código del adaptador del mini PC**, en solo lectura y sin su `.env`:
-   `mfp_adapter.py`, `mfp_wrapper.py` y `cookie_auth.py`. El propietario decide
-   cómo darlo: aceptar la clave de host para leerlo por SSH o copiar los
-   ficheros.
-2. Una respuesta real del diario, saneada, para escribir el analizador contra
-   algo verdadero y dejarla como fixture sin datos personales.
+1. Una página real del diario, saneada, para comprobar el analizador contra
+   algo verdadero y dejarla como fixture sin datos personales. Hasta tenerla,
+   el fixture se construye con la estructura descrita arriba.
+2. El inicio de sesión del propietario en MyFitnessPal dentro de Next.
 3. La prueba controlada de la segunda sesión (riesgo del apartado 1).
+
+## Plan de implementación
+
+Primera entrega, sin teléfono ni sesión: módulo común `shared/mfp-import`.
+
+- Entrada: lo que la página trae, como texto sin interpretar (dirección final,
+  título, marcas de desafío y de diario protegido, cabeceras y filas).
+- Interpretación con las reglas de arriba y estas diferencias de seguridad:
+  número ilegible o negativo es desconocido, no `0`; una columna que el usuario
+  no tiene configurada deja ese nutriente desconocido; el total de una comida
+  es desconocido si lo es alguno de sus alimentos, nunca una suma parcial.
+- Fallos con código estable: consentimiento, desafío, bloqueo, sesión
+  rechazada, límite de peticiones, diario protegido, página inesperada, host
+  que no es `www.myfitnesspal.com` por HTTPS.
+- Identidad `mfp:<fecha>:<comida>` y revisión SHA-256 del texto canónico, con
+  la función de hash inyectada para no duplicar otra implementación.
+- Estabilidad: dos lecturas consecutivas iguales, máximo tres, con la pausa de
+  4 s de Legacy como constante observada. Se devuelven las comidas estables y
+  la lista de las que cambiaron. Nunca se reutiliza una lectura anterior.
+- Se omiten las comidas sin alimentos.
+- El control de 1 g de Legacy no se adopta: en Next el total es la suma.
+
+Segunda entrega, con el Pixel y el propietario: permiso `INTERNET` limitado a
+MyFitnessPal, pantalla con `WebView` para iniciar sesión y leer el diario en la
+misma sesión del navegador (la página se carga en el `WebView` y se extraen las
+filas con un guion mínimo; la interpretación queda en el módulo común),
+interruptor apagado por defecto, importación al borrador de comida con su
+procedencia y pruebas en dispositivo con una página local saneada.
 
 ## Alternativas descartadas
 
