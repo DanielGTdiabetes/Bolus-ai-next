@@ -542,8 +542,11 @@ instala la configuración de seguridad de red. Comprobado en el Pixel:
   destino de una redirección de un recurso hacia un puerto del propio teléfono
   no pasaría por él. Esa conexión no sale del teléfono. Se deja anotado, sin
   más medida.
-- La comprobación con el inicio de sesión real y la lectura del diario
-  corresponde al propietario (lista en la nota de validación).
+
+Con la sesión real: el propietario confirmó el 2026-11-28, con la versión
+nueva instalada en el Pixel, que el inicio de sesión y la lectura del diario
+siguen funcionando, y autorizó la integración. No consta qué pasos de la lista
+de la nota de validación siguió.
 
 **Qué lo mantiene.** `MfpNetworkSecurityConfigTest` (JVM) lee el recurso y
 exige que un host sea de confianza exactamente cuando `MfpHosts` lo admite.

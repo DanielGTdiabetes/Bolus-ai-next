@@ -89,8 +89,8 @@ omiten. Hace como mucho una conexión anónima por prueba a `example.org` o a
 - El comportamiento de las redirecciones es el de esta versión del `WebView`.
   Si una actualización lo cambia, `MfpNetworkBoundaryDeviceTest` falla y hay
   que actualizar el ADR; la medida no se debilita.
-- **Pendiente del propietario**, porque usa su sesión real: la lista que
-  sigue.
+- La comprobación con la sesión real la hizo el propietario, no una prueba
+  automática; su resultado está al final.
 
 ## Comprobación del propietario con la sesión real
 
@@ -110,6 +110,11 @@ conservando los datos de la app.
    depende de la configuración nueva. Tras hacerlo conviene comprobar, como la
    primera vez, que Hermes sigue leyendo al cerrar la app de MyFitnessPal.
 
-Si algún paso falla, anotar el texto y el código que muestre Next y los hosts
+**Resultado.** El propietario confirmó el 2026-11-28 que el inicio de sesión
+y la lectura del diario funcionan con la versión nueva y autorizó integrar la
+PR. No consta qué pasos de la lista siguió ni si repitió el cierre e inicio de
+sesión del paso 4.
+
+Si más adelante algún paso falla, anotar el texto y el código que muestre Next y los hosts
 bloqueados: un host que MyFitnessPal necesite y no esté en la lista se añade
 en `MfpHosts.kt` y en la configuración a la vez, a propósito.
