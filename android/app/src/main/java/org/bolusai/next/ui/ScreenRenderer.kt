@@ -230,18 +230,38 @@ internal class ScreenRenderer(
         }
     }
 
-    private fun glucose(state: UnavailableOverview) {
-        val model = GlucoseStatusPresenter.present(state.glucose)
-        card().also {
-            text(it, R.string.glucose_current, 17f, true)
-            text(it, glucoseTitle(model.messageKey), ink = R.color.error_text).tag = "glucose_status"
-            text(it, R.string.glucose_metadata, 13f, ink = R.color.secondary_text)
+    /**
+     * "Glucosa actual". With [current] (Inicio and Bolo) it shows the Dexcom reading while it is current, or why there
+     * is none. Without it (Ajustes) it shows the overview status, which never carries a value.
+     */
+    private fun glucose(state: UnavailableOverview, current: CurrentGlucoseView? = null) {
+        card().also { currentGlucose(it, state, current, 17f, 22f, R.color.primary_text, R.color.error_text,
+            R.color.secondary_text) }
+    }
+
+    private fun currentGlucose(box: LinearLayout, state: UnavailableOverview, current: CurrentGlucoseView?, titleSize: Float,
+                               valueSize: Float, ink: Int, statusInk: Int, detailInk: Int) {
+        text(box, R.string.glucose_current, titleSize, true, ink)
+        if (current == null) {
+            text(box, glucoseTitle(GlucoseStatusPresenter.present(state.glucose).messageKey), ink = statusInk).tag = "glucose_status"
+            text(box, R.string.glucose_metadata, 13f, ink = detailInk)
+            return
         }
+        fun resolve(line: UiText) = context.getString(line.id, *line.args.toTypedArray())
+        if (current.value != null) {
+            text(box, resolve(current.value), valueSize, true, ink).tag = "glucose_value"
+            text(box, resolve(current.status), 14f, ink = detailInk).tag = "glucose_status"
+        } else {
+            text(box, R.string.glucose_absent, valueSize, true, ink)
+            text(box, resolve(current.status), 14f, ink = statusInk).tag = "glucose_status"
+        }
+        if (current.detail != null) text(box, resolve(current.detail), 13f, ink = detailInk).tag = "glucose_detail"
+        else text(box, R.string.glucose_metadata, 13f, ink = detailInk)
     }
 
     /**
-     * Technical presentation of the latest Dexcom reading (ADR 0023, C1): composed lines only. The clinical status card
-     * above stays "sin lectura" for calculation: nothing here reaches the overview or the engine.
+     * Technical presentation of the latest Dexcom reading (ADR 0023, C1): composed lines only. Nothing here reaches
+     * the overview: the engine receives glucose only through an explicit request of the test calculation.
      */
     private fun dexcomReading(view: DexcomReadingView?) {
         if (view == null) return
@@ -261,11 +281,7 @@ internal class ScreenRenderer(
         card().also {
             it.background = GradientDrawable(GradientDrawable.Orientation.TL_BR,
                 intArrayOf(color(R.color.hero_start), color(R.color.hero_end))).apply { cornerRadius = dp(22).toFloat() }
-            text(it, R.string.glucose_current, 15f, true, R.color.on_hero)
-            text(it, R.string.glucose_absent, 30f, true, R.color.on_hero)
-            text(it, glucoseTitle(GlucoseStatusPresenter.present(state.glucose).messageKey), 14f, ink = R.color.on_hero)
-                .tag = "glucose_status"
-            text(it, R.string.glucose_metadata, 13f, ink = R.color.on_hero)
+            currentGlucose(it, state, reading?.current, 15f, 30f, R.color.on_hero, R.color.on_hero, R.color.on_hero)
             link(Destination.FORECAST, parent = it)
         }
         dexcomReading(reading)
@@ -321,7 +337,7 @@ internal class ScreenRenderer(
             R.color.non_authoritative_background)
         disabled(R.string.calculate_disabled, "calculate")
         heading(R.string.inputs_title)
-        glucose(state)
+        glucose(state, reading?.current)
         if (destination == Destination.BOLUS) dexcomReading(reading)
         info(R.string.iob_absent, R.string.iob_detail)
         info(R.string.profile_absent, R.string.profile_detail)

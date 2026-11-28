@@ -48,9 +48,9 @@ public enum class NoReadingCause(public val code: String) {
     LAST_MESSAGE_REJECTED("dexcom_presentation.last_message_rejected"),
 
     /**
-     * Technical consequence of C2 (b), not a new clinical rule: the last message carried several readings and their
-     * order is not contracted, or it only repeated a reading already stored, so no single reading identifies "the last
-     * received" until B1 is verified.
+     * The last message stored no reading of its own: it only repeated readings already stored. Since B1 was approved
+     * (2026-11-28) a message with several readings selects the one measured last; this cause remains for a message
+     * that brings nothing new, because the store reads only the readings of the last message. The code keeps its name.
      */
     SELECTION_PENDING_B1("dexcom_presentation.selection_pending_b1"),
 }
@@ -65,12 +65,35 @@ public enum class WithheldCause(public val code: String) {
 
     /** The device clock is earlier than the stored reception instant: no elapsed time can be stated. */
     RECEPTION_AFTER_NOW("dexcom_presentation.reception_after_now"),
+
+    /** C4 (a): the producer timestamp is later than the reception of its own message, compared in whole seconds. */
+    FUTURE_TIMESTAMP("dexcom_presentation.future_timestamp"),
+
+    /** The producer timestamp is negative: it is not an instant after the epoch and no age can be stated. */
+    INVALID_TIMESTAMP("dexcom_presentation.invalid_timestamp"),
 }
 
 /**
- * What Inicio and Bolo may show (ADR 0023, part II). Before B1 is approved: selection and elapsed time come from the
- * reception instant only, the measurement time is "not verified", freshness has no approved policy and the value is
- * never called current. The unit is the producer's claim, mg/dL, never converted.
+ * Whether a reading counts as current glucose. Owner decision of 2026-11-28 (ADR 0023, C5): a reading is current up
+ * to [DexcomReadingValidity.MAX_AGE_MS] after its measurement time, inclusive. Older, it is expired and is never used
+ * as current glucose. Always evaluated against an explicit instant.
+ */
+public enum class ReadingFreshness(public val code: String) {
+    CURRENT("dexcom_presentation.current"),
+    EXPIRED("dexcom_presentation.expired"),
+}
+
+/** Validity of a Dexcom reading. Provenance: owner decision of 2026-11-28; 10 minutes, as observed in Legacy. */
+public object DexcomReadingValidity {
+    public const val MAX_AGE_MS: Long = 10L * 60L * 1000L
+    public const val POLICY_VERSION: String = "owner-2026-11-28-10min"
+}
+
+/**
+ * What Inicio and Bolo may show (ADR 0023, part II). Since the owner approved B1 and the validity on 2026-11-28, the
+ * producer timestamp is the measurement time in whole seconds since the epoch (UTC), the age counts from it and a
+ * reading is current only within [DexcomReadingValidity.MAX_AGE_MS]. The unit is the producer claim, mg/dL, never
+ * converted.
  */
 public sealed interface LatestReadingPresentation {
     public data class NoReading(val cause: NoReadingCause, val detail: String?) : LatestReadingPresentation
@@ -83,8 +106,11 @@ public sealed interface LatestReadingPresentation {
 
     public data class Reading(
         val valueMgDl: Int,
+        /** Producer timestamp as an instant: whole seconds since the epoch (B1, approved 2026-11-28). */
+        val measuredAtEpochMs: Long,
+        /** Age at the instant of the read that produced this presentation. Use [freshnessAt] for any later instant. */
+        val ageMs: Long,
         val receivedAtEpochMs: Long,
-        val elapsedSinceReceptionMs: Long,
         val provenance: MessageProvenance,
         /** First 8 hex characters of the transmitter fingerprint, for details only (C3). */
         val transmitterShort: String,
@@ -92,19 +118,28 @@ public sealed interface LatestReadingPresentation {
         val trendLiteral: String,
     ) : LatestReadingPresentation {
         val unit: ProducerUnitClaim get() = ProducerUnitClaim.MG_DL_STATED_BY_PRODUCER
-        val measurementTimeVerified: Boolean get() = false
-        val freshness: String get() = FRESHNESS_POLICY_NOT_APPROVED
+        val measurementTimeVerified: Boolean get() = true
         val status: ObservedReadingStatus get() = ObservedReadingStatus.NOT_APPROVED_FOR_USE
-    }
 
-    public companion object {
-        public const val FRESHNESS_POLICY_NOT_APPROVED: String = "dexcom_presentation.freshness_policy_not_approved"
+        /** Freshness when this presentation was read. */
+        val freshness: ReadingFreshness get() = freshnessOfAge(ageMs)
+
+        /**
+         * Freshness at [nowEpochMs]. An instant earlier than the measurement is not current: a reading can only be
+         * current at or after its measurement and within the validity.
+         */
+        public fun freshnessAt(nowEpochMs: Long): ReadingFreshness =
+            if (nowEpochMs < measuredAtEpochMs) ReadingFreshness.EXPIRED else freshnessOfAge(nowEpochMs - measuredAtEpochMs)
+
+        private fun freshnessOfAge(age: Long): ReadingFreshness =
+            if (age in 0..DexcomReadingValidity.MAX_AGE_MS) ReadingFreshness.CURRENT else ReadingFreshness.EXPIRED
     }
 }
 
 /**
- * Pure use case `PresentLatestDexcomReading(log, clock)` of ADR 0023 (plan step 5), applying C2 (b), C3, C5 (a), C6
- * and B4 (b) while B1 is unverified. It never reads the producer timestamp to order, compare or age a reading.
+ * Pure use case `PresentLatestDexcomReading(log, clock)` of ADR 0023 (plan step 5), applying C3, C4 (a), C6, B4 (b)
+ * and, since the owner approved B1 on 2026-11-28, the producer timestamp as measurement time: among the readings the
+ * last message stored, the one measured last is selected and aged from that instant.
  */
 public object PresentLatestDexcomReading {
     public const val PRODUCER_INTERVAL_MIN: Int = 1
@@ -132,27 +167,37 @@ public object PresentLatestDexcomReading {
             return none(NoReadingCause.LAST_MESSAGE_REJECTED, message.rejection?.code?.code ?: message.outcome.code)
         }
         val received = message.newReadings + message.duplicateReadings + message.conflictingReadings
-        val reading = latest.readings.singleOrNull()
-        if (received != 1 || reading == null) return none(NoReadingCause.SELECTION_PENDING_B1, "readings=$received")
-        val elapsed = nowEpochMs - message.receivedAtEpochMs
+        if (latest.readings.isEmpty()) return none(NoReadingCause.SELECTION_PENDING_B1, "readings=$received")
+        val lastMeasured = latest.readings.maxOf { it.producerTimestamp }
+        fun withheld(cause: WithheldCause) =
+            LatestReadingPresentation.Withheld(cause, message.receivedAtEpochMs, message.provenance)
+        // Two stored readings with the same measurement time cannot both be the last one: no number is shown.
+        val reading = latest.readings.singleOrNull { it.producerTimestamp == lastMeasured }
+            ?: return withheld(WithheldCause.CONFLICT)
+        // C4 (a): whole seconds, never rounded in favour of the reading.
+        val receivedSeconds = floorSeconds(message.receivedAtEpochMs)
         return when {
-            reading.conflictOf != null ->
-                LatestReadingPresentation.Withheld(WithheldCause.CONFLICT, message.receivedAtEpochMs, message.provenance)
+            reading.conflictOf != null -> withheld(WithheldCause.CONFLICT)
             reading.producerGlucoseValue !in PRODUCER_INTERVAL_MIN..PRODUCER_INTERVAL_MAX ->
-                LatestReadingPresentation.Withheld(WithheldCause.OUTSIDE_PRODUCER_INTERVAL, message.receivedAtEpochMs,
-                    message.provenance)
-            elapsed < 0 ->
-                LatestReadingPresentation.Withheld(WithheldCause.RECEPTION_AFTER_NOW, message.receivedAtEpochMs,
-                    message.provenance)
+                withheld(WithheldCause.OUTSIDE_PRODUCER_INTERVAL)
+            nowEpochMs < message.receivedAtEpochMs -> withheld(WithheldCause.RECEPTION_AFTER_NOW)
+            reading.producerTimestamp < 0 -> withheld(WithheldCause.INVALID_TIMESTAMP)
+            reading.producerTimestamp > receivedSeconds -> withheld(WithheldCause.FUTURE_TIMESTAMP)
             else -> LatestReadingPresentation.Reading(
                 valueMgDl = reading.producerGlucoseValue,
+                measuredAtEpochMs = reading.producerTimestamp * 1000L,
+                ageMs = nowEpochMs - reading.producerTimestamp * 1000L,
                 receivedAtEpochMs = message.receivedAtEpochMs,
-                elapsedSinceReceptionMs = elapsed,
                 provenance = message.provenance,
                 transmitterShort = reading.transmitter.sha256Hex.take(8),
                 trendLiteral = reading.producerTrendArrow,
             )
         }
+    }
+
+    private fun floorSeconds(epochMs: Long): Long {
+        val quotient = epochMs / 1000L
+        return if (epochMs % 1000L < 0) quotient - 1 else quotient
     }
 
     private fun none(cause: NoReadingCause, detail: String?) = LatestReadingPresentation.NoReading(cause, detail)

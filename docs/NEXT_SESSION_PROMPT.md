@@ -178,6 +178,19 @@ cambia de versión, vuelve el bloqueo y hace falta decisión nueva. Pendiente:
 que Diagnóstico muestre el bloqueo guardado (`gate_now` no lo consulta).
 Ver docs/validation/dexcom-durable-block-2026-11-28.md.
 
+GLUCOSA ACTUAL DESDE DEXCOM — DECISIONES DEL PROPIETARIO 2026-11-28
+B1 aprobada: la hora que envía Dexcom es la hora de medida (segundos UTC).
+Vigencia aprobada: una lectura es «Glucosa actual» hasta 10 minutos después de
+su medida; más antigua, caducada y no se usa. No volver a preguntarlo.
+Implementado en `LatestReadingPresentation.kt` (selección por hora de medida
+dentro del último mensaje, `future_timestamp`, `ReadingFreshness`), en la
+tarjeta «Glucosa actual» de Inicio y Bolo y en el cálculo de prueba, que
+comprueba la vigencia en su propio instante. Inicio relee cada 30 s. Las
+menciones anteriores a «hora de medida no verificada», «vigencia sin política»
+y «B1 sin aprobar» de este documento son historia. Pendiente: selección por
+hora de medida en todo el registro (hoy solo el último mensaje) y que Ajustes →
+Glucosa muestre la lectura. Detalle en la sección del ADR 0023 de esa fecha.
+
 ESCRITURA EN DEXCOM — AVISO DEL PROPIETARIO 2026-11-28
 Legacy escribe en el historial de la app Dexcom todos los bolos y la insulina
 basal (también hidratos, ejercicio y notas): el Companion envía broadcasts a

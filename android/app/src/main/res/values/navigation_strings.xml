@@ -37,7 +37,8 @@
     <string name="overview_detail">Accede a tus comidas, cálculo e historial.</string>
     <string name="glucose_current">Glucosa actual</string>
     <string name="glucose_absent">Sin lectura</string>
-    <string name="glucose_metadata">Origen previsto: Dexcom local · recepción pendiente\nHora y antigüedad: no disponibles</string>
+    <string name="glucose_metadata">Origen: Dexcom local\nHora y antigüedad: no disponibles</string>
+    <string name="glucose_current_source">Dexcom local · vigente hasta 10 min tras la medida</string>
     <string name="iob">IOB</string>
     <string name="cob">COB</string>
     <string name="last_bolus">Último bolo</string>

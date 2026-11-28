@@ -24,7 +24,7 @@ import java.util.UUID
 @RunWith(AndroidJUnit4::class)
 class TestCalculationDeviceTest {
     private val at = 1_791_793_800_000L
-    @Volatile private var reading = LatestReadingPresentation.Reading(190, at - 120_000, 120_000,
+    @Volatile private var reading = LatestReadingPresentation.Reading(190, at - 120_000, 120_000, at - 117_000,
         ApprovedPermissionSet("synthetic-policy", "c".repeat(64)), "ab12cd34", "SYNTHETIC_TREND")
 
     @Before fun isolate() {
@@ -128,7 +128,7 @@ class TestCalculationDeviceTest {
             scenario.onActivity {
                 assertEquals(it.getString(R.string.test_calc_total, "8"), (view(it, "test_calc:total") as TextView).text.toString())
             }
-            reading = reading.copy(valueMgDl = 191, receivedAtEpochMs = at - 60_000)
+            reading = reading.copy(valueMgDl = 191, measuredAtEpochMs = at - 60_000, ageMs = 60_000, receivedAtEpochMs = at - 57_000)
             scenario.onActivity { ViewModelProvider(it)[DexcomReadingModel::class.java].load() }
             await(scenario, "old result discarded") { view(it, "test_calc:invalidated") != null }
             scenario.onActivity { assertNull(view(it, "test_calc:total")) }

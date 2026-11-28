@@ -108,6 +108,17 @@ class MainActivity : ComponentActivity() {
     /** Folded Dexcom log block of Diagnóstico; not saved, folds on another destination and after recreation (F3). */
     private var dexcomLogOpen = false
     private lateinit var dexcomReading: DexcomReadingModel
+    private val dexcomRefreshHandler = android.os.Handler(android.os.Looper.getMainLooper())
+    /**
+     * While Inicio stays open the reading is re-read, so a new one appears and an old one stops being shown as
+     * current. Bolo is not re-rendered under the form: its calculation checks the freshness at its own instant.
+     */
+    private val dexcomRefresh = object : Runnable {
+        override fun run() {
+            if (navigation.current == Destination.HOME) dexcomReading.refresh()
+            dexcomRefreshHandler.postDelayed(this, DexcomReadingModel.REFRESH_INTERVAL_MS)
+        }
+    }
     private lateinit var testCalculation: TestCalculationModel
     private lateinit var doseHistory: DoseHistoryModel
     private lateinit var mfp: MfpLinkModel
@@ -228,6 +239,8 @@ class MainActivity : ComponentActivity() {
         super.onResume()
         refreshReview(navigation.current)
         if (showsDexcomReading(navigation.current)) dexcomReading.load()
+        dexcomRefreshHandler.removeCallbacks(dexcomRefresh)
+        dexcomRefreshHandler.postDelayed(dexcomRefresh, DexcomReadingModel.REFRESH_INTERVAL_MS)
         mfpSession?.resume()
         val position = pausedPosition
         pausedPosition = null
@@ -243,6 +256,7 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onPause() {
+        dexcomRefreshHandler.removeCallbacks(dexcomRefresh)
         rememberScroll()
         pausedPosition = navigation.current to findViewById<ScrollView>(R.id.screen_scroll).scrollY
         mfpSession?.pause()
@@ -340,7 +354,8 @@ class MainActivity : ComponentActivity() {
         testCalculation.invalidateIfChanged(TestCalculation.dependencies(profile.gate, meals.selection,
             dexcomReading.state, testCalculation.form, doseHistory.state))
         TestCalculationScreen(this, findViewById(R.id.screen_content), testCalculation,
-            dexcomReading.state is LatestReadingPresentation.Reading, TestCalculation.profile(profile.gate),
+            (dexcomReading.state as? LatestReadingPresentation.Reading)?.freshnessAt(clock()) ==
+                org.bolusai.dexcomg7.ReadingFreshness.CURRENT, TestCalculation.profile(profile.gate),
             meals.selection is org.bolusai.meals.MealSelection.Reviewed,
             now = clock,
             calculate = {
@@ -521,7 +536,7 @@ class MainActivity : ComponentActivity() {
         if (destination == Destination.DIAGNOSTICS && dexcomLog.state == null) dexcomLog.load()
         val state = overview.execute()
         val reading = if (showsDexcomReading(destination)) {
-            DexcomReadingBlock.view(dexcomReading.state, java.time.ZoneId.systemDefault())
+            DexcomReadingBlock.view(dexcomReading.state, java.time.ZoneId.systemDefault(), clock())
         } else null
         renderer.render(destination, state, settingsSection, blockingView(destination, state), dexcomLogView(destination),
             reading)

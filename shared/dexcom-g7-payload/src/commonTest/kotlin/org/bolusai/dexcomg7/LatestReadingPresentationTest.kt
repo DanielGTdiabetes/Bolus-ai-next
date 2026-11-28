@@ -22,8 +22,10 @@ class LatestReadingPresentationTest {
         if (outcome == StoredMessageOutcome.OBSERVED) duplicates else 0,
         if (outcome == StoredMessageOutcome.OBSERVED) conflicts else 0, 0, emptyList(), emptyList(), 0)
 
-    private fun reading(id: String, value: Int = 123, conflictOf: String? = null, messageId: String = "m") =
-        StoredReading(id, messageId, 0, tx, 50L, value, "SYNTHETIC_TREND", 7L, conflictOf)
+    /** Measured at second 997, received at 1 000 000 ms: three seconds later, as observed on the Pixel. */
+    private fun reading(id: String, value: Int = 123, conflictOf: String? = null, messageId: String = "m",
+                        measuredAtSeconds: Long = 997L) =
+        StoredReading(id, messageId, 0, tx, measuredAtSeconds, value, "SYNTHETIC_TREND", 7L, conflictOf)
 
     private fun present(
         latest: ObservationLatest,
@@ -31,26 +33,57 @@ class LatestReadingPresentationTest {
         now: Long = 1_120_000L,
     ) = PresentLatestDexcomReading.present(gate, null, ObservationLatestRead.Loaded(latest), now)
 
-    @Test fun showsTheSingleReadingOfTheLastMessageWithElapsedTimeSinceReception() {
+    @Test fun showsTheReadingOfTheLastMessageAgedFromItsMeasurementTime() {
         val shown = assertIs<LatestReadingPresentation.Reading>(present(ObservationLatest(message(), listOf(reading("r")))))
         assertEquals(123, shown.valueMgDl)
-        assertEquals(120_000L, shown.elapsedSinceReceptionMs)
+        assertEquals(997_000L, shown.measuredAtEpochMs)
+        assertEquals(123_000L, shown.ageMs)
         assertEquals(1_000_000L, shown.receivedAtEpochMs)
         assertEquals("ab12cd34", shown.transmitterShort)
         assertEquals("SYNTHETIC_TREND", shown.trendLiteral)
         assertEquals(ProducerUnitClaim.MG_DL_STATED_BY_PRODUCER, shown.unit)
-        assertEquals(false, shown.measurementTimeVerified)
-        assertEquals(LatestReadingPresentation.FRESHNESS_POLICY_NOT_APPROVED, shown.freshness)
+        assertEquals(true, shown.measurementTimeVerified)
+        assertEquals(ReadingFreshness.CURRENT, shown.freshness)
         assertEquals(ObservedReadingStatus.NOT_APPROVED_FOR_USE, shown.status)
         assertEquals(permissionSet, shown.provenance)
     }
 
-    @Test fun theProducerTimestampNeverAgesOrSelectsAReading() {
-        val early = StoredReading("r", "m", 0, tx, Long.MIN_VALUE, 123, "T", 0L, null)
-        val late = StoredReading("r", "m", 0, tx, Long.MAX_VALUE, 123, "T", 0L, null)
-        val a = assertIs<LatestReadingPresentation.Reading>(present(ObservationLatest(message(), listOf(early))))
-        val b = assertIs<LatestReadingPresentation.Reading>(present(ObservationLatest(message(), listOf(late))))
-        assertEquals(a.elapsedSinceReceptionMs, b.elapsedSinceReceptionMs)
+    @Test fun aReadingIsCurrentUpToTenMinutesAfterItsMeasurementAndExpiredAfterwards() {
+        assertEquals(600_000L, DexcomReadingValidity.MAX_AGE_MS)
+        val latest = ObservationLatest(message(), listOf(reading("r")))
+        fun at(now: Long) = assertIs<LatestReadingPresentation.Reading>(present(latest, now = now))
+        assertEquals(ReadingFreshness.CURRENT, at(1_000_000L).freshness)
+        assertEquals(ReadingFreshness.CURRENT, at(997_000L + 600_000L).freshness)
+        val expired = at(997_000L + 600_001L)
+        assertEquals(ReadingFreshness.EXPIRED, expired.freshness)
+        assertEquals(123, expired.valueMgDl)
+        // The same presentation, asked later, expires without a new read; before its measurement it is never current.
+        val fresh = at(1_000_000L)
+        assertEquals(ReadingFreshness.CURRENT, fresh.freshnessAt(997_000L + 600_000L))
+        assertEquals(ReadingFreshness.EXPIRED, fresh.freshnessAt(997_000L + 600_001L))
+        assertEquals(ReadingFreshness.EXPIRED, fresh.freshnessAt(996_999L))
+    }
+
+    @Test fun aLateDeliveryOfAnOldMeasurementIsNeverCurrent() {
+        // Measured 15 minutes before it was received: the reception is recent, the measurement is not.
+        val late = ObservationLatest(message(), listOf(reading("r", measuredAtSeconds = 100L)))
+        val shown = assertIs<LatestReadingPresentation.Reading>(present(late, now = 1_000_001L))
+        assertEquals(ReadingFreshness.EXPIRED, shown.freshness)
+        assertEquals(900_001L, shown.ageMs)
+    }
+
+    @Test fun timestampsAfterTheReceptionOrBeforeTheEpochShowNoNumber() {
+        fun cause(seconds: Long) = assertIs<LatestReadingPresentation.Withheld>(
+            present(ObservationLatest(message(), listOf(reading("r", measuredAtSeconds = seconds))))).cause
+        assertEquals(WithheldCause.FUTURE_TIMESTAMP, cause(1_001L))
+        assertEquals(WithheldCause.FUTURE_TIMESTAMP, cause(Long.MAX_VALUE))
+        assertEquals(WithheldCause.INVALID_TIMESTAMP, cause(-1L))
+        assertEquals(WithheldCause.INVALID_TIMESTAMP, cause(Long.MIN_VALUE))
+        // Whole seconds, never rounded in favour: received at 1 000 999 ms is still second 1000.
+        val sameSecond = ObservationLatest(message(receivedAt = 1_000_999L), listOf(reading("r", measuredAtSeconds = 1_000L)))
+        assertIs<LatestReadingPresentation.Reading>(present(sameSecond))
+        val nextSecond = ObservationLatest(message(receivedAt = 1_000_999L), listOf(reading("r", measuredAtSeconds = 1_001L)))
+        assertEquals(WithheldCause.FUTURE_TIMESTAMP, assertIs<LatestReadingPresentation.Withheld>(present(nextSecond)).cause)
     }
 
     @Test fun everyClosedGateShowsItsCauseAndNoEarlierValue() {
@@ -81,10 +114,21 @@ class LatestReadingPresentationTest {
             present(ObservationLatest(unreadable, emptyList())))
     }
 
-    @Test fun batchesAndRepeatedReadingsWaitForB1() {
+    @Test fun aBatchSelectsTheReadingMeasuredLastWhateverItsOrder() {
         val batch = message(new = 2)
-        assertEquals(LatestReadingPresentation.NoReading(NoReadingCause.SELECTION_PENDING_B1, "readings=2"),
-            present(ObservationLatest(batch, listOf(reading("r1"), reading("r2")))))
+        val older = reading("r1", value = 111, measuredAtSeconds = 697L)
+        val newer = reading("r2", value = 222, measuredAtSeconds = 997L)
+        listOf(listOf(older, newer), listOf(newer, older)).forEach {
+            val shown = assertIs<LatestReadingPresentation.Reading>(present(ObservationLatest(batch, it)))
+            assertEquals(222, shown.valueMgDl)
+            assertEquals(997_000L, shown.measuredAtEpochMs)
+        }
+        // Two stored readings with the same measurement time: neither is shown.
+        val tie = present(ObservationLatest(batch, listOf(reading("r1", value = 111), reading("r2", value = 222))))
+        assertEquals(WithheldCause.CONFLICT, assertIs<LatestReadingPresentation.Withheld>(tie).cause)
+    }
+
+    @Test fun aMessageThatOnlyRepeatsStoredReadingsShowsNoValue() {
         val repeated = message(new = 0, duplicates = 1)
         assertEquals(LatestReadingPresentation.NoReading(NoReadingCause.SELECTION_PENDING_B1, "readings=1"),
             present(ObservationLatest(repeated, emptyList())))

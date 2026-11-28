@@ -411,6 +411,47 @@ límite ya descrito de que las anclas no prueban igualdad binaria. Evidencia,
 opciones y riesgos en la
 [validación](../validation/dexcom-durable-block-2026-11-28.md).
 
+## Hora de medida y vigencia aprobadas por el propietario — 2026-11-28
+
+El propietario decidió el 2026-11-28, preguntado de forma explícita, dos
+puntos que este ADR dejaba pendientes. Sustituyen el estado «pendiente» de
+B1, C2, C4 y C5 en las tablas anteriores, que se conservan como historia.
+
+| Decisión | Aprobación y límite |
+|---|---|
+| B1 | **Aprobada (a):** `timestamp` es la hora de medida, en segundos enteros desde la época (UTC). La evidencia del Pixel del 2026-10-12 (diferencias de 3 a 5 s, y 5 min en una lectura reenviada) era compatible y el propietario la acepta |
+| C5 | **Aprobada (b), 10 minutos:** una lectura cuenta como «Glucosa actual» hasta 10 minutos después de su hora de medida, incluido el límite. Es el valor observado en Legacy al elegir la fuente. Más antigua, está caducada: puede mostrarse con ese estado y no se usa como glucosa actual |
+
+Consecuencias implementadas, sin más reglas nuevas:
+
+- **Selección (C2 a, acotada):** entre las lecturas que guardó el último
+  mensaje se elige la de mayor hora de medida. Dos lecturas guardadas con la
+  misma hora de medida no muestran número (conflicto). El almacén sigue
+  leyendo solo el último mensaje: si ese mensaje únicamente repite lecturas ya
+  guardadas no identifica ninguna y no hay valor
+  (`dexcom_presentation.selection_pending_b1`, que conserva su código).
+  Buscar la mayor hora de medida en todo el registro queda pendiente; la
+  limitación falla hacia «sin valor» o «caducada», nunca hacia «actual».
+- **C4 (a):** hora de medida posterior a la recepción de su mensaje, comparada
+  en segundos enteros sin redondear a favor: `future_timestamp`, sin número.
+  Hora negativa: `invalid_timestamp`, sin número.
+- **Antigüedad y vigencia:** se cuentan desde la hora de medida con el reloj
+  inyectado. Una lectura antigua recibida tarde no es actual. La vigencia se
+  evalúa en el instante de uso: la pantalla al componer, y el cálculo de
+  prueba en su propio instante, de modo que una lectura que era actual al
+  leerla no se usa después de caducar (`glucose.dexcom_presentation.expired`).
+- **Pantallas:** «Glucosa actual» de Inicio y Bolo muestra el valor solo
+  mientras es actual; si no, «Sin lectura» y la causa. Inicio vuelve a leer el
+  registro cada 30 s (constante técnica) mientras está abierto. Bolo no se
+  redibuja bajo el formulario.
+- **Cálculo de prueba:** la glucosa de Dexcom entra con su hora de medida
+  verificada y la versión de vigencia `owner-2026-11-28-10min` en su
+  referencia, que forma parte de la huella de entradas.
+
+No cambia: unidad mg/dL sin conversión (B3), filtro `1..400` (B4), sin flecha
+(B5), procedencia «emisor del conjunto aprobado», `ReadOverview` y el puerto
+local de glucosa sin valor, y ningún resultado utilizable para tratamiento.
+
 ## Fuentes y condiciones para revisar
 
 Fuentes primarias consultadas el 2026-10-11; no prueban todavía el comportamiento

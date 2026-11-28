@@ -92,7 +92,7 @@ class TestCalculationTest {
     private val form = TestCalculationForm(carbs = "60", fiber = "0", fat = "0", protein = "0", glucoseMgDl = "190",
         glucoseEnteredAtEpochMs = at - 60_000, iobUnits = "0")
 
-    private fun reading(value: Int = 190) = LatestReadingPresentation.Reading(value, at - 120_000, 120_000,
+    private fun reading(value: Int = 190) = LatestReadingPresentation.Reading(value, at - 120_000, 120_000, at - 117_000,
         ApprovedPermissionSet("adr0023-i2b-2026-10-12", "c".repeat(64)), "ab12cd34", "SYNTHETIC_TREND")
 
     @Test fun aConfirmedProfileWithEveryInputGivesATestTotalThatIsNeverUsable() {
@@ -256,11 +256,23 @@ class TestCalculationTest {
             TestCalculationText.limits(Input.Unavailable("profile.missing")))
     }
 
-    @Test fun dexcomGlucoseIsUsedOnlyWhenTheNumberIsShownAndKeepsItsLimitations() {
+    @Test fun dexcomGlucoseIsUsedOnlyWhileTheReadingIsCurrentAndCarriesItsMeasurementTime() {
         val used = TestCalculation.dexcomGlucose(reading()) as Input.Provided
         assertEquals("190", used.value.value.text)
         assertEquals(GlucoseOrigin.DEXCOM_PERMISSION_SET, used.value.origin)
-        assertFalse(used.value.measurementTimeVerified)
+        assertTrue(used.value.measurementTimeVerified)
+        assertEquals(at - 120_000, used.value.recordedAtEpochMs)
+        assertTrue(used.value.sourceReference.endsWith(":validity=owner-2026-11-28-10min"))
+        // Owner decision of 2026-11-28: current up to 10 minutes after the measurement, expired afterwards.
+        val expired = Input.Unavailable("glucose.dexcom_presentation.expired")
+        assertEquals(expired, TestCalculation.dexcomGlucose(reading().copy(ageMs = 600_001)))
+        assertTrue(TestCalculation.dexcomGlucose(reading().copy(ageMs = 600_000)) is Input.Provided)
+        // A reading that was current when the screen read it is not used by a calculation made after it expired.
+        assertTrue(TestCalculation.dexcomGlucose(reading(), at - 120_000 + 600_000) is Input.Provided)
+        assertEquals(expired, TestCalculation.dexcomGlucose(reading(), at - 120_000 + 600_001))
+        val dexcomForm = form.copy(glucoseChoice = GlucoseChoice.DEXCOM)
+        assertTrue(TestCalculation.request(at, state(), null, reading(), dexcomForm).glucose is Input.Provided)
+        assertEquals(expired, TestCalculation.request(at + 480_001, state(), null, reading(), dexcomForm).glucose)
         assertEquals(Input.Unavailable("glucose.dexcom_presentation.outside_producer_interval"), TestCalculation.dexcomGlucose(
             LatestReadingPresentation.Withheld(WithheldCause.OUTSIDE_PRODUCER_INTERVAL, at, reading().provenance)))
         assertEquals(Input.Unavailable("glucose.dexcom_presentation.receiver_disabled"), TestCalculation.dexcomGlucose(
@@ -339,7 +351,7 @@ class TestCalculationTest {
         model.store(TestCalculation.calculate(TestCalculation.request(at, state(), null, reading(), dexcomForm)), at,
             TestCalculation.dependencies(state(), null, reading(), dexcomForm))
         // Reloading the same reading only changes the elapsed time: the result stays.
-        model.invalidateIfChanged(TestCalculation.dependencies(state(), null, reading().copy(elapsedSinceReceptionMs = 1), dexcomForm))
+        model.invalidateIfChanged(TestCalculation.dependencies(state(), null, reading().copy(ageMs = 121_000), dexcomForm))
         assertTrue(model.result != null)
         // The meal selection is not used by this form.
         model.invalidateIfChanged(TestCalculation.dependencies(state(), MealSelection.Missing, reading(), dexcomForm))

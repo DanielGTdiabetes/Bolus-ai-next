@@ -2,7 +2,9 @@ package org.bolusai.next.application
 
 import org.bolusai.dexcomg7.ApprovedPermissionSet
 import org.bolusai.dexcomg7.AuthenticatedSender
+import org.bolusai.dexcomg7.DexcomReadingValidity
 import org.bolusai.dexcomg7.LatestReadingPresentation
+import org.bolusai.dexcomg7.ReadingFreshness
 import org.bolusai.engine.candidate.CandidateEngine
 import org.bolusai.engine.candidate.CandidateRequest
 import org.bolusai.engine.candidate.CandidateResult
@@ -120,7 +122,7 @@ internal object TestCalculation {
         },
         glucose = when (form.glucoseChoice) {
             GlucoseChoice.MANUAL -> manualGlucose(form)
-            GlucoseChoice.DEXCOM -> dexcomGlucose(dexcom)
+            GlucoseChoice.DEXCOM -> dexcomGlucose(dexcom, atEpochMs)
         },
         iob = when (form.iobChoice) {
             IobChoice.MANUAL -> quantity(form.iobUnits, "iob.manual", absent = "iob.unknown").map { IobValue(it) }
@@ -282,16 +284,24 @@ internal object TestCalculation {
         return Input.Provided(local.hour * 60 + local.minute)
     }
 
-    /** Only a reading the presentation shows with its number can be used; its limitations travel with it. */
-    fun dexcomGlucose(presentation: LatestReadingPresentation?): Input<GlucoseValue> = when (presentation) {
+    /**
+     * Only a reading that is current can be used (owner decision of 2026-11-28: up to 10 minutes after its measurement,
+     * the producer timestamp). [atEpochMs] is the calculation instant: a reading that was current when the screen read
+     * it and has expired since is not used. Without it, as in the dependencies of a stored result, the freshness is
+     * that of the read. An expired reading is unavailable, never a value.
+     */
+    fun dexcomGlucose(presentation: LatestReadingPresentation?, atEpochMs: Long? = null): Input<GlucoseValue> = when (presentation) {
         null -> Input.Unavailable("glucose.dexcom.read_pending")
-        is LatestReadingPresentation.Reading -> Input.Provided(GlucoseValue(Quantity(presentation.valueMgDl.toString()),
-            GlucoseUnitCode.MG_DL, GlucoseOrigin.DEXCOM_PERMISSION_SET, presentation.receivedAtEpochMs,
+        is LatestReadingPresentation.Reading -> if ((atEpochMs?.let { presentation.freshnessAt(it) } ?: presentation.freshness) !=
+            ReadingFreshness.CURRENT) {
+            Input.Unavailable("glucose.${ReadingFreshness.EXPIRED.code}")
+        } else Input.Provided(GlucoseValue(Quantity(presentation.valueMgDl.toString()),
+            GlucoseUnitCode.MG_DL, GlucoseOrigin.DEXCOM_PERMISSION_SET, presentation.measuredAtEpochMs,
             measurementTimeVerified = presentation.measurementTimeVerified,
             sourceReference = when (val provenance = presentation.provenance) {
                 is ApprovedPermissionSet -> "${provenance.code}:${provenance.policyVersion}:${provenance.holderSetSha256}"
                 is AuthenticatedSender -> "${provenance.code}:${provenance.packageName}@${provenance.versionCode}"
-            } + ":tx=${presentation.transmitterShort}"))
+            } + ":tx=${presentation.transmitterShort}:validity=${DexcomReadingValidity.POLICY_VERSION}"))
         is LatestReadingPresentation.Withheld -> Input.Unavailable("glucose.${presentation.cause.code}")
         is LatestReadingPresentation.NoReading -> Input.Unavailable("glucose.${presentation.cause.code}")
     }

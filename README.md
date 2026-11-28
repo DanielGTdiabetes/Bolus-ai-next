@@ -225,8 +225,11 @@ permiso, conjunto exacto con anclas I-2b, bloqueo durable, registro v2 con
 procedencia y última lectura en Inicio y Bolo, con antigüedad desde la recepción,
 hora de medida no verificada y vigencia sin política. I-3 demostró en el Pixel
 que hace falta `QUERY_ALL_PACKAGES`, ya declarado. La recepción real se probó
-sin Internet antes y después de reiniciar; B1 sigue sin aprobarse. Véase la
-[validación actual](docs/validation/pixel-dexcom-and-calculation-2026-10-12.md).
+sin Internet antes y después de reiniciar. Véase la
+[validación](docs/validation/pixel-dexcom-and-calculation-2026-10-12.md).
+Desde el 2026-11-28, por decisión del propietario, la hora de Dexcom es la hora
+de medida (B1) y una lectura es «Glucosa actual» hasta 10 minutos después de
+ella; Inicio y Bolo la muestran así y el cálculo de prueba no usa una caducada.
 
 El motor único `shared/bolus-engine` incluye un conjunto candidato trazado al
 núcleo backend de Legacy (`bcac891`), con paridad exacta en 12 vectores
