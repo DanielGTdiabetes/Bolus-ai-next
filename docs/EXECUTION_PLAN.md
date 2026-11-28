@@ -865,6 +865,15 @@ Ejecutada el 2026-11-28 con los 325 cálculos reales de Legacy: 318 comparables,
 ([validación](validation/shadow-replay-real-data-2026-11-28.md)). Falta la
 comparación de lo escrito en Dexcom y Nightscout.
 
+### Entrega de reducción por ejercicio — 2026-11-28
+
+[ADR 0031](adr/0031-exercise-reduction-candidate-rule.md): tabla de reducción
+por intensidad y minutos de Legacy `bcac891` en el motor único, con paridad
+exacta en 23 vectores nuevos. Motor `0.6.0-candidate`. Ejercicio como entrada
+explícita en Bolo; previsto con datos desconocidos bloquea. La sombra repite el
+ejercicio desde el desglose de Legacy: los 7 cálculos reales que faltaban
+coinciden, y con ellos los 325 guardados en Legacy.
+
 ### Secuencia de capacidades
 
 La secuencia inicial siguiente queda como referencia de dependencias, no como

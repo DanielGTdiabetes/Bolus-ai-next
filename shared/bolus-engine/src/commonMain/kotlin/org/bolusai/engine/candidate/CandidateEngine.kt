@@ -10,7 +10,7 @@ import kotlin.math.round
  * every result is a test result.
  */
 public object CandidateRuleSet {
-    public const val ID: String = "legacy-backend-core-candidate-v2"
+    public const val ID: String = "legacy-backend-core-candidate-v3"
     public const val LEGACY_REPOSITORY: String = "DanielGTdiabetes/bolus_ai"
     public const val LEGACY_SHA: String = "bcac891d85e6fb3e84398c118061e6aeae3f73f1"
     public const val LEGACY_SOURCE: String = "backend/app/services/bolus_engine.py::_calculate_core"
@@ -33,12 +33,31 @@ public object CandidateRuleSet {
     public const val LEGACY_WARSAW_ABOVE_KCAL: Double = 50.0
 
     /**
+     * Exercise reduction observed in Legacy `EXERCISE_REDUCTION_TABLE` and `calculate_exercise_reduction`: the
+     * fraction at 60 and at 120 minutes per intensity, linear from 0 to 60 and from 60 to 120, constant after 120,
+     * and never above [LEGACY_EXERCISE_MAX_REDUCTION]. Candidate, not approved.
+     */
+    public const val LEGACY_EXERCISE_MAX_REDUCTION: Double = 0.9
+
+    public fun legacyExerciseReductionAt60(intensity: ExerciseIntensity): Double = when (intensity) {
+        ExerciseIntensity.LOW -> 0.15
+        ExerciseIntensity.MODERATE -> 0.30
+        ExerciseIntensity.HIGH -> 0.45
+    }
+
+    public fun legacyExerciseReductionAt120(intensity: ExerciseIntensity): Double = when (intensity) {
+        ExerciseIntensity.LOW -> 0.30
+        ExerciseIntensity.MODERATE -> 0.55
+        ExerciseIntensity.HIGH -> 0.75
+    }
+
+    /**
      * Legacy features outside this candidate set. They are not applied and the result says so. `dual_bolus` is the
      * delivery split: the extended Warsaw component is computed and rounded apart, as Legacy does, and then added to
      * the total exactly as Legacy does with dual delivery disabled.
      */
     public val NOT_APPLIED: List<String> = listOf(
-        "autosens", "exercise_reduction", "techne_rounding",
+        "autosens", "techne_rounding",
         "dual_bolus", "max_iob_ceiling", "stacking_warning", "glucose_staleness",
     )
 }
@@ -50,6 +69,7 @@ public enum class CandidateStep(public val code: String, public val legacyRefere
     CORRECTION("correction", "corr_u = (bg_mgdl - target_mgdl) / isf"),
     CORRECTION_LIMIT("correction_limit", "if corr_u > max_correction_u: corr_u = max_correction_u"),
     IOB("iob", "upfront_net = max(0, meal_u + min(corr_u, 0) + max(max(corr_u, 0) - iob_u, 0))"),
+    EXERCISE("exercise", "final_upfront = upfront_net * (1 - min(reduction, 0.9)); final_later likewise"),
     ROUNDING("rounding", "final_total = _round_step(final_upfront) + _round_step(final_later)"),
     MAX_BOLUS("max_bolus", "if final_total > max_bolus_u: final_total = max_bolus_u"),
     HYPO_STOP("hypo_stop", "if bg_mgdl < 70: final_total = 0"),
@@ -318,10 +338,37 @@ public object CandidateEngine {
         }
         steps += StepResult(CandidateStep.IOB, upfront)
 
+        // 5) Exercise (ADR 0031). The same reduction applies to the upfront and to the extended part, before rounding.
+        var extendedAfterExercise = 0.0
+        val exercised: StepOutcome = after(upfront, CandidateStep.IOB) { value ->
+            val later = (extended as StepOutcome.Computed).units
+            val plan = when (val e = request.exercise) {
+                is Input.Unavailable -> return@after blocked(e.cause)
+                is Input.Provided -> e.value
+            }
+            when (plan) {
+                ExercisePlan.NotPlanned -> {
+                    extendedAfterExercise = later
+                    StepOutcome.Computed(value, listOf(Fact("exercise_planned", 0.0)))
+                }
+                is ExercisePlan.Planned -> {
+                    val reduction = min(exerciseReduction(plan.minutes, plan.intensity),
+                        CandidateRuleSet.LEGACY_EXERCISE_MAX_REDUCTION)
+                    // Legacy applies it only when minutes > 0; with 0 minutes the reduction is 0 and nothing changes.
+                    extendedAfterExercise = if (plan.minutes > 0) later * (1.0 - reduction) else later
+                    StepOutcome.Computed(if (plan.minutes > 0) value * (1.0 - reduction) else value, listOf(
+                        Fact("exercise_planned", 1.0), Fact("exercise_minutes", plan.minutes.toDouble()),
+                        Fact("exercise_reduction", reduction), Fact("before_exercise_u", value),
+                        Fact("extended_after_exercise_u", extendedAfterExercise)))
+                }
+            }
+        }
+        steps += StepResult(CandidateStep.EXERCISE, exercised)
+
         // 6) Rounding. Kotlin round() is half-even, like Python round() in Legacy. Upfront and extended parts are
         // rounded apart and then added, as Legacy does before any delivery split.
-        val rounded: StepOutcome = after(upfront, CandidateStep.IOB) { value ->
-            val later = (extended as StepOutcome.Computed).units
+        val rounded: StepOutcome = after(exercised, CandidateStep.EXERCISE) { value ->
+            val later = extendedAfterExercise
             val step = when (val s = roundStep) {
                 is Input.Unavailable -> return@after blocked(s.cause)
                 is Input.Provided -> s.value.value
@@ -374,6 +421,18 @@ public object CandidateEngine {
 
     private fun blocked(cause: String) = StepOutcome.Blocked(listOf(cause))
 
+    /** Legacy `calculate_exercise_reduction`, with its operation order. */
+    internal fun exerciseReduction(minutes: Int, intensity: ExerciseIntensity): Double {
+        if (minutes <= 0) return 0.0
+        val at60 = CandidateRuleSet.legacyExerciseReductionAt60(intensity)
+        val at120 = CandidateRuleSet.legacyExerciseReductionAt120(intensity)
+        return when {
+            minutes <= 60 -> at60 * (minutes / 60.0)
+            minutes <= 120 -> at60 + (at120 - at60) * ((minutes - 60) / 60.0)
+            else -> at120
+        }
+    }
+
     private inline fun after(previous: StepOutcome, step: CandidateStep, next: (Double) -> StepOutcome): StepOutcome =
         when (previous) {
             is StepOutcome.Blocked -> blocked("depends_on.${step.code}")
@@ -417,7 +476,7 @@ public object CandidateCodec {
         fun segments(key: String, list: List<SegmentValue>) = list.forEach { segment ->
             input("$key.${segment.startMinute}-${segment.endMinute}", segment.value) { it.text }
         }
-        line("codec", "bolus-ai-next/candidate-request/v3")
+        line("codec", "bolus-ai-next/candidate-request/v4")
         line("engine", EngineIdentity.VERSION)
         line("rule_set", CandidateRuleSet.ID)
         line("calculation_at_ms", request.calculationAtEpochMs.toString())
@@ -450,5 +509,11 @@ public object CandidateCodec {
         input("meal.fat", request.nutrition.fat) { it.text }
         input("meal.protein", request.nutrition.protein) { it.text }
         line("warsaw_strategy", request.warsawStrategy.code)
+        input("exercise", request.exercise) {
+            when (it) {
+                ExercisePlan.NotPlanned -> "none"
+                is ExercisePlan.Planned -> "${it.minutes}:${it.intensity.code}"
+            }
+        }
     }
 }

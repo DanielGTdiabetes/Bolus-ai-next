@@ -8,6 +8,8 @@ import org.bolusai.engine.candidate.CandidateRequest
 import org.bolusai.engine.candidate.CandidateResult
 import org.bolusai.engine.candidate.CarbsOrigin
 import org.bolusai.engine.candidate.CarbsValue
+import org.bolusai.engine.candidate.ExerciseIntensity
+import org.bolusai.engine.candidate.ExercisePlan
 import org.bolusai.engine.candidate.GlucoseOrigin
 import org.bolusai.engine.candidate.GlucoseUnitCode
 import org.bolusai.engine.candidate.GlucoseValue
@@ -81,6 +83,10 @@ internal data class TestCalculationForm(
     val protein: String = "",
     /** Legacy request default `strategy = "auto"`; shown and switchable in the form. */
     val warsawStrategy: WarsawStrategy = WarsawStrategy.AUTO,
+    /** Exercise (ADR 0031). Not planned is a declaration; planned needs whole minutes and an intensity. */
+    val exercisePlanned: Boolean = false,
+    val exerciseMinutes: String = "",
+    val exerciseIntensity: ExerciseIntensity? = null,
     val glucoseChoice: GlucoseChoice = GlucoseChoice.MANUAL,
     val glucoseMgDl: String = "",
     /** When the manual glucose text was last edited; part of the input, never replaced by the calculation time. */
@@ -126,7 +132,19 @@ internal object TestCalculation {
             CarbsChoice.MEAL_SELECTION -> mealNutrition(meal)
         },
         warsawStrategy = form.warsawStrategy,
+        exercise = exercise(form),
     )
+
+    /** A planned exercise with blank or invalid minutes, or without intensity, is unknown: it blocks, never "none". */
+    fun exercise(form: TestCalculationForm): Input<ExercisePlan> {
+        if (!form.exercisePlanned) return Input.Provided(ExercisePlan.NotPlanned)
+        val text = form.exerciseMinutes.trim()
+        if (text.isEmpty()) return Input.Unavailable("exercise.minutes.missing")
+        val minutes = text.takeIf { it.length <= 4 && it.all(Char::isDigit) }?.toInt()
+            ?: return Input.Unavailable("exercise.minutes.invalid")
+        val intensity = form.exerciseIntensity ?: return Input.Unavailable("exercise.intensity.missing")
+        return Input.Provided(ExercisePlan.Planned(minutes, intensity))
+    }
 
     /**
      * ADR 0028: the candidate IOB at [atEpochMs] from the insulin action of the profile version and the local dose

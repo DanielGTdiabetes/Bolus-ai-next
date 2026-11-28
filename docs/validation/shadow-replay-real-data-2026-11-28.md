@@ -49,6 +49,14 @@ Comparables: 318. Coincidencias: 318. Diferencias: 0.
 | `MATCH_WITHIN_TRACE_PRECISION`: `autosens.effective_ratio_rounded_to_three_decimals` | 6 |
 | `NOT_COMPARABLE`: `legacy.exercise_reduction_applied` | 7 |
 
+### Actualización tras implementar el ejercicio (ADR 0031)
+
+Los 7 cálculos con ejercicio se leyeron de nuevo, en solo lectura, con los
+minutos y la intensidad de su línea de desglose, y se repitieron con el motor
+`0.6.0-candidate`: 6 `MATCH` y 1 `MATCH_SETTINGS_UNVERIFIED`, ninguna
+diferencia. Total acumulado: **325 cálculos, 325 coincidencias**. Los otros 318
+se ejecutaron con el motor `0.5.0`; no se repitieron con el `0.6.0`.
+
 ## Lectura del resultado
 
 - 299 de los 325 cálculos usaron autosens. Se repiten con el ratio y la
