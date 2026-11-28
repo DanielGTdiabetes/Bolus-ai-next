@@ -11,6 +11,6 @@ package org.bolusai.engine
  */
 public object EngineIdentity {
     public const val ARTIFACT_NAME: String = "bolus-engine"
-    public const val VERSION: String = "0.4.0-candidate"
+    public const val VERSION: String = "0.5.0-candidate"
     public const val IMPLEMENTS_APPROVED_CLINICAL_RULES: Boolean = false
 }

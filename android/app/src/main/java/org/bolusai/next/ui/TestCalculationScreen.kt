@@ -18,6 +18,7 @@ import org.bolusai.engine.candidate.ProfileSnapshot
 import org.bolusai.engine.candidate.Quantity
 import org.bolusai.engine.candidate.StepOutcome
 import org.bolusai.engine.candidate.Warnings
+import org.bolusai.engine.candidate.WarsawStrategy
 import org.bolusai.engine.iob.IobOutcome
 import org.bolusai.engine.iob.IobResult
 import org.bolusai.next.application.IobChoice
@@ -98,6 +99,7 @@ internal class TestCalculationModel : ViewModel() {
 internal object TestCalculationText {
     private val steps = mapOf(
         CandidateStep.MEAL to R.string.test_calc_step_meal,
+        CandidateStep.EXTENDED to R.string.test_calc_step_extended,
         CandidateStep.CORRECTION to R.string.test_calc_step_correction,
         CandidateStep.CORRECTION_LIMIT to R.string.test_calc_step_correction_limit,
         CandidateStep.IOB to R.string.test_calc_step_iob,
@@ -138,11 +140,20 @@ internal object TestCalculationText {
                 is Input.Provided -> "${value.value.text.replace('.', ',')} U"
                 is Input.Unavailable -> "desconocido (${value.cause})"
             }
+            fun rule(name: String, value: Input<Quantity>, unit: String) = "$name: " + when (value) {
+                is Input.Provided -> "${value.value.text.replace('.', ',')} $unit" + if (value.value.value == 0.0 && unit == "×") " (regla desactivada)" else ""
+                is Input.Unavailable -> "desconocido (${value.cause})"
+            }
             listOf(
                 "Perfil v${snapshot.version}" + if (snapshot.dataConfirmed) " confirmado" else " sin confirmar (profile.unconfirmed)",
                 line("Paso de redondeo", snapshot.roundStep),
                 line("Bolo máximo", snapshot.maxBolus),
                 line("Corrección máxima", snapshot.maxCorrection),
+                rule("Fibra: factor de descuento", snapshot.nutritionRules.fiberFactor, "×"),
+                rule("Fibra: umbral", snapshot.nutritionRules.fiberThresholdG, "g"),
+                rule("Warsaw: factor simple", snapshot.nutritionRules.warsawFactorSimple, "×"),
+                rule("Warsaw: factor dual", snapshot.nutritionRules.warsawFactorDual, "×"),
+                rule("Warsaw: umbral", snapshot.nutritionRules.warsawTriggerKcal, "kcal"),
             ).joinToString("\n")
         }
     }
@@ -254,6 +265,17 @@ internal class TestCalculationScreen(
         }
         if (form.carbsChoice == CarbsChoice.MANUAL) {
             field(R.string.test_calc_carbs, "test_calc:carbs", form.carbs, result) { model.form.copy(carbs = it) }
+            field(R.string.test_calc_fiber, "test_calc:fiber", form.fiber, result) { model.form.copy(fiber = it) }
+            field(R.string.test_calc_fat, "test_calc:fat", form.fat, result) { model.form.copy(fat = it) }
+            field(R.string.test_calc_protein, "test_calc:protein", form.protein, result) { model.form.copy(protein = it) }
+        }
+        label(content, "Estrategia Warsaw", bold = true)
+        choice("Automática: factor dual a partir del umbral (como bolus_ai)", "test_calc:warsaw:auto",
+            form.warsawStrategy == WarsawStrategy.AUTO) {
+            model.update(model.form.copy(warsawStrategy = WarsawStrategy.AUTO)); changed()
+        }
+        choice("Normal: siempre factor simple", "test_calc:warsaw:normal", form.warsawStrategy == WarsawStrategy.NORMAL) {
+            model.update(model.form.copy(warsawStrategy = WarsawStrategy.NORMAL)); changed()
         }
 
         label(content, context.getString(R.string.test_calc_glucose_source), bold = true)

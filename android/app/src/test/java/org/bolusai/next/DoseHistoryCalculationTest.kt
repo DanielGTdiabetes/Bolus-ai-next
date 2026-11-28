@@ -79,8 +79,8 @@ class DoseHistoryCalculationTest {
     }
 
     /** 60 g and 190 mg/dL: meal 6 U, correction 2 U, 8 U without IOB. */
-    private val form = TestCalculationForm(carbs = "60", glucoseMgDl = "190", glucoseEnteredAtEpochMs = at - 60_000,
-        iobChoice = IobChoice.DOSE_HISTORY)
+    private val form = TestCalculationForm(carbs = "60", fiber = "0", fat = "0", protein = "0", glucoseMgDl = "190",
+        glucoseEnteredAtEpochMs = at - 60_000, iobChoice = IobChoice.DOSE_HISTORY)
 
     private fun calculate(profile: ProfileGateState = profile(), doses: LedgerRead? = log.read()) =
         TestCalculation.calculate(TestCalculation.request(at, profile, null, null, form, doses))

@@ -832,6 +832,26 @@ sincronización. Fase 6, puntos 4 y 5, y fase 7 en modo de prueba.
 recorrido manual en Bolo queda pendiente
 ([validación](validation/local-dose-ledger-2026-11-28.md)).
 
+### Entrega de fibra y Warsaw en el cálculo — 2026-11-28
+
+[ADR 0029](adr/0029-fiber-and-warsaw-candidate-rules.md): descuento de fibra y Warsaw (grasa y proteína)
+de Legacy `bcac891` en el motor único, con paridad exacta en 23 vectores
+nuevos. Reglas en el esquema de contenido 4 del perfil, sin defaults; un factor
+`0` desactiva la regla. Fibra, grasa y proteína son entradas explícitas: vacío
+bloquea, nunca vale cero. Bolo las toma del formulario o de la revisión de
+comida. Motor `0.5.0-candidate`. LC-008 cubierto salvo la entrega dual.
+
+### Decisión sobre MyFitnessPal — 2026-11-28
+
+El propietario descarta Health Connect para la fase 8: en su uso real llega
+con mucho retraso y no funciona bien. El enlace se hará como el de Hermes en
+Legacy, con la sesión (cookies) de MyFitnessPal, pero dentro del móvil y sin
+servidor: ni NAS, ni Render, ni el EVO-X2. Antes de implementarlo hay que
+auditar en solo lectura `scripts/hermes/mfp_sync_trigger.py`,
+`scripts/hermes/sync_to_bolus.py` y `docs/HERMES_MYFITNESSPAL_BOLUS_SYNC.md`.
+Las cookies nunca entran en logs, fixtures ni en el repositorio. El host BMAX
+ya no existe; lo sustituye el EVO-X2, y cualquier mención al BMAX es histórica.
+
 ### Secuencia de capacidades
 
 La secuencia inicial siguiente queda como referencia de dependencias, no como
@@ -870,9 +890,9 @@ unitarias, incluidos los límites del perfil de PR #58.
    lo justifiquen.
 2. Sin depender del teléfono: el IOB candidato (ADR 0026), DIA, curva y pico en
    el perfil (ADR 0027) y el historial local de dosis con IOB calculado en Bolo
-   (ADR 0028) están hechos. Sigue fibra/Warsaw (LC-008), y después el techo de
-   IOB (`max_iob_u`), el intervalo mínimo entre bolos y el bolo extendido o
-   dual, que dependen del IOB calculado.
+   (ADR 0028) y fibra/Warsaw (ADR 0029) están hechos. Siguen el techo de IOB
+   (`max_iob_u`), el intervalo mínimo entre bolos y la entrega dual o
+   extendida, y después el enlace MyFitnessPal por sesión en el móvil.
 3. Mantener la matriz de `docs/audit/legacy-functional-inventory.md` en cada
    entrega, incluidos MyFitnessPal y los casos de uso del bot.
 

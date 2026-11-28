@@ -72,6 +72,32 @@ ambos con `run-as org.bolusai.next` (docs/validation/local-dose-ledger-2026-11-2
 Pendiente: recorrido manual del registro en Bolo y prueba instrumentada de sus
 diálogos.
 
+ENTREGA 2026-11-28 — FIBRA Y WARSAW EN EL CÁLCULO (ADR 0029)
+Reglas de Legacy `bcac891` en el motor único (`0.5.0-candidate`, conjunto v2,
+códec de petición v3), paridad exacta en 23 vectores nuevos
+(`capture_nutrition_vectors.py`). Perfil con esquema de contenido 4: cinco
+campos (`fiber_factor`, `fiber_threshold`, `warsaw_factor_simple`,
+`warsaw_factor_dual`, `warsaw_trigger`), sin defaults; factor `0` = regla
+desactivada. Sin migración de base: usan `profile_limits`. Fibra, grasa y
+proteína son entradas explícitas; vacío bloquea la comida. La comida manual de
+Bolo pide los tres. La parte extendida de Warsaw se redondea aparte y se suma
+al total; la entrega dual sigue sin aplicarse. `main` de Legacy (`e48c4ab`) no
+cambia el cálculo respecto de `bcac891`.
+
+MYFITNESSPAL — DECISIÓN DEL PROPIETARIO 2026-11-28
+Health Connect descartado (retraso y fallos). Hacer el enlace por sesión de
+MyFitnessPal (cookies), como Hermes en Legacy, pero en el propio móvil y sin
+servidor. Auditar antes los scripts de Hermes en Legacy, solo lectura. El BMAX
+ya no existe: lo sustituye el EVO-X2.
+
+ESCRITURA EN DEXCOM — AVISO DEL PROPIETARIO 2026-11-28
+Legacy escribe en el historial de la app Dexcom todos los bolos y la insulina
+basal (también hidratos, ejercicio y notas): el Companion envía broadcasts a
+`com.dexcom.g7` (`DexcomEventWriter.kt`, inventario LF-031). Next no emite
+nada hoy, así que no hay doble escritura. Cuando Next asuma esta función debe
+haber relevo explícito: nunca Legacy y Next emitiendo a la vez, o Dexcom
+tendrá entradas duplicadas. Lo mismo vale para Nightscout.
+
 SIGUIENTE
 - Teléfono: cálculo con perfil real confirmado (P6) y actualización sobre un
   perfil v2 real existente (P7 de la validación de límites). B1 tiene evidencia
@@ -80,9 +106,14 @@ SIGUIENTE
   pruebas ya ejecutadas sin cambios que lo justifiquen. En esta sesión Codex
   hizo las pruebas del Pixel mientras Claude avanzaba desde la nube, sin
   modificar la implementación de perfil o motor de Claude.
-- Sin teléfono: fibra/Warsaw (LC-008); después techo de IOB, intervalo mínimo
-  entre bolos y bolo extendido o dual. Comparar Legacy `bcac891..e48c4ab` antes
-  de capturar vectores nuevos.
+- Primero, por petición del propietario del 2026-11-28: modo sombra (fase 9).
+  Las dos apps en paralelo; Next lee en solo lectura los cálculos de Legacy,
+  los repite con su motor y muestra la comparación por componente y lo que
+  cada una escribió o habría escrito en Dexcom y Nightscout. La escritura de
+  Next nace con interruptor apagado por defecto. Auditar antes qué guarda
+  Legacy de cada cálculo y por dónde leerlo sin efectos.
+- Después: techo de IOB, intervalo mínimo entre bolos y entrega dual o
+  extendida; luego MyFitnessPal por sesión en el móvil.
 No repetir las decisiones ya aprobadas.
 
 CONTINUACIÓN ACTIVA — 2026-10-12

@@ -59,6 +59,16 @@
     <string name="profile_action_peak">Pico</string>
     <string name="profile_action_not_in_schema">desconocido (versión sin acción de la insulina)</string>
     <string name="profile_action_preview_unknown">Se guardará: desconocido (versión sin acción de la insulina)</string>
+    <string name="profile_nutrition_title">Fibra y grasa/proteína (Warsaw)</string>
+    <string name="profile_nutrition_explanation">Reglas observadas en bolus_ai, de prueba y con validación pendiente. Sin valores por defecto: vacío = sin configurar y bloquea la comida que necesite la regla. Un factor 0 desactiva la regla. Fibra: se descuenta fibra × factor de los hidratos cuando la fibra supera el umbral. Warsaw: grasa y proteína se convierten en hidratos equivalentes con el factor simple, o con el factor dual a partir del umbral de kcal.</string>
+    <string name="profile_nutrition_not_in_schema_notice">La versión de partida no tiene reglas de fibra ni Warsaw: siguen desconocidas hasta que introduzcas algún valor. Nada se rellena automáticamente.</string>
+    <string name="profile_nutrition_fiber_factor">Fibra: factor de descuento</string>
+    <string name="profile_nutrition_fiber_threshold">Fibra: umbral</string>
+    <string name="profile_nutrition_warsaw_simple">Warsaw: factor simple</string>
+    <string name="profile_nutrition_warsaw_dual">Warsaw: factor dual</string>
+    <string name="profile_nutrition_warsaw_trigger">Warsaw: umbral de grasa y proteína</string>
+    <string name="profile_nutrition_not_in_schema">desconocido (versión sin reglas de fibra y Warsaw)</string>
+    <string name="profile_nutrition_preview_unknown">Se guardará: desconocido (versión sin reglas de fibra y Warsaw)</string>
     <string name="profile_curve_walsh">Walsh</string>
     <string name="profile_curve_bilinear">Bilineal</string>
     <string name="profile_curve_fiasp">Fiasp (tabla)</string>

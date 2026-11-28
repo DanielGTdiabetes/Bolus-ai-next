@@ -13,6 +13,9 @@ import org.bolusai.engine.candidate.GlucoseUnitCode
 import org.bolusai.engine.candidate.GlucoseValue
 import org.bolusai.engine.candidate.Input
 import org.bolusai.engine.candidate.IobValue
+import org.bolusai.engine.candidate.MealNutrition
+import org.bolusai.engine.candidate.NutritionRules
+import org.bolusai.engine.candidate.WarsawStrategy
 import org.bolusai.engine.candidate.ProfileSnapshot
 import org.bolusai.engine.candidate.Quantity
 import org.bolusai.engine.candidate.SegmentValue
@@ -53,6 +56,8 @@ internal data class TestCalculationDependencies(
     val meal: Input<CarbsValue>?,
     /** Null when the form does not take glucose from Dexcom. */
     val dexcom: Input<GlucoseValue>?,
+    /** Null when the form does not take fibre, fat and protein from the meal selection. */
+    val mealNutrition: MealNutrition? = null,
     /** Null when the form takes the IOB typed by hand. Otherwise the ledger as read: a new dose discards the result. */
     val doses: LedgerRead? = null,
 )
@@ -70,6 +75,12 @@ internal enum class CarbsChoice { MANUAL, MEAL_SELECTION }
 internal data class TestCalculationForm(
     val carbsChoice: CarbsChoice = CarbsChoice.MANUAL,
     val carbs: String = "",
+    /** Fibre, fat and protein typed with manual carbohydrates. Blank means unknown, never zero (ADR 0029). */
+    val fiber: String = "",
+    val fat: String = "",
+    val protein: String = "",
+    /** Legacy request default `strategy = "auto"`; shown and switchable in the form. */
+    val warsawStrategy: WarsawStrategy = WarsawStrategy.AUTO,
     val glucoseChoice: GlucoseChoice = GlucoseChoice.MANUAL,
     val glucoseMgDl: String = "",
     /** When the manual glucose text was last edited; part of the input, never replaced by the calculation time. */
@@ -109,6 +120,12 @@ internal object TestCalculation {
             IobChoice.MANUAL -> quantity(form.iobUnits, "iob.manual", absent = "iob.unknown").map { IobValue(it) }
             IobChoice.DOSE_HISTORY -> iob(atEpochMs, profile, doses).asCandidateInput()
         },
+        nutrition = when (form.carbsChoice) {
+            CarbsChoice.MANUAL -> MealNutrition(quantity(form.fiber, "meal.fiber"), quantity(form.fat, "meal.fat"),
+                quantity(form.protein, "meal.protein"))
+            CarbsChoice.MEAL_SELECTION -> mealNutrition(meal)
+        },
+        warsawStrategy = form.warsawStrategy,
     )
 
     /**
@@ -179,6 +196,7 @@ internal object TestCalculation {
         profile(profile),
         if (form.carbsChoice == CarbsChoice.MEAL_SELECTION) mealCarbs(meal) else null,
         if (form.glucoseChoice == GlucoseChoice.DEXCOM) dexcomGlucose(dexcom) else null,
+        if (form.carbsChoice == CarbsChoice.MEAL_SELECTION) mealNutrition(meal) else null,
         if (form.iobChoice == IobChoice.DOSE_HISTORY) doses ?: LedgerRead.Failed("iob.history.read_pending") else null,
     )
 
@@ -220,6 +238,13 @@ internal object TestCalculation {
                 roundStep = limit(content, ProfileLimit.ROUND_STEP),
                 maxBolus = limit(content, ProfileLimit.MAX_BOLUS),
                 maxCorrection = limit(content, ProfileLimit.MAX_CORRECTION),
+                nutritionRules = NutritionRules(
+                    fiberFactor = limit(content, ProfileLimit.FIBER_FACTOR),
+                    fiberThresholdG = limit(content, ProfileLimit.FIBER_THRESHOLD),
+                    warsawFactorSimple = limit(content, ProfileLimit.WARSAW_FACTOR_SIMPLE),
+                    warsawFactorDual = limit(content, ProfileLimit.WARSAW_FACTOR_DUAL),
+                    warsawTriggerKcal = limit(content, ProfileLimit.WARSAW_TRIGGER),
+                ),
             ))
         }
     }
@@ -266,6 +291,27 @@ internal object TestCalculation {
         null -> Input.Unavailable("meal.selection.read_pending")
         MealSelection.Missing -> Input.Unavailable("meal.selection.missing")
         is MealSelection.Failed -> Input.Unavailable("meal.selection.unreadable")
+    }
+
+    /**
+     * Fibre, fat and protein of the pinned meal revision, under the same conditions as its carbohydrates. A field the
+     * revision does not have stays unknown: it is never read as zero.
+     */
+    fun mealNutrition(selection: MealSelection?): MealNutrition {
+        fun field(name: String, read: (org.bolusai.meals.MealContent) -> DraftField): Input<Quantity> = when (selection) {
+            is MealSelection.Reviewed -> when {
+                selection.obsolete -> Input.Unavailable("meal.selection.obsolete")
+                selection.snapshot.content.basis != NutritionBasis.TOTAL_GRAMS -> Input.Unavailable("meal.basis.not_total_grams")
+                else -> when (val value = read(selection.snapshot.content)) {
+                    DraftField.Missing -> Input.Unavailable("meal.$name.missing")
+                    is DraftField.Entered -> quantity(value.text, "meal.$name")
+                }
+            }
+            null -> Input.Unavailable("meal.selection.read_pending")
+            MealSelection.Missing -> Input.Unavailable("meal.selection.missing")
+            is MealSelection.Failed -> Input.Unavailable("meal.selection.unreadable")
+        }
+        return MealNutrition(field("fiber") { it.fiber }, field("fat") { it.fat }, field("protein") { it.protein })
     }
 
     /** A schema 1 version has no limits: unknown, never filled in from another version or a default. */

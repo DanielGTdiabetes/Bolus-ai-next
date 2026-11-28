@@ -23,6 +23,7 @@ internal fun profile(
     roundStep: String? = "0.1",
     maxBolus: String? = "15",
     maxCorrection: String? = "5",
+    nutritionRules: NutritionRules = NutritionRules.NOT_IN_SCHEMA,
 ) = ProfileSnapshot(
     version = 3,
     fingerprintSha256 = FINGERPRINT,
@@ -36,7 +37,11 @@ internal fun profile(
     maxBolus = if (maxBolus == null) Input.Unavailable("profile.max_bolus.not_configured") else Input.Provided(q(maxBolus)),
     maxCorrection = if (maxCorrection == null) Input.Unavailable("profile.max_correction.not_configured") else
         Input.Provided(q(maxCorrection)),
+    nutritionRules = nutritionRules,
 )
+
+/** A meal declared without fibre, fat or protein, as the Legacy vectors of ADR 0024 were captured. */
+internal val NO_NUTRIENTS = MealNutrition(Input.Provided(q("0")), Input.Provided(q("0")), Input.Provided(q("0")))
 
 internal fun request(
     roundStep: String? = "0.1",
@@ -49,6 +54,8 @@ internal fun request(
     glucose: Input<GlucoseValue> = Input.Provided(GlucoseValue(q("190"), GlucoseUnitCode.MG_DL,
         GlucoseOrigin.MANUAL_ENTRY, 1_000L, measurementTimeVerified = false, sourceReference = "manual")),
     iob: String? = "0",
+    nutrition: MealNutrition = NO_NUTRIENTS,
+    strategy: WarsawStrategy = WarsawStrategy.AUTO,
 ) = CandidateRequest(
     calculationAtEpochMs = 2_000L,
     localMinuteOfDay = minute,
@@ -57,6 +64,8 @@ internal fun request(
         Input.Provided(CarbsValue(q(carbs), CarbsOrigin.MANUAL_ENTRY)),
     glucose = glucose,
     iob = if (iob == null) Input.Unavailable("iob.unknown") else Input.Provided(IobValue(q(iob))),
+    nutrition = nutrition,
+    warsawStrategy = strategy,
 )
 
 private fun units(outcome: StepOutcome): Double = (outcome as StepOutcome.Computed).units
